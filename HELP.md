@@ -25,3 +25,8 @@ parent.
 To prevent this, the project POM contains empty overrides for these elements.
 If you manually switch to a different parent and actually want the inheritance, you need to remove those overrides.
 
+### 开发
+1. BPMN， 表单，工作流
+```
+docker run -d --name camunda -p 8080:8080 camunda/camunda-bpm-platform:7.20.0
+```

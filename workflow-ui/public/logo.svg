@@ -1,0 +1,31 @@
+<svg width="128" height="128" viewBox="0 0 128 128" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <!-- 背景 -->
+    <rect width="128" height="128" rx="24" fill="url(#gradient-bg)"/>
+
+    <!-- 主图形 - 三个节点和连接线 -->
+    <g transform="translate(12, 12) scale(0.8125)">
+        <!-- 中心节点 (深蓝色) -->
+        <circle cx="64" cy="64" r="20" fill="#0056b3"/>
+        <circle cx="64" cy="64" r="10" fill="white"/>
+
+        <!-- 左上节点 (浅蓝色) -->
+        <circle cx="28" cy="28" r="16" fill="#007bff"/>
+        <circle cx="28" cy="28" r="8" fill="white"/>
+
+        <!-- 右下节点 (浅蓝色) -->
+        <circle cx="100" cy="100" r="16" fill="#007bff"/>
+        <circle cx="100" cy="100" r="8" fill="white"/>
+
+        <!-- 连接线 -->
+        <path d="M40 40 L52 52" stroke="#B0C4DE" stroke-width="6" stroke-linecap="round"/>
+        <path d="M76 76 L88 88" stroke="#B0C4DE" stroke-width="6" stroke-linecap="round"/>
+    </g>
+
+    <!-- 定义渐变 -->
+    <defs>
+        <linearGradient id="gradient-bg" x1="0" y1="0" x2="128" y2="128" gradientUnits="userSpaceOnUse">
+            <stop stop-color="#E6F7FF"/>
+            <stop offset="1" stop-color="#BAE7FF"/>
+        </linearGradient>
+    </defs>
+</svg>
