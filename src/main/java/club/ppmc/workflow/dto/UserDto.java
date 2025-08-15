@@ -10,4 +10,5 @@ import lombok.Data;
 public class UserDto {
     private String id;
     private String name;
+    private String role; // 角色字段
 }

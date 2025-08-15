@@ -11,8 +11,10 @@ import club.ppmc.workflow.service.FormService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
+import java.security.Principal;
 import java.util.List;
 
 /**
@@ -22,7 +24,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/forms")
 @RequiredArgsConstructor
-@CrossOrigin(origins = "*") // 允许所有来源的跨域请求，方便前后端分离开发
+@CrossOrigin(origins = "*")
 public class FormController {
 
     private final FormService formService;
@@ -30,10 +32,10 @@ public class FormController {
 
     /**
      * API: 创建一个新的表单定义
-     * METHOD: POST
-     * PATH: /api/forms
+     * 权限: 仅限管理员
      */
     @PostMapping
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<FormDefinitionResponse> createFormDefinition(@RequestBody CreateFormDefinitionRequest request) {
         FormDefinitionResponse response = formService.createFormDefinition(request);
         return new ResponseEntity<>(response, HttpStatus.CREATED);
@@ -41,8 +43,7 @@ public class FormController {
 
     /**
      * API: 获取所有表单定义的列表
-     * METHOD: GET
-     * PATH: /api/forms
+     * 权限: 已认证用户
      */
     @GetMapping
     public ResponseEntity<List<FormDefinitionResponse>> getAllFormDefinitions() {
@@ -52,8 +53,7 @@ public class FormController {
 
     /**
      * API: 根据 ID 获取单个表单定义
-     * METHOD: GET
-     * PATH: /api/forms/{id}
+     * 权限: 已认证用户
      */
     @GetMapping("/{id}")
     public ResponseEntity<FormDefinitionResponse> getFormDefinitionById(@PathVariable Long id) {
@@ -63,27 +63,23 @@ public class FormController {
 
     /**
      * API: 为指定表单提交一份数据
-     * METHOD: POST
-     * PATH: /api/forms/{formId}/submissions
-     * @param submitterId 提交人ID，为了简化从请求头获取
+     * @param principal Spring Security 自动注入的当前用户信息
+     * 权限: 已认证用户
      */
     @PostMapping("/{formId}/submissions")
     public ResponseEntity<FormSubmissionResponse> createFormSubmission(
             @PathVariable Long formId,
             @RequestBody CreateFormSubmissionRequest request,
-            @RequestHeader("X-User-ID") String submitterId) {
-
-        if (submitterId == null || submitterId.isEmpty()) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
-        }
+            Principal principal) {
+        // 从 Principal 安全地获取当前登录用户的ID
+        String submitterId = principal.getName();
         FormSubmissionResponse response = formService.createFormSubmission(formId, request, submitterId);
         return new ResponseEntity<>(response, HttpStatus.CREATED);
     }
 
     /**
      * API: 获取指定表单的所有提交数据
-     * METHOD: GET
-     * PATH: /api/forms/{formId}/submissions
+     * 权限: 已认证用户
      */
     @GetMapping("/{formId}/submissions")
     public ResponseEntity<List<FormSubmissionResponse>> getSubmissionsByFormId(@PathVariable Long formId) {
@@ -93,8 +89,7 @@ public class FormController {
 
     /**
      * API: 根据提交ID获取单个提交数据详情
-     * METHOD: GET
-     * PATH: /api/forms/submissions/{submissionId}
+     * 权限: 已认证用户
      */
     @GetMapping("/submissions/{submissionId}")
     public ResponseEntity<FormSubmissionResponse> getSubmissionById(@PathVariable Long submissionId) {

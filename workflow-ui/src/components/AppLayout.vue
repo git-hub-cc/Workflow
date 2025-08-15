@@ -8,57 +8,62 @@
         </div>
         <div class="user-actions">
           <a-space>
-            <span>当前用户:</span>
-            <a-select
-                :value="userStore.currentUserId"
-                style="width: 200px"
-                placeholder="请选择用户"
-                @change="handleUserChange"
-                :options="userOptions"
-            ></a-select>
-            <a-button type="primary" @click="$router.push({ name: 'task-list' })">
+            <a-button type="primary" ghost @click="$router.push({ name: 'task-list' })">
               我的待办
             </a-button>
+            <a-dropdown v-if="userStore.currentUser">
+              <a class="ant-dropdown-link" @click.prevent>
+                <a-avatar style="background-color: #1890ff; margin-right: 8px;">
+                  {{ userStore.currentUser.name.charAt(0) }}
+                </a-avatar>
+                {{ userStore.currentUser.name }}
+                <DownOutlined />
+              </a>
+              <template #overlay>
+                <a-menu>
+                  <a-menu-item v-if="userStore.isAdmin" key="admin-users" @click="$router.push({ name: 'admin-users' })">
+                    用户管理
+                  </a-menu-item>
+                  <a-menu-item v-if="userStore.isAdmin" key="admin-instances" @click="$router.push({ name: 'admin-instances' })">
+                    实例管理
+                  </a-menu-item>
+                  <a-menu-divider v-if="userStore.isAdmin" />
+                  <a-menu-item key="logout" @click="userStore.logout">
+                    退出登录
+                  </a-menu-item>
+                </a-menu>
+              </template>
+            </a-dropdown>
           </a-space>
         </div>
       </div>
     </a-layout-header>
-    <a-layout-content :style="{ padding: '0 24px' }">
-      <router-view v-slot="{ Component }">
-        <transition name="fade" mode="out-in">
-          <component :is="Component" />
-        </transition>
-      </router-view>
+    <a-layout-content :style="{ padding: '24px' }">
+      <div style="background: #fff; padding: 24px; min-height: 280px; border-radius: 4px;">
+        <router-view v-slot="{ Component }">
+          <transition name="fade" mode="out-in">
+            <component :is="Component" />
+          </transition>
+        </router-view>
+      </div>
     </a-layout-content>
   </a-layout>
 </template>
 
 <script setup>
-import { onMounted, computed } from 'vue';
+import { onMounted } from 'vue';
 import { useUserStore } from '@/stores/user';
-import { useRouter } from 'vue-router';
+import { DownOutlined } from '@ant-design/icons-vue';
 
 const userStore = useUserStore();
-const router = useRouter();
 
 onMounted(() => {
-  userStore.fetchAllUsers();
+  // Fetch users for dropdowns if needed, only if logged in
+  if (userStore.isAuthenticated) {
+    userStore.fetchAllUsers();
+  }
 });
 
-const userOptions = computed(() =>
-    userStore.allUsers.map(user => ({
-      value: user.id,
-      label: user.name,
-    }))
-);
-
-const handleUserChange = (userId) => {
-  userStore.setCurrentUserId(userId);
-  // 用户切换后，如果当前在任务列表或详情页，刷新页面以获取新用户的任务
-  if (router.currentRoute.value.name === 'task-list' || router.currentRoute.value.name === 'task-detail') {
-    router.go(0); // 刷新当前页面
-  }
-};
 </script>
 
 <style scoped>

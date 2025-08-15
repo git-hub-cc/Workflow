@@ -1,46 +1,90 @@
-import { ref, computed } from 'vue'
-import { defineStore } from 'pinia'
-import { getUsers } from '@/api'
-import { message } from 'ant-design-vue'
+import { ref, computed } from 'vue';
+import { defineStore } from 'pinia';
+import { login, getAllUsers } from '@/api';
+import { message } from 'ant-design-vue';
+import router from '@/router';
 
-// 定义一个名为 'user' 的 store
 export const useUserStore = defineStore('user', () => {
-    // state: 存储所有用户列表和当前选中的用户ID
-    const allUsers = ref([])
-    const currentUserId = ref(localStorage.getItem('currentUserId') || null)
+    // --- State ---
+    const token = ref(localStorage.getItem('token') || null);
+    const currentUser = ref(JSON.parse(localStorage.getItem('user')) || null);
+    const allUsers = ref([]); // For dropdowns
+    const loading = ref(false);
 
-    // getters: 计算属性，获取当前用户的详细信息
-    const currentUser = computed(() => {
-        return allUsers.value.find(u => u.id === currentUserId.value)
-    })
+    // --- Getters ---
+    const isAuthenticated = computed(() => !!token.value && !!currentUser.value);
+    const isAdmin = computed(() => currentUser.value?.role === 'ADMIN');
 
-    // actions: 方法，用于修改 state
-    async function fetchAllUsers() {
+    // --- Actions ---
+    async function handleLogin(credentials) {
+        loading.value = true;
         try {
-            const users = await getUsers()
-            allUsers.value = users
-            // 如果没有选中的用户ID，或者选中的ID无效，则默认选中第一个
-            if (!currentUserId.value || !allUsers.value.some(u => u.id === currentUserId.value)) {
-                if (users.length > 0) {
-                    setCurrentUserId(users[0].id)
-                }
-            }
+            const response = await login(credentials);
+            token.value = response.token;
+            currentUser.value = response.user;
+
+            localStorage.setItem('token', token.value);
+            localStorage.setItem('user', JSON.stringify(currentUser.value));
+
+            // After successful login, fetch all users for the dropdown
+            await fetchAllUsers();
+
+            await router.push('/');
+            message.success(`欢迎回来, ${currentUser.value.name}`);
         } catch (error) {
-            message.error('获取用户列表失败!')
-            console.error(error)
+            console.error("Login failed:", error);
+            // Error is already handled by the global interceptor
+        } finally {
+            loading.value = false;
         }
     }
 
-    function setCurrentUserId(userId) {
-        currentUserId.value = userId
-        localStorage.setItem('currentUserId', userId)
+    function logout() {
+        token.value = null;
+        currentUser.value = null;
+        allUsers.value = [];
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        router.push('/login');
     }
 
-    return {
-        allUsers,
-        currentUserId,
-        currentUser,
-        fetchAllUsers,
-        setCurrentUserId
+    async function fetchAllUsers() {
+        if (!isAuthenticated.value) return;
+        try {
+            allUsers.value = await getAllUsers();
+        } catch (error) {
+            message.error('获取用户列表失败!');
+            console.error(error);
+        }
     }
-})
+
+    // --- Admin-related actions for UserManagement.vue ---
+    function addUser(user) {
+        allUsers.value.push(user);
+    }
+    function updateUser(updatedUser) {
+        const index = allUsers.value.findIndex(u => u.id === updatedUser.id);
+        if (index !== -1) {
+            allUsers.value[index] = updatedUser;
+        }
+    }
+    function removeUser(userId) {
+        allUsers.value = allUsers.value.filter(u => u.id !== userId);
+    }
+
+
+    return {
+        token,
+        currentUser,
+        allUsers,
+        loading,
+        isAuthenticated,
+        isAdmin,
+        login: handleLogin,
+        logout,
+        fetchAllUsers,
+        addUser,
+        updateUser,
+        removeUser,
+    };
+});

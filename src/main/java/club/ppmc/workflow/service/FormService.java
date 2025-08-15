@@ -10,6 +10,7 @@ import club.ppmc.workflow.dto.FormSubmissionResponse;
 import club.ppmc.workflow.exception.ResourceNotFoundException;
 import club.ppmc.workflow.repository.FormDefinitionRepository;
 import club.ppmc.workflow.repository.FormSubmissionRepository;
+import club.ppmc.workflow.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -29,6 +30,7 @@ public class FormService {
     private final FormDefinitionRepository formDefinitionRepository;
     private final FormSubmissionRepository formSubmissionRepository;
     private final WorkflowService workflowService;
+    private final UserRepository userRepository;
 
     /**
      * 创建一个新的表单定义
@@ -89,7 +91,8 @@ public class FormService {
         workflowService.startWorkflow(savedSubmission);
 
         // 重新从数据库获取最新的 submission 状态
-        FormSubmission finalSubmission = formSubmissionRepository.findById(savedSubmission.getId()).get();
+        FormSubmission finalSubmission = formSubmissionRepository.findById(savedSubmission.getId())
+                .orElseThrow(() -> new IllegalStateException("刚保存的提交记录找不到了")); // 理论上不会发生
         return convertToSubmissionResponse(finalSubmission);
     }
 
@@ -124,24 +127,23 @@ public class FormService {
         FormSubmissionResponse dto = new FormSubmissionResponse();
         dto.setId(entity.getId());
         dto.setFormDefinitionId(entity.getFormDefinition().getId());
+        dto.setFormName(entity.getFormDefinition().getName()); // 设置表单名称
         dto.setDataJson(entity.getDataJson());
         dto.setCreatedAt(entity.getCreatedAt());
+
+        // 设置提交人姓名
+        userRepository.findById(entity.getSubmitterId())
+                .ifPresent(user -> dto.setSubmitterName(user.getName()));
 
         WorkflowInstance instance = entity.getWorkflowInstance();
         if (instance == null) {
             dto.setWorkflowStatus("无流程");
         } else {
-            switch (instance.getStatus()) {
-                case PROCESSING:
-                    dto.setWorkflowStatus("审批中");
-                    break;
-                case APPROVED:
-                    dto.setWorkflowStatus("已通过");
-                    break;
-                case REJECTED:
-                    dto.setWorkflowStatus("已拒绝");
-                    break;
-            }
+            dto.setWorkflowStatus(switch (instance.getStatus()) {
+                case PROCESSING -> "审批中";
+                case APPROVED -> "已通过";
+                case REJECTED -> "已拒绝";
+            });
         }
         return dto;
     }

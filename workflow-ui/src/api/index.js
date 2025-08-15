@@ -2,6 +2,9 @@ import axios from 'axios';
 import { message } from 'ant-design-vue';
 import { useUserStore } from '@/stores/user';
 
+// --- Authentication API ---
+export const login = (credentials) => service.post('/auth/login', credentials);
+
 // 创建 axios 实例
 const service = axios.create({
     baseURL: '/api', // Vite 代理会自动处理
@@ -11,10 +14,10 @@ const service = axios.create({
 // 请求拦截器
 service.interceptors.request.use(
     config => {
-        // 在发送请求之前做些什么，比如添加 token 或用户ID
+        // 在 Vue 组件之外使用 Pinia store
         const userStore = useUserStore();
-        if (userStore.currentUserId) {
-            config.headers['X-User-ID'] = userStore.currentUserId;
+        if (userStore.token) {
+            config.headers['Authorization'] = `Bearer ${userStore.token}`;
         }
         return config;
     },
@@ -27,12 +30,18 @@ service.interceptors.request.use(
 // 响应拦截器
 service.interceptors.response.use(
     response => {
-        // 对响应数据做点什么
         return response.data;
     },
     error => {
         console.error('API Error:', error);
-        message.error(error.message || '请求失败，请检查网络或联系管理员');
+        if (error.response?.status === 401 || error.response?.status === 403) {
+            message.error('认证失败或权限不足，请重新登录。');
+            // 如果认证失败，强制登出
+            const userStore = useUserStore();
+            userStore.logout();
+        } else {
+            message.error(error.response?.data?.message || error.message || '请求失败');
+        }
         return Promise.reject(error);
     }
 );
@@ -45,14 +54,23 @@ export const getSubmissions = (formId) => service.get(`/forms/${formId}/submissi
 export const getSubmissionById = (submissionId) => service.get(`/forms/submissions/${submissionId}`);
 export const submitForm = (formId, data) => service.post(`/forms/${formId}/submissions`, data);
 
-// --- 工作流与用户 API ---
-export const getUsers = () => service.get('/workflows/users');
+// --- 工作流 API ---
 export const deployWorkflow = (data) => service.post('/workflows/deploy', data);
 export const getWorkflowTemplate = (formId) => service.get(`/workflows/templates?formId=${formId}`);
 
 // --- 任务 API ---
-export const getPendingTasks = (assigneeId) => service.get(`/tasks/pending?assigneeId=${assigneeId}`);
+export const getPendingTasks = () => service.get('/tasks/pending'); // assigneeId is determined by backend via JWT
 export const getTaskById = (taskId) => service.get(`/tasks/${taskId}`);
 export const completeTask = (taskId, data) => service.post(`/tasks/${taskId}/complete`, data);
+
+// --- 用户和管理 API ---
+export const getAllUsers = () => service.get('/workflows/users');
+// Admin User Management
+export const createUser = (data) => service.post('/admin/users', data);
+export const updateUser = (id, data) => service.put(`/admin/users/${id}`, data);
+export const deleteUser = (id) => service.delete(`/admin/users/${id}`);
+// Admin Instance Management
+export const getActiveInstances = () => service.get('/admin/instances');
+export const terminateInstance = (instanceId, reason) => service.delete(`/admin/instances/${instanceId}?reason=${reason}`);
 
 export default service;

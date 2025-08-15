@@ -9,7 +9,7 @@ import lombok.Data;
 @Data
 public class CompleteTaskRequest {
     private Decision decision;
-    private String comment; // 审批意见（在第三阶段中，此字段未直接使用，但可保留用于扩展）
+    private String approvalComment; // 审批意见
 
     public enum Decision {
         APPROVED,

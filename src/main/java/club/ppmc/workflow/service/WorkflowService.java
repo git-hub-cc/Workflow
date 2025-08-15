@@ -1,37 +1,36 @@
 package club.ppmc.workflow.service;
 
-import club.ppmc.workflow.domain.FormDefinition;
-import club.ppmc.workflow.domain.FormSubmission;
-import club.ppmc.workflow.domain.WorkflowInstance;
-import club.ppmc.workflow.domain.WorkflowTemplate;
+import club.ppmc.workflow.domain.*;
 import club.ppmc.workflow.dto.CompleteTaskRequest;
 import club.ppmc.workflow.dto.DeployWorkflowRequest;
+import club.ppmc.workflow.dto.HistoryActivityDto;
 import club.ppmc.workflow.dto.TaskDto;
 import club.ppmc.workflow.exception.ResourceNotFoundException;
-import club.ppmc.workflow.repository.FormDefinitionRepository;
-import club.ppmc.workflow.repository.UserRepository;
-import club.ppmc.workflow.repository.WorkflowInstanceRepository;
-import club.ppmc.workflow.repository.WorkflowTemplateRepository;
+import club.ppmc.workflow.repository.*;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
-import org.camunda.bpm.engine.RepositoryService;
-import org.camunda.bpm.engine.RuntimeService;
-import org.camunda.bpm.engine.TaskService;
+import org.camunda.bpm.engine.*;
+import org.camunda.bpm.engine.history.HistoricActivityInstance;
+import org.camunda.bpm.engine.history.HistoricProcessInstance;
+import org.camunda.bpm.engine.history.HistoricTaskInstance;
+import org.camunda.bpm.engine.history.HistoricVariableInstance;
 import org.camunda.bpm.engine.repository.Deployment;
 import org.camunda.bpm.engine.runtime.ProcessInstance;
 import org.camunda.bpm.engine.task.Task;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.List;
-import java.util.Map;
+import java.time.ZoneId;
+import java.util.*;
+import java.util.function.Function;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 /**
  * @author 你的名字
- * @description 工作流核心服务 (已重构，集成 Camunda)
+ * @description 工作流核心服务
  */
 @Service
 @RequiredArgsConstructor
@@ -41,10 +40,13 @@ public class WorkflowService {
     private final RepositoryService repositoryService;
     private final RuntimeService runtimeService;
     private final TaskService taskService;
+    private final HistoryService historyService;
+    private final IdentityService identityService; // 用于设置流程发起人
 
     private final WorkflowTemplateRepository templateRepository;
     private final WorkflowInstanceRepository instanceRepository;
     private final FormDefinitionRepository formDefinitionRepository;
+    private final FormSubmissionRepository formSubmissionRepository;
     private final UserRepository userRepository;
 
     private final ObjectMapper objectMapper;
@@ -60,7 +62,7 @@ public class WorkflowService {
         Deployment deployment = repositoryService.createDeployment()
                 .addString(request.getProcessDefinitionKey() + ".bpmn", request.getBpmnXml())
                 .name("Deployment for form: " + formDef.getName())
-                .tenantId("default") // 建议为部署设置一个租户ID
+                .tenantId("default")
                 .deploy();
 
         WorkflowTemplate template = templateRepository.findByFormDefinitionId(request.getFormDefinitionId())
@@ -79,29 +81,45 @@ public class WorkflowService {
      * @param submission 触发流程的表单提交记录
      */
     public void startWorkflow(FormSubmission submission) {
-        templateRepository.findByFormDefinitionId(submission.getFormDefinition().getId()).ifPresent(template -> {
-            try {
-                Map<String, Object> variables = objectMapper.readValue(submission.getDataJson(), new TypeReference<Map<String, Object>>() {});
-                variables.put("submitterId", submission.getSubmitterId());
-                variables.put("formSubmissionId", submission.getId());
+        // 在启动流程前，设置 Camunda 的认证用户，这样 Camunda 会自动记录此用户为流程的发起人
+        try {
+            identityService.setAuthenticatedUserId(submission.getSubmitterId());
+            templateRepository.findByFormDefinitionId(submission.getFormDefinition().getId()).ifPresent(template -> {
+                try {
+                    Map<String, Object> variables = objectMapper.readValue(submission.getDataJson(), new TypeReference<>() {});
+                    variables.put("submitterId", submission.getSubmitterId());
+                    variables.put("formSubmissionId", submission.getId());
 
-                ProcessInstance camundaInstance = runtimeService.startProcessInstanceByKey(
-                        template.getProcessDefinitionKey(),
-                        variables
-                );
+                    // 处理动态审批人: 约定如果表单数据中有名为 "nextAssignee" 的字段，则将其作为流程变量
+                    if (variables.containsKey("nextAssignee")) {
+                        Object assignee = variables.get("nextAssignee");
+                        if (assignee instanceof String && !((String) assignee).isEmpty()) {
+                            variables.put("nextAssignee", assignee);
+                        }
+                    }
 
-                WorkflowInstance localInstance = new WorkflowInstance();
-                localInstance.setTemplate(template);
-                localInstance.setFormSubmission(submission);
-                localInstance.setProcessInstanceId(camundaInstance.getId());
+                    ProcessInstance camundaInstance = runtimeService.startProcessInstanceByKey(
+                            template.getProcessDefinitionKey(),
+                            submission.getId().toString(), // 设置 BusinessKey 为 submissionId
+                            variables
+                    );
 
-                instanceRepository.save(localInstance);
-                submission.setWorkflowInstance(localInstance);
+                    WorkflowInstance localInstance = new WorkflowInstance();
+                    localInstance.setTemplate(template);
+                    localInstance.setFormSubmission(submission);
+                    localInstance.setProcessInstanceId(camundaInstance.getId());
 
-            } catch (JsonProcessingException e) {
-                throw new RuntimeException("解析表单数据以启动工作流失败", e);
-            }
-        });
+                    instanceRepository.save(localInstance);
+                    submission.setWorkflowInstance(localInstance);
+
+                } catch (JsonProcessingException e) {
+                    throw new RuntimeException("解析表单数据以启动工作流失败", e);
+                }
+            });
+        } finally {
+            // 清理线程局部变量，这是一个非常重要的好习惯
+            identityService.clearAuthentication();
+        }
     }
 
     /**
@@ -110,16 +128,26 @@ public class WorkflowService {
      * @param request 包含决定和评论
      */
     public void completeUserTask(String camundaTaskId, CompleteTaskRequest request) {
-        String decisionVariable = "approved";
+        Task task = taskService.createTaskQuery().taskId(camundaTaskId).singleResult();
+        if (task == null) {
+            throw new ResourceNotFoundException("在 Camunda 中未找到任务 ID: " + camundaTaskId);
+        }
+
+        // 将审批意见作为任务的局部变量存储
+        if (request.getApprovalComment() != null && !request.getApprovalComment().isEmpty()) {
+            taskService.setVariableLocal(camundaTaskId, "approvalComment", request.getApprovalComment());
+        }
+
+        // 设置用于网关判断的流程变量
         Map<String, Object> variables = Map.of(
-                decisionVariable, request.getDecision().equals(CompleteTaskRequest.Decision.APPROVED)
+                "approved", request.getDecision().equals(CompleteTaskRequest.Decision.APPROVED)
         );
 
         taskService.complete(camundaTaskId, variables);
     }
 
     /**
-     * 根据用户ID获取其待办任务列表 (直接从 Camunda 查询)
+     * 根据用户ID获取其待办任务列表
      * @param assigneeId 办理人ID
      * @return 任务 DTO 列表
      */
@@ -136,6 +164,11 @@ public class WorkflowService {
                 .collect(Collectors.toList());
     }
 
+    /**
+     * 获取单个任务详情
+     * @param camundaTaskId 任务ID
+     * @return 任务DTO
+     */
     @Transactional(readOnly = true)
     public TaskDto getTaskDetails(String camundaTaskId) {
         Task task = taskService.createTaskQuery().taskId(camundaTaskId).singleResult();
@@ -145,6 +178,9 @@ public class WorkflowService {
         return convertCamundaTaskToDto(task);
     }
 
+    /**
+     * 内部方法，将 Camunda Task 转换为 TaskDto
+     */
     private TaskDto convertCamundaTaskToDto(Task camundaTask) {
         TaskDto dto = new TaskDto();
         dto.setCamundaTaskId(camundaTask.getId());
@@ -168,5 +204,137 @@ public class WorkflowService {
         });
 
         return dto;
+    }
+
+    /**
+     * 根据业务ID（FormSubmission ID）获取工作流历史记录
+     * @param submissionId 表单提交 ID
+     * @return 历史活动 DTO 列表
+     */
+    @Transactional(readOnly = true)
+    public List<HistoryActivityDto> getWorkflowHistoryBySubmissionId(Long submissionId) {
+        FormSubmission submission = formSubmissionRepository.findById(submissionId)
+                .orElseThrow(() -> new ResourceNotFoundException("未找到提交记录 ID: " + submissionId));
+
+        if (submission.getWorkflowInstance() == null) {
+            return Collections.emptyList();
+        }
+
+        String processInstanceId = submission.getWorkflowInstance().getProcessInstanceId();
+
+        // 1. 获取所有活动实例 (事件、任务、网关等)
+        List<HistoricActivityInstance> activityInstances = historyService.createHistoricActivityInstanceQuery()
+                .processInstanceId(processInstanceId)
+                .orderByHistoricActivityInstanceStartTime().asc()
+                .list();
+
+        // 2. 获取所有已完成的任务实例，用于提取审批意见
+        List<HistoricTaskInstance> taskInstances = historyService.createHistoricTaskInstanceQuery()
+                .processInstanceId(processInstanceId)
+                .finished()
+                .list();
+        Map<String, HistoricTaskInstance> taskInstanceMap = taskInstances.stream()
+                .collect(Collectors.toMap(HistoricTaskInstance::getId, Function.identity()));
+
+        // 3. 获取任务相关的局部变量 (审批意见)
+        List<HistoricVariableInstance> variableInstances = historyService.createHistoricVariableInstanceQuery()
+                .processInstanceId(processInstanceId)
+                .variableName("approvalComment")
+                .list();
+        Map<String, HistoricVariableInstance> taskComments = variableInstances.stream()
+                .filter(v -> v.getTaskId() != null)
+                .collect(Collectors.toMap(HistoricVariableInstance::getTaskId, Function.identity()));
+
+        // 4. 获取全局变量 (最终决定)
+        Map<String, Object> processVariables = historyService.createHistoricVariableInstanceQuery()
+                .processInstanceId(processInstanceId)
+                .list().stream()
+                .collect(Collectors.toMap(HistoricVariableInstance::getName, HistoricVariableInstance::getValue));
+
+        // 5. 预加载所有可能的用户信息
+        Set<String> userIds = Stream.concat(
+                        activityInstances.stream().map(HistoricActivityInstance::getAssignee),
+                        Stream.of(submission.getSubmitterId())
+                )
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+        Map<String, User> userMap = userRepository.findAllById(userIds).stream()
+                .collect(Collectors.toMap(User::getId, Function.identity()));
+
+        List<HistoryActivityDto> historyList = new ArrayList<>();
+
+        // 6. 添加一个“发起申请”的虚拟节点
+        historyList.add(HistoryActivityDto.builder()
+                .activityName("发起申请")
+                .activityType("startEvent")
+                .assigneeId(submission.getSubmitterId())
+                .assigneeName(userMap.getOrDefault(submission.getSubmitterId(), new User()).getName())
+                .startTime(submission.getCreatedAt())
+                .endTime(submission.getCreatedAt())
+                .build());
+
+        // 7. 组合真实活动节点数据
+        for (HistoricActivityInstance activity : activityInstances) {
+            if (!activity.getActivityType().equals("userTask") && !activity.getActivityType().endsWith("EndEvent")) {
+                continue;
+            }
+
+            HistoryActivityDto.HistoryActivityDtoBuilder dtoBuilder = HistoryActivityDto.builder()
+                    .activityId(activity.getId())
+                    .activityName(activity.getActivityName())
+                    .activityType(activity.getActivityType())
+                    .assigneeId(activity.getAssignee())
+                    .assigneeName(Optional.ofNullable(activity.getAssignee()).map(id -> userMap.getOrDefault(id, new User()).getName()).orElse(null))
+                    .startTime(Optional.ofNullable(activity.getStartTime()).map(d -> d.toInstant().atZone(ZoneId.systemDefault()).toLocalDateTime()).orElse(null))
+                    .endTime(Optional.ofNullable(activity.getEndTime()).map(d -> d.toInstant().atZone(ZoneId.systemDefault()).toLocalDateTime()).orElse(null))
+                    .durationInMillis(activity.getDurationInMillis());
+
+            // 【修正】使用 activity.getId() 来关联任务实例和变量
+            if (activity.getActivityType().equals("userTask") && taskInstanceMap.containsKey(activity.getId())) {
+                HistoricVariableInstance commentVar = taskComments.get(activity.getId());
+                if (commentVar != null) {
+                    dtoBuilder.comment((String) commentVar.getValue());
+                }
+            }
+
+            if(activity.getActivityType().endsWith("EndEvent")) {
+                Object approvedVar = processVariables.get("approved");
+                if (approvedVar instanceof Boolean) {
+                    dtoBuilder.decision(((Boolean) approvedVar) ? "APPROVED" : "REJECTED");
+                    dtoBuilder.activityName(((Boolean) approvedVar) ? "审批通过" : "审批拒绝");
+                } else {
+                    dtoBuilder.activityName("流程结束");
+                }
+            }
+
+            historyList.add(dtoBuilder.build());
+        }
+        return historyList;
+    }
+
+    /**
+     * 权限校验方法: 检查用户是否是指定任务的办理人
+     * @param camundaTaskId 任务ID
+     * @param username 用户名 (ID)
+     * @return 如果是，返回 true
+     */
+    public boolean isTaskOwner(String camundaTaskId, String username) {
+        if (username == null) return false;
+        Task task = taskService.createTaskQuery().taskId(camundaTaskId).singleResult();
+        return task != null && username.equals(task.getAssignee());
+    }
+
+    /**
+     * 权限校验方法: 检查用户是否是指定申请的提交人
+     * @param submissionId 申请ID
+     * @param username 用户名 (ID)
+     * @return 如果是，返回 true
+     */
+    public boolean isSubmissionOwner(Long submissionId, String username) {
+        if (username == null) return false;
+        return formSubmissionRepository.findById(submissionId)
+                .map(FormSubmission::getSubmitterId)
+                .map(username::equals)
+                .orElse(false);
     }
 }

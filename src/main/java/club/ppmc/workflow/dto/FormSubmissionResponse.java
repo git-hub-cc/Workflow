@@ -10,8 +10,10 @@ import java.time.LocalDateTime;
 @Data
 public class FormSubmissionResponse {
     private Long id;
-    private Long formDefinitionId; // 新增，方便前端反查
+    private Long formDefinitionId;
+    private String formName; // 表单名称
     private String dataJson;
     private LocalDateTime createdAt;
     private String workflowStatus;
+    private String submitterName; // 提交人姓名
 }

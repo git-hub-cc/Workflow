@@ -1,0 +1,175 @@
+package club.ppmc.workflow.service;
+
+import club.ppmc.workflow.domain.User;
+import club.ppmc.workflow.dto.ProcessInstanceDto;
+import club.ppmc.workflow.dto.UserDto;
+import club.ppmc.workflow.exception.ResourceNotFoundException;
+import club.ppmc.workflow.repository.UserRepository;
+import lombok.RequiredArgsConstructor;
+import org.camunda.bpm.engine.HistoryService;
+import org.camunda.bpm.engine.RuntimeService;
+import org.camunda.bpm.engine.history.HistoricProcessInstance;
+import org.camunda.bpm.engine.runtime.ActivityInstance;
+import org.camunda.bpm.engine.runtime.ProcessInstance;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.time.ZoneId;
+import java.util.*;
+import java.util.function.Function;
+import java.util.stream.Collectors;
+
+/**
+ * @author 你的名字
+ * @description 包含管理员操作的业务逻辑服务
+ */
+@Service
+@RequiredArgsConstructor
+@Transactional
+public class AdminService {
+
+    private final UserRepository userRepository;
+    private final RuntimeService runtimeService;
+    private final HistoryService historyService;
+    private final PasswordEncoder passwordEncoder;
+
+    /**
+     * 获取所有正在运行的流程实例
+     * @return 流程实例DTO列表
+     */
+    @Transactional(readOnly = true)
+    public List<ProcessInstanceDto> getActiveProcessInstances() {
+        // 1. 获取所有正在运行的流程实例
+        List<ProcessInstance> instances = runtimeService.createProcessInstanceQuery().active().list();
+        if (instances.isEmpty()) {
+            return List.of();
+        }
+
+        List<String> processInstanceIds = instances.stream()
+                .map(ProcessInstance::getProcessInstanceId)
+                .collect(Collectors.toList());
+
+        // 2. 批量获取这些实例的历史信息 (包含发起人等)
+        // 【修正】使用 .processInstanceIds(Set<String>) 方法，它接受一个 Set 集合，兼容性更好。
+        Set<String> processInstanceIdSet = new HashSet<>(processInstanceIds);
+        Map<String, HistoricProcessInstance> historicInstanceMap = historyService.createHistoricProcessInstanceQuery()
+                .processInstanceIds(processInstanceIdSet)
+                .list()
+                .stream()
+                .collect(Collectors.toMap(HistoricProcessInstance::getId, Function.identity()));
+
+        // 3. 预加载所有相关的用户信息
+        List<String> userIds = historicInstanceMap.values().stream()
+                .map(HistoricProcessInstance::getStartUserId)
+                .filter(Objects::nonNull) // 过滤掉可能为 null 的 startUserId
+                .distinct()
+                .collect(Collectors.toList());
+        Map<String, User> userMap = userRepository.findAllById(userIds).stream()
+                .collect(Collectors.toMap(User::getId, Function.identity()));
+
+        // 4. 组合最终结果
+        return instances.stream()
+                .map(instance -> {
+                    HistoricProcessInstance historicInstance = historicInstanceMap.get(instance.getProcessInstanceId());
+                    if (historicInstance == null) {
+                        return null; // 数据不一致，跳过
+                    }
+
+                    ActivityInstance activityInstance = runtimeService.getActivityInstance(instance.getProcessInstanceId());
+                    String activityName = "未知";
+                    if (activityInstance != null && activityInstance.getChildActivityInstances().length > 0) {
+                        // 通常当前活动是子实例, 比如用户任务
+                        activityName = Arrays.stream(activityInstance.getChildActivityInstances())
+                                .map(ActivityInstance::getActivityName)
+                                .filter(Objects::nonNull)
+                                .collect(Collectors.joining(", "));
+                    } else if (activityInstance != null) {
+                        activityName = activityInstance.getActivityName();
+                    }
+                    if (activityName == null || activityName.isEmpty()){
+                        activityName = "进行中";
+                    }
+
+                    String startUserName = Optional.ofNullable(historicInstance.getStartUserId())
+                            .map(userMap::get)
+                            .map(User::getName)
+                            .orElse("未知用户");
+
+                    return ProcessInstanceDto.builder()
+                            .processInstanceId(instance.getProcessInstanceId())
+                            .businessKey(instance.getBusinessKey())
+                            .processDefinitionName(historicInstance.getProcessDefinitionName())
+                            .version(historicInstance.getProcessDefinitionVersion())
+                            .startTime(historicInstance.getStartTime().toInstant().atZone(ZoneId.systemDefault()).toLocalDateTime())
+                            .startUserId(historicInstance.getStartUserId())
+                            .startUserName(startUserName)
+                            .currentActivityName(activityName)
+                            .build();
+                })
+                .filter(Objects::nonNull)
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * 终止一个正在运行的流程实例
+     * @param processInstanceId 流程实例ID
+     * @param reason 终止原因
+     */
+    public void terminateProcessInstance(String processInstanceId, String reason) {
+        runtimeService.deleteProcessInstance(processInstanceId, reason);
+    }
+
+    /**
+     * 创建一个新用户
+     * @param userDto 用户数据
+     * @return 创建后的用户DTO
+     */
+    public UserDto createUser(UserDto userDto) {
+        if (userRepository.existsById(userDto.getId())) {
+            throw new IllegalArgumentException("用户ID '" + userDto.getId() + "' 已存在");
+        }
+        User user = new User();
+        user.setId(userDto.getId());
+        user.setName(userDto.getName());
+        user.setRole(userDto.getRole() != null ? userDto.getRole() : "USER");
+        // 默认密码为 'password'，在真实项目中应有更安全的处理方式
+        user.setPassword(passwordEncoder.encode("password"));
+        User savedUser = userRepository.save(user);
+        return toUserDto(savedUser);
+    }
+
+    /**
+     * 更新用户信息 (不允许更新ID和密码)
+     * @param id 用户ID
+     * @param userDto 更新数据
+     * @return 更新后的用户DTO
+     */
+    public UserDto updateUser(String id, UserDto userDto) {
+        User user = userRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("未找到用户: " + id));
+        user.setName(userDto.getName());
+        user.setRole(userDto.getRole());
+        User updatedUser = userRepository.save(user);
+        return toUserDto(updatedUser);
+    }
+
+    /**
+     * 删除用户
+     * @param id 用户ID
+     */
+    public void deleteUser(String id) {
+        if (!userRepository.existsById(id)) {
+            throw new ResourceNotFoundException("未找到用户: " + id);
+        }
+        userRepository.deleteById(id);
+    }
+
+    private UserDto toUserDto(User user) {
+        UserDto dto = new UserDto();
+        dto.setId(user.getId());
+        dto.setName(user.getName());
+        dto.setRole(user.getRole());
+        return dto;
+    }
+}
