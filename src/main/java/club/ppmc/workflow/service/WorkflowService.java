@@ -5,6 +5,7 @@ import club.ppmc.workflow.dto.CompleteTaskRequest;
 import club.ppmc.workflow.dto.DeployWorkflowRequest;
 import club.ppmc.workflow.dto.HistoryActivityDto;
 import club.ppmc.workflow.dto.TaskDto;
+import club.ppmc.workflow.dto.WorkflowTemplateResponse;
 import club.ppmc.workflow.exception.ResourceNotFoundException;
 import club.ppmc.workflow.repository.*;
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -75,6 +76,87 @@ public class WorkflowService {
 
         templateRepository.save(template);
     }
+
+    /**
+     * 获取或创建一个工作流模板的 DTO。
+     * 如果模板已存在，则返回它。如果不存在，则在内存中生成一个默认模板 DTO。
+     * @param formId 表单定义 ID
+     * @return WorkflowTemplateResponse
+     */
+    @Transactional(readOnly = true)
+    public WorkflowTemplateResponse getOrCreateWorkflowTemplate(Long formId) {
+        // 1. 验证表单是否存在
+        formDefinitionRepository.findById(formId)
+                .orElseThrow(() -> new ResourceNotFoundException("未找到表单定义 ID: " + formId));
+
+        // 2. 尝试查找已存在的模板
+        return templateRepository.findByFormDefinitionId(formId)
+                .map(template -> {
+                    // 3a. 如果存在，则转换并返回
+                    WorkflowTemplateResponse dto = new WorkflowTemplateResponse();
+                    dto.setFormDefinitionId(template.getFormDefinition().getId());
+                    dto.setBpmnXml(template.getBpmnXml());
+                    dto.setProcessDefinitionKey(template.getProcessDefinitionKey());
+                    return dto;
+                })
+                .orElseGet(() -> {
+                    // 3b. 如果不存在，则生成一个包含基础审批流程的默认 DTO
+                    String processDefinitionKey = "Process_Form_" + formId;
+                    String defaultXml = String.format("""
+                        <?xml version="1.0" encoding="UTF-8"?>
+                        <bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" xmlns:di="http://www.omg.org/spec/DD/20100524/DI" xmlns:camunda="http://camunda.org/schema/1.0/bpmn" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" id="Definitions_1" targetNamespace="http://bpmn.io/schema/bpmn" exporter="Camunda Modeler" exporterVersion="5.20.0">
+                          <bpmn:process id="%s" name="新流程" isExecutable="true">
+                            <bpmn:startEvent id="StartEvent_1" name="开始">
+                              <bpmn:outgoing>Flow_1</bpmn:outgoing>
+                            </bpmn:startEvent>
+                            <bpmn:sequenceFlow id="Flow_1" sourceRef="StartEvent_1" targetRef="Activity_ManagerApprove" />
+                            <bpmn:userTask id="Activity_ManagerApprove" name="部门经理审批" camunda:assignee="manager001">
+                              <bpmn:incoming>Flow_1</bpmn:incoming>
+                              <bpmn:outgoing>Flow_2</bpmn:outgoing>
+                            </bpmn:userTask>
+                            <bpmn:endEvent id="EndEvent_1" name="结束">
+                              <bpmn:incoming>Flow_2</bpmn:incoming>
+                            </bpmn:endEvent>
+                            <bpmn:sequenceFlow id="Flow_2" sourceRef="Activity_ManagerApprove" targetRef="EndEvent_1" />
+                          </bpmn:process>
+                          <bpmndi:BPMNDiagram id="BPMNDiagram_1">
+                            <bpmndi:BPMNPlane id="BPMNPlane_1" bpmnElement="%s">
+                              <bpmndi:BPMNShape id="StartEvent_1_di" bpmnElement="StartEvent_1">
+                                <dc:Bounds x="179" y="102" width="36" height="36" />
+                                <bpmndi:BPMNLabel>
+                                  <dc:Bounds x="185" y="145" width="22" height="14" />
+                                </bpmndi:BPMNLabel>
+                              </bpmndi:BPMNShape>
+                              <bpmndi:BPMNShape id="Activity_ManagerApprove_di" bpmnElement="Activity_ManagerApprove">
+                                <dc:Bounds x="270" y="80" width="100" height="80" />
+                              </bpmndi:BPMNShape>
+                              <bpmndi:BPMNShape id="EndEvent_1_di" bpmnElement="EndEvent_1">
+                                <dc:Bounds x="432" y="102" width="36" height="36" />
+                                <bpmndi:BPMNLabel>
+                                  <dc:Bounds x="438" y="145" width="22" height="14" />
+                                </bpmndi:BPMNLabel>
+                              </bpmndi:BPMNShape>
+                              <bpmndi:BPMNEdge id="Flow_1_di" bpmnElement="Flow_1">
+                                <di:waypoint x="215" y="120" />
+                                <di:waypoint x="270" y="120" />
+                              </bpmndi:BPMNEdge>
+                              <bpmndi:BPMNEdge id="Flow_2_di" bpmnElement="Flow_2">
+                                <di:waypoint x="370" y="120" />
+                                <di:waypoint x="432" y="120" />
+                              </bpmndi:BPMNEdge>
+                            </bpmndi:BPMNPlane>
+                          </bpmndi:BPMNDiagram>
+                        </bpmn:definitions>
+                        """, processDefinitionKey, processDefinitionKey);
+
+                    WorkflowTemplateResponse dto = new WorkflowTemplateResponse();
+                    dto.setFormDefinitionId(formId);
+                    dto.setBpmnXml(defaultXml);
+                    dto.setProcessDefinitionKey(processDefinitionKey);
+                    return dto;
+                });
+    }
+
 
     /**
      * 启动一个新的工作流实例

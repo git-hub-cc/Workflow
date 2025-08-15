@@ -3,6 +3,7 @@ package club.ppmc.workflow;
 import club.ppmc.workflow.domain.User;
 import club.ppmc.workflow.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import org.camunda.bpm.spring.boot.starter.annotation.EnableProcessApplication;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
@@ -18,6 +19,7 @@ import java.util.List;
  */
 @SpringBootApplication
 @RequiredArgsConstructor
+@EnableProcessApplication // <-- 2. 添加注解，激活内嵌的 Camunda 引擎
 @EnableAsync // 启用异步任务, 用于发送邮件
 public class WorkflowApplication {
 
@@ -27,8 +29,8 @@ public class WorkflowApplication {
         SpringApplication.run(WorkflowApplication.class, args);
         System.out.println("==================================================");
         System.out.println("应用程序启动成功！");
-        System.out.println("访问地址: http://localhost:8081");
-        System.out.println("H2 数据库控制台: http://localhost:8081/h2-console");
+        System.out.println("访问地址: http://localhost:8080");
+        System.out.println("H2 数据库控制台: http://localhost:8080/h2-console");
         System.out.println("确保 Camunda 引擎正在 http://localhost:8080 运行！");
         System.out.println("==================================================");
     }

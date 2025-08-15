@@ -50,15 +50,9 @@ public class WorkflowController {
      */
     @GetMapping("/templates")
     public ResponseEntity<WorkflowTemplateResponse> getTemplateByFormId(@RequestParam Long formId) {
-        return templateRepository.findByFormDefinitionId(formId)
-                .map(template -> {
-                    WorkflowTemplateResponse dto = new WorkflowTemplateResponse();
-                    dto.setFormDefinitionId(template.getFormDefinition().getId());
-                    dto.setBpmnXml(template.getBpmnXml());
-                    dto.setProcessDefinitionKey(template.getProcessDefinitionKey());
-                    return ResponseEntity.ok(dto);
-                })
-                .orElse(ResponseEntity.notFound().build());
+        // 【修改】调用新的 Service 方法，该方法永远不会导致 404
+        WorkflowTemplateResponse templateResponse = workflowService.getOrCreateWorkflowTemplate(formId);
+        return ResponseEntity.ok(templateResponse);
     }
 
     /**

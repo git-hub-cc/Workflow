@@ -5,20 +5,35 @@
     <parent>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
-        <version>3.2.5</version> <!-- 请与您项目版本保持一致 -->
+        <version>3.2.5</version> <!-- 建议使用较新的 Spring Boot 版本 -->
         <relativePath/> <!-- lookup parent from repository -->
     </parent>
     <groupId>club.ppmc</groupId>
-    <artifactId>workflow</artifactId>
+    <artifactId>workflow-engine</artifactId>
     <version>0.0.1-SNAPSHOT</version>
-    <name>workflow</name>
-    <description>Form and Workflow Engine with Spring Boot and Camunda</description>
+    <name>workflow-engine</name>
+    <description>Form Workflow Engine with Embedded Camunda</description>
+
     <properties>
         <java.version>17</java.version>
-        <!-- 统一管理 Camunda 版本 -->
+        <!-- 使用 Camunda 7 的最新稳定版本 -->
         <camunda.version>7.21.0</camunda.version>
     </properties>
+
+    <dependencyManagement>
+        <dependencies>
+            <dependency>
+                <groupId>org.camunda.bpm</groupId>
+                <artifactId>camunda-bom</artifactId>
+                <version>${camunda.version}</version>
+                <scope>import</scope>
+                <type>pom</type>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
+
     <dependencies>
+        <!-- Spring Boot 基础 -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-data-jpa</artifactId>
@@ -27,45 +42,37 @@
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-web</artifactId>
         </dependency>
-
-        <!--
-            【重大变更】使用 Camunda Spring Boot Starter REST
-            这个 starter 会在 Spring Boot 应用中自动配置一个内嵌的 Camunda 引擎,
-            并创建所有引擎服务 (RuntimeService, TaskService 等) 的 Bean, 解决了依赖注入失败的问题。
-        -->
-        <dependency>
-            <groupId>org.camunda.bpm.springboot</groupId>
-            <artifactId>camunda-bpm-spring-boot-starter-rest</artifactId>
-            <version>${camunda.version}</version>
-        </dependency>
-
-        <!--
-            【说明】camunda-engine 依赖已由上面的 starter 传递引入，无需重复声明
-        -->
-
-        <dependency>
-            <groupId>com.h2database</groupId>
-            <artifactId>h2</artifactId>
-            <scope>runtime</scope>
-        </dependency>
-        <dependency>
-            <groupId>org.projectlombok</groupId>
-            <artifactId>lombok</artifactId>
-            <optional>true</optional>
-        </dependency>
-        <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-test</artifactId>
-            <scope>test</scope>
-        </dependency>
-
-        <!-- Spring Boot Security for authentication and authorization -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-security</artifactId>
         </dependency>
 
-        <!-- Java JWT: for creating and parsing JWTs -->
+        <!-- Camunda 核心依赖：内嵌引擎 + Webapps -->
+        <dependency>
+            <groupId>org.camunda.bpm.springboot</groupId>
+            <artifactId>camunda-bpm-spring-boot-starter-webapp</artifactId>
+        </dependency>
+        <!-- Camunda REST API (可选，但推荐) -->
+        <dependency>
+            <groupId>org.camunda.bpm.springboot</groupId>
+            <artifactId>camunda-bpm-spring-boot-starter-rest</artifactId>
+        </dependency>
+
+        <!-- 数据库 -->
+        <dependency>
+            <groupId>com.h2database</groupId>
+            <artifactId>h2</artifactId>
+            <scope>runtime</scope>
+        </dependency>
+
+        <!-- 工具类 -->
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <optional>true</optional>
+        </dependency>
+
+        <!-- JWT 支持 -->
         <dependency>
             <groupId>io.jsonwebtoken</groupId>
             <artifactId>jjwt-api</artifactId>
@@ -84,12 +91,18 @@
             <scope>runtime</scope>
         </dependency>
 
-        <!-- Spring Boot Mail Sender for notifications -->
+        <!-- 邮件服务 -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-mail</artifactId>
         </dependency>
 
+        <!-- Spring Boot 测试 -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
 
     <build>
