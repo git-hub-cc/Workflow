@@ -39,15 +39,19 @@
       </a-space>
     </div>
 
-    <div class="designer-container">
+    <!-- 设计器区域 -->
+    <div class="designer-container" v-show="!loading">
       <div id="canvas" ref="canvasRef"></div>
       <div id="properties-panel-container" ref="propertiesPanelRef"></div>
+    </div>
+    <div v-if="loading" class="loading-container">
+      <a-spin size="large" tip="正在加载设计器..." />
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted, onBeforeUnmount } from 'vue';
+import { ref, onMounted, onBeforeUnmount, watch, nextTick } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { message } from 'ant-design-vue';
 import { getFormById, deployWorkflow, getWorkflowTemplate } from '@/api';
@@ -56,18 +60,25 @@ import {
   FullscreenOutlined, DownloadOutlined, FileImageOutlined
 } from '@ant-design/icons-vue';
 
-// --- BPMN.js 相关导入 ---
-import BpmnModeler from 'bpmn-js/lib/Modeler';
-import * as BpmnJSExtra from 'bpmn-js-properties-panel';
-const {
+// --- BPMN.js 核心 ---
+import BpmnModeler from 'bpmn-js/lib/Modeler.js';
+import 'bpmn-js/dist/assets/diagram-js.css';
+import 'bpmn-js/dist/assets/bpmn-js.css';
+import 'bpmn-js/dist/assets/bpmn-font/css/bpmn.css';
+import '@bpmn-io/properties-panel/dist/assets/properties-panel.css';
+
+// --- 属性面板相关 ---
+import {
   BpmnPropertiesPanelModule,
   BpmnPropertiesProviderModule,
-  CamundaPlatformPropertiesProviderModule,
-} = BpmnJSExtra;
+  CamundaPlatformPropertiesProviderModule
+} from 'bpmn-js-properties-panel';
 import camundaModdleDescriptors from 'camunda-bpmn-moddle/resources/camunda.json';
-// 【新增】导入汉化模块
-import customTranslate from '@/utils/customTranslate';
 
+// 汉化
+import customTranslateModule from '@/utils/customTranslate';
+
+// --- 路由与状态 ---
 const route = useRoute();
 const router = useRouter();
 const formId = route.params.formId;
@@ -76,16 +87,22 @@ const canvasRef = ref(null);
 const propertiesPanelRef = ref(null);
 const formName = ref('加载中...');
 const saving = ref(false);
+const loading = ref(true);
 let modeler = null;
 
 const canUndo = ref(false);
 const canRedo = ref(false);
 
-onMounted(async () => {
-  try {
-    const form = await getFormById(formId);
-    formName.value = form.name;
+// 监听 loading，加载完成后再初始化 BPMN
+watch(loading, async (val) => {
+  if (!val) {
+    await nextTick(); // 确保 DOM 尺寸已计算
+    await initModeler();
+  }
+});
 
+async function initModeler() {
+  try {
     modeler = new BpmnModeler({
       container: canvasRef.value,
       propertiesPanel: {
@@ -95,17 +112,11 @@ onMounted(async () => {
         BpmnPropertiesPanelModule,
         BpmnPropertiesProviderModule,
         CamundaPlatformPropertiesProviderModule,
-        // 【新增】加载汉化模块
-        {
-          translate: ['value', customTranslate]
-        }
+        customTranslateModule // <-- 已修正：直接使用导入的汉化模块
       ],
-      moddleExtensions: {
-        camunda: camundaModdleDescriptors,
-      },
+      moddleExtensions: { camunda: camundaModdleDescriptors },
     });
 
-    // 监听命令栈变化，更新撤销/重做按钮状态
     const eventBus = modeler.get('eventBus');
     eventBus.on('commandStack.changed', () => {
       canUndo.value = modeler.get('commandStack').canUndo();
@@ -114,14 +125,27 @@ onMounted(async () => {
 
     const template = await getWorkflowTemplate(formId);
     await modeler.importXML(template.bpmnXml);
-    handleFitViewport(); // 初始加载后适应屏幕
-
+    handleFitViewport();
   } catch (error) {
     message.error('初始化设计器失败! 请检查控制台获取详细信息。');
     console.error('Designer Initialization Error:', error);
   }
+}
+
+// --- 页面挂载 ---
+onMounted(async () => {
+  try {
+    const form = await getFormById(formId);
+    formName.value = form.name;
+  } catch (err) {
+    message.error('获取表单信息失败');
+    console.error(err);
+  } finally {
+    loading.value = false; // 触发 watch，开始初始化 BPMN
+  }
 });
 
+// --- 卸载清理 ---
 onBeforeUnmount(() => {
   if (modeler) {
     modeler.destroy();
@@ -129,8 +153,8 @@ onBeforeUnmount(() => {
   }
 });
 
+// --- 保存并部署 ---
 const saveAndDeploy = async () => {
-  // ... (省略原有保存逻辑, 无需修改)
   if (!modeler) {
     message.error('设计器未初始化！');
     return;
@@ -138,23 +162,18 @@ const saveAndDeploy = async () => {
   saving.value = true;
   try {
     const { xml } = await modeler.saveXML({ format: true });
-
     const elementRegistry = modeler.get('elementRegistry');
     const processElement = elementRegistry.find(el => el.type === 'bpmn:Process');
-    if (!processElement) {
-      throw new Error('无法在BPMN图中找到 <bpmn:process> 元素。');
-    }
+    if (!processElement) throw new Error('无法在BPMN图中找到 <bpmn:process> 元素。');
+
     const processDefinitionKey = processElement.businessObject.id;
-    if (!processDefinitionKey) {
-      throw new Error('流程 Process ID 不能为空，请在属性面板中设置。');
-    }
+    if (!processDefinitionKey) throw new Error('流程 Process ID 不能为空，请在属性面板中设置。');
 
     const payload = {
       formDefinitionId: parseInt(formId, 10),
       bpmnXml: xml,
-      processDefinitionKey: processDefinitionKey,
+      processDefinitionKey
     };
-
     await deployWorkflow(payload);
     message.success('流程部署成功！');
     router.push('/');
@@ -186,12 +205,15 @@ const handleFitViewport = () => {
   modeler.get('canvas').zoom('fit-viewport');
 };
 
+// --- 文件下载 ---
 function downloadFile(filename, data, type) {
   const a = document.createElement('a');
   const url = URL.createObjectURL(new Blob([data], { type }));
   a.href = url;
   a.download = filename;
+  document.body.appendChild(a);
   a.click();
+  document.body.removeChild(a);
   URL.revokeObjectURL(url);
 }
 
@@ -199,7 +221,7 @@ const downloadBpmn = async () => {
   try {
     const { xml } = await modeler.saveXML({ format: true });
     downloadFile(`${formName.value || 'process'}.bpmn`, xml, 'application/xml');
-  } catch (err) {
+  } catch {
     message.error('下载 BPMN 文件失败');
   }
 };
@@ -208,7 +230,7 @@ const downloadSvg = async () => {
   try {
     const { svg } = await modeler.saveSVG();
     downloadFile(`${formName.value || 'process'}.svg`, svg, 'image/svg+xml');
-  } catch (err) {
+  } catch {
     message.error('下载 SVG 图像失败');
   }
 };
@@ -219,7 +241,7 @@ const downloadSvg = async () => {
   padding: 0;
   display: flex;
   flex-direction: column;
-  height: calc(100vh - 64px);
+  height: calc(100vh - 64px - 48px);
   background-color: #fff;
 }
 
@@ -227,6 +249,7 @@ const downloadSvg = async () => {
   padding: 8px 24px;
   border-bottom: 1px solid #f0f0f0;
   background: #fff;
+  flex-shrink: 0;
 }
 
 .designer-container {
@@ -246,13 +269,22 @@ const downloadSvg = async () => {
   background: #f8f8f8;
   overflow-y: auto;
   border-left: 1px solid #e0e0e0;
+  flex-shrink: 0;
+}
+
+.loading-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100%;
+}
+
+:deep(.bjs-powered-by) {
+  display: none !important;
 }
 
 :deep(.djs-palette) {
   top: 20px;
   left: 20px;
-}
-:deep(.bjs-powered-by) {
-  display: none !important;
 }
 </style>

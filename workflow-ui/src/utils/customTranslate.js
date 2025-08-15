@@ -1,9 +1,379 @@
 // src/utils/customTranslate.js
+
+// 1. 导入基础的 bpmn-js 汉化包
 import translations from 'bpmn-js-i18n/translations/zn.js';
 
-export default function customTranslate(template, replacements) {
-    if (replacements) {
-        template = template.replace(/{([^}]+)}/g, (_, key) => replacements[key] || `{${key}}`);
+// 2. 定义我们自己的、用于补充的汉化字典 (终极版)
+//    我们按照属性面板的标签页和元素类型进行了分组，方便维护
+const customTranslations = {
+    //================================================================
+    // General & Common (Based on your provided HTML)
+    //================================================================
+    'General': '常规',
+    'Details': '详情',
+    'Documentation': '文档',
+    'Version tag': '版本标签',
+    'Executable': '可执行',
+    'Startable': '可启动', // from isStartableInTasklist
+    'Name': '名称',
+    'Id': 'ID',
+    'Type': '类型',
+    'Value': '值',
+    'Must provide a value': '必须提供一个值',
+    'Must be a valid QName': '必须是有效的QName',
+    'Must be a valid URI': '必须是有效的URI',
+    'Must not contain spaces': '不能包含空格',
+    'Toggle section': '切换区域',
+    'Section contains edits': '区域包含编辑',
+
+    //================================================================
+    // Actions & Buttons
+    //================================================================
+    'Append': '追加',
+    'Create': '创建',
+    'Remove': '移除',
+    'Add': '添加',
+    'Edit': '编辑',
+    'Clear': '清除',
+    'Change type': '更改类型',
+    'Connect using Sequence/MessageFlow': '使用顺序/消息流连接',
+    'Create new list item': '创建新的列表项',
+
+    //================================================================
+    // Process Properties (Based on your provided HTML)
+    //================================================================
+    'Process Id': '流程 ID',
+    'Process Name': '流程名称',
+    'Element documentation': '元素文档',
+    'History cleanup': '历史清理',
+    'Time to live': '存活时间 (TTL)', // from historyTimeToLive
+    'Tasklist': '任务列表',
+    'Candidate starter': '候选启动者',
+    'Candidate starter groups': '候选启动组',
+    'Candidate starter users': '候选启动用户',
+    'This maps to the process definition key.': '这将映射到流程定义的 “key”。',
+    'Specify more than one group as a comma separated list.': '指定多个组，请使用逗号分隔。',
+    'Specify more than one user as a comma separated list.': '指定多个用户，请使用逗号分隔。',
+
+    //================================================================
+    // External Task & Job Execution (Based on your provided HTML)
+    //================================================================
+    'External task': '外部任务',
+    'Job execution': '作业执行',
+    'Task priority': '任务优先级',
+    'Job priority': '作业优先级',
+    'External task priority': '外部任务优先级',
+
+    //================================================================
+    // User Task Properties
+    //================================================================
+    'Implementation': '实现',
+    'Implementation type': '实现类型',
+    'Assignments': '分配',
+    'Assignee': '处理人',
+    'Candidate users': '候选用户',
+    'Candidate groups': '候选组',
+    'Due date': '到期时间',
+    'Follow up date': '跟踪日期',
+    'Priority': '优先级',
+
+    //================================================================
+    // Forms Properties
+    //================================================================
+    'Forms': '表单',
+    'Form key': '表单 Key',
+    'Form fields': '表单字段',
+    'Business key': '业务 Key',
+    'Form field id': '表单字段 ID',
+    'Form field type': '表单字段类型',
+    'Form field label': '表单字段标签',
+    'Default value': '默认值',
+    'Validation': '校验',
+    'Add constraint': '添加约束',
+    'Constraint': '约束',
+    'Configuration': '配置',
+
+    //================================================================
+    // Sequence Flow Properties
+    //================================================================
+    'Condition': '条件',
+    'Condition type': '条件类型',
+    'Expression': '表达式',
+    'Script': '脚本',
+    'Script format': '脚本格式',
+    'Script type': '脚本类型',
+    'Inline script': '内联脚本',
+    'External resource': '外部资源',
+    'Resource': '资源',
+    'Default flow': '默认流',
+
+    //================================================================
+    // Asynchronous Continuations
+    //================================================================
+    'Asynchronous continuations': '异步执行',
+    'Asynchronous before': '前置异步',
+    'Asynchronous after': '后置异步',
+    'Exclusive': '排他',
+
+    //================================================================
+    // Listeners (Based on your provided HTML)
+    //================================================================
+    'Listeners': '监听器',
+    'Execution listeners': '执行监听器',
+    'Task listeners': '任务监听器',
+    'Event type': '事件类型',
+    'Listener type': '监听器类型',
+    'Java class': 'Java类',
+    'Delegate expression': '代理表达式',
+    'Fields': '字段',
+    'Field injection': '字段注入',
+    'String': '字符串',
+    'start': '开始',
+    'end': '结束',
+    'take': '采用',
+    'create': '创建',
+    'assignment': '分配',
+    'complete': '完成',
+    'delete': '删除',
+
+    //================================================================
+    // Input/Output
+    //================================================================
+    'Input/Output': '输入/输出',
+    'Input parameters': '输入参数',
+    'Output parameters': '输出参数',
+    'Source': '源',
+    'Target': '目标',
+    'All': '全部',
+
+    //================================================================
+    // Extensions (Properties) (Based on your provided HTML)
+    //================================================================
+    'Extensions': '扩展',
+    'Extension properties': '扩展属性',
+    'Properties': '属性',
+    'Add property': '添加属性',
+
+    //================================================================
+    // BPMN Element Names & Tooltips
+    //================================================================
+    'Process': '流程',
+    'Task': '任务',
+    'User Task': '用户任务',
+    'Service Task': '服务任务',
+    'Send Task': '发送任务',
+    'Receive Task': '接收任务',
+    'Manual Task': '手动任务',
+    'Business Rule Task': '业务规则任务',
+    'Script Task': '脚本任务',
+    'Start Event': '开始事件',
+    'End Event': '结束事件',
+    'Intermediate Throw Event': '中间抛出事件',
+    'Intermediate Catch Event': '中间捕获事件',
+    'Gateway': '网关',
+    'Exclusive Gateway': '排他网关',
+    'Parallel Gateway': '并行网关',
+    'Inclusive Gateway': '包容网关',
+    'Event-based Gateway': '事件网关',
+    'Sequence Flow': '顺序流',
+    'Message Flow': '消息流',
+    'Data Object Reference': '数据对象引用',
+    'Data Store Reference': '数据存储引用',
+    'Participant': '参与者',
+    'Lane': '泳道',
+    'Sub-Process (collapsed)': '子流程 (折叠)',
+    'Sub-Process (expanded)': '子流程 (展开)',
+    'Transaction': '事务',
+    'Create StartEvent': '创建开始事件',
+    'Create UserTask': '创建用户任务',
+    'Create EndEvent': '创建结束事件',
+    'Append UserTask': '追加用户任务',
+    'Append EndEvent': '追加结束事件',
+    "Activate create/remove space tool": "启动创建/删除空间工具",
+    "Activate global connect tool": "启动全局连接工具",
+    "Activate hand tool": "启动手动工具",
+    "Activate lasso tool": "启动 Lasso 工具",
+    "Ad-hoc": "Ad-hoc子流程",
+    "Ad-hoc sub-process (collapsed)": "临时子流程（折叠）",
+    "Ad-hoc sub-process (expanded)": "临时子流程（展开）",
+    "Add lane above": "在上方添加通道",
+    "Add lane below": "在下方添加通道",
+    "Add text annotation": "添加文本注释",
+    "Append compensation activity": "追加补偿活动",
+    "Append conditional intermediate catch event": "添加中间条件捕获事件",
+    "Append end event": "添加结束事件",
+    "Append gateway": "添加网关",
+    "Append intermediate/boundary event": "添加中间/边界事件",
+    "Append message intermediate catch event": "添加消息中间捕获事件",
+    "Append receive task": "添加接收任务",
+    "Append signal intermediate catch event": "添加信号中间捕获事件",
+    "Append task": "添加任务",
+    "Append timer intermediate catch event": "添加定时器中间捕获事件",
+    "Business rule task": "规则任务",
+    "Call activity": "引用流程",
+    "Cancel boundary event": "取消边界事件",
+    "Cancel end event": "取消结束事件",
+    "Collection": "集合",
+    "Compensation boundary event": "补偿边界事件",
+    "Compensation end event": "结束补偿事件",
+    "Compensation intermediate throw event": "中间补偿抛出事件",
+    "Compensation start event": "补偿启动事件",
+    "Complex gateway": "复杂网关",
+    "Conditional boundary event": "条件边界事件",
+    "Conditional boundary event (non-interrupting)": "条件边界事件 (非中断)",
+    "Conditional flow": "条件流",
+    "Conditional intermediate catch event": "中间条件捕获事件",
+    "Conditional start event": "条件启动事件",
+    "Conditional start event (non-interrupting)": "条件启动事件 (非中断)",
+    "Connect to other element": "连接到其他元素",
+    "Connect using association": "文本关联",
+    "Connect using data input association": "数据关联",
+    "Connect using sequence/message flow or association": "消息关联",
+    "Create data object reference": "创建数据对象引用",
+    "Create data store reference": "创建数据存储引用",
+    "Create end event": "创建结束事件",
+    "Create expanded sub-process": "创建可折叠子流程",
+    "Create gateway": "创建网关",
+    "Create group": "创建组",
+    "Create intermediate/boundary event": "创建中间/边界事件",
+    "Create pool/participant": "创建池/参与者",
+    "Create start event": "创建开始事件",
+    "Create task": "创建任务",
+    "Data object reference": "数据对象引用",
+    "Data store reference": "数据存储引用",
+    "Delete": "删除",
+    "Divide into three lanes": "分成三条通道",
+    "Divide into two lanes": "分成两条通道",
+    "Empty pool/participant": "空泳道",
+    "Empty pool/participant (removes content)": "清空泳道（删除内容）",
+    "End event": "结束事件",
+    "Error boundary event": "错误边界事件",
+    "Error end event": "结束错误事件",
+    "Error start event": "错误启动事件",
+    "Escalation boundary event": "升级边界事件",
+    "Escalation boundary event (non-interrupting)": "升级边界事件 (非中断)",
+    "Escalation end event": "结束升级事件",
+    "Escalation intermediate throw event": "中间升级抛出事件",
+    "Escalation start event": "升级启动事件",
+    "Escalation start event (non-interrupting)": "升级启动事件 (非中断)",
+    "Event sub-process": "事件子流程",
+    "Event-based gateway": "事件网关",
+    "Exclusive gateway": "独占网关",
+    "Inclusive gateway": "包容网关",
+    "Intermediate throw event": "中间抛出事件",
+    "Link intermediate catch event": "中间链接捕获事件",
+    "Link intermediate throw event": "中间链接抛出事件",
+    "Loop": "循环",
+    "Manual task": "手动任务",
+    "Message boundary event": "消息边界事件",
+    "Message boundary event (non-interrupting)": "消息边界事件 (非中断)",
+    "Message end event": "结束消息事件",
+    "Message intermediate catch event": "中间消息捕获事件",
+    "Message intermediate throw event": "中间消息抛出事件",
+    "Message start event": "消息启动事件",
+    "Message start event (non-interrupting)": "消息启动事件 (非中断)",
+    "Open {element}": "打开 {element}",
+    "Parallel gateway": "并行网关",
+    "Parallel multi-instance": "并行多实例",
+    "Participant multiplicity": "参与者多重性",
+    "Receive task": "接受任务",
+    "Script task": "脚本任务",
+    "Search in diagram": "在图表中搜索",
+    "Send task": "发送任务",
+    "Sequence flow": "顺序流",
+    "Sequential multi-instance": "串行多实例",
+    "Service task": "服务任务",
+    "Signal boundary event": "信号边界事件",
+    "Signal boundary event (non-interrupting)": "信号边界事件 (非中断)",
+    "Signal end event": "结束信号事件",
+    "Signal intermediate catch event": "中间信号捕获事件",
+    "Signal intermediate throw event": "中间信号抛出事件",
+    "Signal start event": "信号启动事件",
+    "Signal start event (non-interrupting)": "信号启动事件 (非中断)",
+    "Start event": "开始事件",
+    "Sub-process": "子流程",
+    "Sub-process (collapsed)": "可折叠子流程",
+    "Sub-process (expanded)": "可展开子流程",
+    "Terminate end event": "终止边界事件",
+    "Timer boundary event": "定时边界事件",
+    "Timer boundary event (non-interrupting)": "定时边界事件 (非中断)",
+    "Timer intermediate catch event": "中间定时捕获事件",
+    "Timer start event": "定时启动事件",
+    "Timer start event (non-interrupting)": "定时启动事件 (非中断)",
+    "User task": "用户任务",
+    "already rendered {element}": "{element} 已呈现",
+    "correcting missing bpmnElement on {plane} to {rootElement}": "在 {plane} 上更正缺失的 bpmnElement 为 {rootElement}",
+    "diagram not part of bpmn:Definitions": "图表不是 bpmn:Definitions 的一部分",
+    "element required": "需要元素",
+    "element {element} referenced by {referenced}#{property} not yet drawn": "元素 {element} 的引用 {referenced}#{property} 尚未绘制",
+    "failed to import {element}": "{element} 导入失败",
+    "flow elements must be children of pools/participants": "元素必须是池/参与者的子级",
+    "missing {semantic}#attachedToRef": "在 {element} 中缺少 {semantic}#attachedToRef",
+    "more than {count} child lanes": "超过 {count} 条通道",
+    "multiple DI elements defined for {element}": "为 {element} 定义了多个 DI 元素",
+    "no bpmnElement referenced in {element}": "{element} 中没有引用 bpmnElement",
+    "no diagram to display": "没有要显示的图表",
+    "no parent for {element} in {parent}": "在 {element} 中没有父元素 {parent}",
+    "no process or collaboration to display": "没有可显示的流程或协作",
+    "no shape type specified": "未指定形状类型",
+    "out of bounds release": "越界释放",
+
+    //================================================================
+    // 手动补充
+    //================================================================
+
+    "Before": "前置条件",
+    "After": "后置条件",
+    "Inputs": "输入",
+    "Outputs": "输出",
+    "User assignment": "用户分配",
+    "The due date as an EL expression (e.g. ${someDate}) or an ISO date (e.g. 2015-06-26T09:54:00).":
+        "截止时间，可以使用 EL 表达式（例如 ${someDate}）或 ISO 日期（例如 2015-06-26T09:54:00）",
+    "The follow up date as an EL expression (e.g. ${someDate}) or an ISO date (e.g. 2015-06-26T09:54:00).":
+        "后续日期，可以使用 EL 表达式（例如 ${someDate}）或 ISO 日期（例如 2015-06-26T09:54:00）",
+    "Follow-up date": "后续日期",
+    "Owner": "负责人",
+    "Input parameter": "输入参数",
+    "Output parameter": "输出参数",
+    "Condition expression": "条件表达式",
+    "Variable mapping": "变量映射",
+    "Service task implementation": "服务任务实现方式",
+    "Message name": "消息名称",
+    "Signal name": "信号名称",
+    "Error code": "错误编码",
+    "Escalation code": "升级编码",
+    "Description": "描述",
+};
+
+
+// 3. 合并基础汉化包和自定义汉化包
+//    自定义的会覆盖基础的，确保我们的翻译优先
+const allTranslations = {
+    ...translations,
+    ...customTranslations
+};
+
+/**
+ * 自定义翻译函数
+ * @param {string} template 原始模板字符串
+ * @param {Object} [replacements] 替换占位符的键值对
+ * @returns {string} 翻译后的文本
+ */
+function customTranslate(template, replacements) {
+    // 使用合并后的全量字典进行查找
+    let str = allTranslations[template] || template;
+
+    if (replacements && typeof str === 'string') {
+        str = str.replace(/{([^}]+)}/g, (_, key) => {
+            return replacements[key] !== undefined ? replacements[key] : `{${key}}`;
+        });
     }
-    return translations[template] || template;
+
+    return str;
 }
+
+// 导出符合 bpmn-js 规范的模块
+export default {
+    __init__: [ 'translate' ],
+    translate: [ 'value', customTranslate ]
+};

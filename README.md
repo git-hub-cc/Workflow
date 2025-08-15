@@ -2,7 +2,7 @@
 
 这是一个功能完备、前后端分离的表单与工作流解决方案。它允许用户通过可视化的界面**拖拽生成表单**，并为表单**设计BPMN 2.0审批流程**。整个应用打包成一个独立的单元，后端内置了 Camunda 7 流程引擎和 H2 内存数据库，实现了**零外部依赖**，一键启动。
 
- <!-- 建议在这里放一张项目截图 -->
+## 📸 预览
 
 ---
 
@@ -104,7 +104,7 @@
 
 1.  **克隆仓库**
     ```bash
-    git clone https://github.com/your-username/your-repo-name.git
+    git clone https://github.com/git-hub-cc/Workflow.git
     cd your-repo-name
     ```
 
