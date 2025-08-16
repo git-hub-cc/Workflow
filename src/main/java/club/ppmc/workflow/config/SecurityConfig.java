@@ -32,7 +32,8 @@ public class SecurityConfig {
                 .csrf(csrf -> csrf.disable()) // 禁用 CSRF，因为我们使用无状态的 JWT
                 .authorizeHttpRequests(auth -> auth
                         // 公开访问端点：登录接口和 H2 数据库控制台
-                        .requestMatchers("/api/auth/**", "/h2-console/**").permitAll()
+                        // todo camunda为临时添加
+                        .requestMatchers("/api/auth/**", "/h2-console/**",  "/camunda/**").permitAll()
                         // 其他所有请求都需要经过认证
                         .anyRequest().authenticated()
                 )
