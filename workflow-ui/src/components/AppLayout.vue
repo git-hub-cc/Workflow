@@ -21,6 +21,9 @@
               </a>
               <template #overlay>
                 <a-menu>
+                  <a-menu-item v-if="userStore.isAdmin" key="admin-dashboard" @click="$router.push({ name: 'admin-dashboard' })">
+                    仪表盘
+                  </a-menu-item>
                   <a-menu-item v-if="userStore.isAdmin" key="admin-users" @click="$router.push({ name: 'admin-users' })">
                     用户管理
                   </a-menu-item>
@@ -28,6 +31,9 @@
                     实例管理
                   </a-menu-item>
                   <a-menu-divider v-if="userStore.isAdmin" />
+                  <a-menu-item key="profile" @click="$router.push({ name: 'profile' })">
+                    个人中心
+                  </a-menu-item>
                   <a-menu-item key="logout" @click="userStore.logout">
                     退出登录
                   </a-menu-item>

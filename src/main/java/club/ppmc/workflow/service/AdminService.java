@@ -8,12 +8,14 @@ import club.ppmc.workflow.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.camunda.bpm.engine.HistoryService;
 import org.camunda.bpm.engine.RuntimeService;
+import org.camunda.bpm.engine.TaskService;
 import org.camunda.bpm.engine.history.HistoricProcessInstance;
 import org.camunda.bpm.engine.runtime.ActivityInstance;
 import org.camunda.bpm.engine.runtime.ProcessInstance;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 
 import java.time.ZoneId;
 import java.util.*;
@@ -32,6 +34,7 @@ public class AdminService {
     private final UserRepository userRepository;
     private final RuntimeService runtimeService;
     private final HistoryService historyService;
+    private final TaskService taskService; // 新增注入
     private final PasswordEncoder passwordEncoder;
 
     /**
@@ -121,6 +124,36 @@ public class AdminService {
     }
 
     /**
+     * 挂起流程实例
+     * @param processInstanceId 流程实例ID
+     */
+    public void suspendProcessInstance(String processInstanceId) {
+        runtimeService.suspendProcessInstanceById(processInstanceId);
+    }
+
+    /**
+     * 激活流程实例
+     * @param processInstanceId 流程实例ID
+     */
+    public void activateProcessInstance(String processInstanceId) {
+        runtimeService.activateProcessInstanceById(processInstanceId);
+    }
+
+    /**
+     * 改派任务
+     * @param taskId 任务ID
+     * @param newAssigneeId 新的办理人ID
+     */
+    public void reassignTask(String taskId, String newAssigneeId) {
+        if (!userRepository.existsById(newAssigneeId)) {
+            throw new ResourceNotFoundException("新的办理人ID不存在: " + newAssigneeId);
+        }
+        // Camunda API 内部会检查 task 是否存在
+        taskService.setAssignee(taskId, newAssigneeId);
+    }
+
+
+    /**
      * 创建一个新用户
      * @param userDto 用户数据
      * @return 创建后的用户DTO
@@ -135,6 +168,14 @@ public class AdminService {
         user.setRole(userDto.getRole() != null ? userDto.getRole() : "USER");
         // 默认密码为 'password'，在真实项目中应有更安全的处理方式
         user.setPassword(passwordEncoder.encode("password"));
+
+        // 设置上级
+        if (StringUtils.hasText(userDto.getManagerId())) {
+            User manager = userRepository.findById(userDto.getManagerId())
+                    .orElseThrow(() -> new ResourceNotFoundException("未找到上级用户: " + userDto.getManagerId()));
+            user.setManager(manager);
+        }
+
         User savedUser = userRepository.save(user);
         return toUserDto(savedUser);
     }
@@ -150,6 +191,16 @@ public class AdminService {
                 .orElseThrow(() -> new ResourceNotFoundException("未找到用户: " + id));
         user.setName(userDto.getName());
         user.setRole(userDto.getRole());
+
+        // 更新上级
+        if (StringUtils.hasText(userDto.getManagerId())) {
+            User manager = userRepository.findById(userDto.getManagerId())
+                    .orElseThrow(() -> new ResourceNotFoundException("未找到上级用户: " + userDto.getManagerId()));
+            user.setManager(manager);
+        } else {
+            user.setManager(null); // 如果 managerId 为空，则清除上级
+        }
+
         User updatedUser = userRepository.save(user);
         return toUserDto(updatedUser);
     }
@@ -170,6 +221,9 @@ public class AdminService {
         dto.setId(user.getId());
         dto.setName(user.getName());
         dto.setRole(user.getRole());
+        if (user.getManager() != null) {
+            dto.setManagerId(user.getManager().getId());
+        }
         return dto;
     }
 }

@@ -8,7 +8,7 @@ export const login = (credentials) => service.post('/auth/login', credentials);
 // 创建 axios 实例
 const service = axios.create({
     baseURL: '/api', // Vite 代理会自动处理
-    timeout: 10000, // 请求超时时间
+    timeout: 1200000, // 请求超时时间
 });
 
 // 请求拦截器
@@ -57,6 +57,10 @@ export const submitForm = (formId, data) => service.post(`/forms/${formId}/submi
 // --- 工作流 API ---
 export const deployWorkflow = (data) => service.post('/workflows/deploy', data);
 export const getWorkflowTemplate = (formId) => service.get(`/workflows/templates?formId=${formId}`);
+export const getWorkflowHistory = (submissionId) => service.get(`/workflows/history/${submissionId}`);
+// --- 【新增】 ---
+export const updateWorkflowTemplate = (formId, data) => service.put(`/workflows/templates/${formId}`, data);
+
 
 // --- 任务 API ---
 export const getPendingTasks = () => service.get('/tasks/pending'); // assigneeId is determined by backend via JWT
@@ -65,12 +69,22 @@ export const completeTask = (taskId, data) => service.post(`/tasks/${taskId}/com
 
 // --- 用户和管理 API ---
 export const getAllUsers = () => service.get('/workflows/users');
+export const changePassword = (data) => service.post('/users/me/change-password', data);
+
 // Admin User Management
 export const createUser = (data) => service.post('/admin/users', data);
 export const updateUser = (id, data) => service.put(`/admin/users/${id}`, data);
 export const deleteUser = (id) => service.delete(`/admin/users/${id}`);
+
 // Admin Instance Management
 export const getActiveInstances = () => service.get('/admin/instances');
 export const terminateInstance = (instanceId, reason) => service.delete(`/admin/instances/${instanceId}?reason=${reason}`);
+export const suspendInstance = (instanceId) => service.post(`/admin/instances/${instanceId}/suspend`);
+export const activateInstance = (instanceId) => service.post(`/admin/instances/${instanceId}/activate`);
+export const reassignTask = (taskId, newAssigneeId) => service.post(`/admin/tasks/${taskId}/reassign`, { newAssigneeId });
+
+// Admin Dashboard
+export const getDashboardStats = () => service.get('/dashboard/stats');
+
 
 export default service;

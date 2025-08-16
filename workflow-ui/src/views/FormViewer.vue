@@ -26,7 +26,7 @@
               :is="getComponentByType(field.type)"
               v-model:value="formData[field.id]"
               :placeholder="field.props.placeholder"
-              :options="field.type === 'Select' ? field.props.options.map(o => ({label: o, value: o})) : undefined"
+              :options="getOptionsForField(field)"
           />
         </a-form-item>
       </a-form>
@@ -38,6 +38,7 @@
 import { ref, reactive, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { getFormById, submitForm } from '@/api';
+import { useUserStore } from '@/stores/user';
 import { message } from 'ant-design-vue';
 import {
   Input as AInput,
@@ -49,6 +50,7 @@ import {
 
 const props = defineProps({ formId: String });
 const router = useRouter();
+const userStore = useUserStore();
 
 const loading = ref(true);
 const submitting = ref(false);
@@ -57,8 +59,18 @@ const formData = reactive({});
 const formRef = ref();
 
 const getComponentByType = (type) => ({
-  Input: AInput, Textarea: ATextarea, Select: ASelect, Checkbox: ACheckbox, DatePicker: ADatePicker,
+  Input: AInput, Textarea: ATextarea, Select: ASelect, Checkbox: ACheckbox, DatePicker: ADatePicker, UserPicker: ASelect,
 }[type] || AInput);
+
+const getOptionsForField = (field) => {
+  if (field.type === 'Select') {
+    return field.props.options.map(o => ({ label: o, value: o }));
+  }
+  if (field.type === 'UserPicker') {
+    return userStore.allUsers.map(u => ({ label: `${u.name} (${u.id})`, value: u.id }));
+  }
+  return undefined;
+};
 
 onMounted(async () => {
   try {

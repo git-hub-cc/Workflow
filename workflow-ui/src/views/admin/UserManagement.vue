@@ -22,6 +22,9 @@
               {{ record.role }}
             </a-tag>
           </template>
+          <template v-if="column.key === 'managerName'">
+            {{ getManagerName(record.managerId) }}
+          </template>
           <template v-else-if="column.key === 'actions'">
             <a-space>
               <a-button type="link" @click="showModal(record)">编辑</a-button>
@@ -30,9 +33,9 @@
                   ok-text="确认删除"
                   cancel-text="取消"
                   @confirm="handleDelete(record.id)"
-                  :disabled="record.id === userStore.currentUserId"
+                  :disabled="record.id === userStore.currentUser.id"
               >
-                <a-button type="link" danger :disabled="record.id === userStore.currentUserId">
+                <a-button type="link" danger :disabled="record.id === userStore.currentUser.id">
                   删除
                 </a-button>
               </a-popconfirm>
@@ -63,6 +66,20 @@
             <a-select-option value="ADMIN">管理员 (ADMIN)</a-select-option>
           </a-select>
         </a-form-item>
+        <a-form-item label="直属上级" name="managerId">
+          <a-select
+              v-model:value="formState.managerId"
+              placeholder="请选择直属上级 (可选)"
+              allow-clear
+              show-search
+              :filter-option="filterOption"
+          >
+            <!-- 过滤掉用户自己，防止自己是自己的上级 -->
+            <a-select-option v-for="user in availableManagers" :key="user.id" :value="user.id">
+              {{ user.name }} ({{ user.id }})
+            </a-select-option>
+          </a-select>
+        </a-form-item>
         <a-alert v-if="!isEditing" message="新用户默认密码为 'password'，请提醒用户及时修改。" type="info" show-icon />
       </a-form>
     </a-modal>
@@ -70,7 +87,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted } from 'vue';
+import { ref, reactive, onMounted, computed } from 'vue';
 import { useUserStore } from '@/stores/user';
 import { createUser, updateUser, deleteUser } from '@/api';
 import { message } from 'ant-design-vue';
@@ -79,13 +96,16 @@ import { PlusOutlined } from '@ant-design/icons-vue';
 const userStore = useUserStore();
 
 onMounted(() => {
-  userStore.fetchAllUsers();
+  if (userStore.allUsers.length === 0) {
+    userStore.fetchAllUsers();
+  }
 });
 
 const columns = [
   { title: '用户ID', dataIndex: 'id', key: 'id' },
   { title: '姓名', dataIndex: 'name', key: 'name' },
   { title: '角色', dataIndex: 'role', key: 'role', align: 'center' },
+  { title: '直属上级', dataIndex: 'managerId', key: 'managerName', align: 'center' },
   { title: '操作', key: 'actions', align: 'center' },
 ];
 
@@ -98,6 +118,7 @@ const formState = reactive({
   id: '',
   name: '',
   role: 'USER',
+  managerId: null,
 });
 
 const rules = {
@@ -106,10 +127,30 @@ const rules = {
   role: [{ required: true, message: '请选择角色' }],
 };
 
+const availableManagers = computed(() => {
+  if (!isEditing.value) {
+    return userStore.allUsers;
+  }
+  // 编辑时，从列表中排除自己
+  return userStore.allUsers.filter(u => u.id !== formState.id);
+});
+
+const getManagerName = (managerId) => {
+  if (!managerId) return '-';
+  const manager = userStore.allUsers.find(u => u.id === managerId);
+  return manager ? manager.name : managerId;
+};
+
+const filterOption = (input, option) => {
+  // 允许通过姓名或ID搜索
+  const label = option.children()[0].children.toLowerCase();
+  return label.includes(input.toLowerCase());
+};
+
 const showModal = (user) => {
   if (user) {
     isEditing.value = true;
-    Object.assign(formState, user);
+    Object.assign(formState, { ...user, managerId: user.managerId || null });
   } else {
     isEditing.value = false;
     resetForm();
@@ -122,12 +163,15 @@ const handleOk = async () => {
     await formRef.value.validate();
     modalConfirmLoading.value = true;
 
+    // 准备提交的数据，如果 managerId 为空，确保发送 null 或 undefined 而不是空字符串
+    const payload = { ...formState, managerId: formState.managerId || null };
+
     if (isEditing.value) {
-      const updatedUser = await updateUser(formState.id, formState);
+      const updatedUser = await updateUser(payload.id, payload);
       userStore.updateUser(updatedUser);
       message.success('用户更新成功！');
     } else {
-      const newUser = await createUser(formState);
+      const newUser = await createUser(payload);
       userStore.addUser(newUser);
       message.success('用户创建成功！');
     }
@@ -147,6 +191,7 @@ const resetForm = () => {
   formState.id = '';
   formState.name = '';
   formState.role = 'USER';
+  formState.managerId = null;
   formRef.value?.clearValidate();
 };
 

@@ -44,6 +44,23 @@ public class WorkflowController {
         return ResponseEntity.ok().build();
     }
 
+    // --- 【新增】 ---
+    /**
+     * API: 更新工作流模板（仅保存，不部署）
+     * @param formId 表单ID
+     * @param request 包含BPMN XML和流程Key的请求体
+     * @return 更新后的模板信息
+     */
+    @PutMapping("/templates/{formId}")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<WorkflowTemplateResponse> updateWorkflowTemplate(
+            @PathVariable Long formId,
+            @RequestBody UpdateWorkflowTemplateRequest request) {
+        WorkflowTemplateResponse response = workflowService.updateWorkflowTemplate(formId, request);
+        return ResponseEntity.ok(response);
+    }
+    // --- 【新增结束】 ---
+
     /**
      * API: 根据表单ID获取其工作流模板
      * 权限: 已认证用户
@@ -88,10 +105,12 @@ public class WorkflowController {
 
     /**
      * API: 根据业务ID（FormSubmission ID）获取工作流实例的历史记录
-     * 权限: 仅限提交人或管理员
+     * 权限: 仅限提交人、流程参与者或管理员
      */
     @GetMapping("/history/{submissionId}")
-    @PreAuthorize("@workflowService.isSubmissionOwner(#submissionId, principal.username) or hasRole('ADMIN')")
+    @PreAuthorize("@workflowService.isSubmissionOwner(#submissionId, principal.username) " +
+            "or @workflowService.isTaskAssigneeForSubmission(#submissionId, principal.username) " +
+            "or hasRole('ADMIN')")
     public ResponseEntity<List<HistoryActivityDto>> getWorkflowHistory(@PathVariable Long submissionId) {
         List<HistoryActivityDto> history = workflowService.getWorkflowHistoryBySubmissionId(submissionId);
         return ResponseEntity.ok(history);

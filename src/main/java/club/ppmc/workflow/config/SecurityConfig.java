@@ -3,6 +3,7 @@ package club.ppmc.workflow.config;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.AuthenticationProvider;
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
@@ -34,6 +35,8 @@ public class SecurityConfig {
                         // 公开访问端点：登录接口和 H2 数据库控制台
                         // todo camunda为临时添加
                         .requestMatchers("/api/auth/**", "/h2-console/**",  "/camunda/**").permitAll()
+                        // 【新增】允许已认证用户访问自己的密码修改接口
+                        .requestMatchers(HttpMethod.POST, "/api/users/me/change-password").authenticated()
                         // 其他所有请求都需要经过认证
                         .anyRequest().authenticated()
                 )

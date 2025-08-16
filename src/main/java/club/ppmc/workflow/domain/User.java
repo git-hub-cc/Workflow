@@ -1,9 +1,6 @@
 package club.ppmc.workflow.domain;
 
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.Id;
-import jakarta.persistence.Table;
+import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
 import org.springframework.security.core.GrantedAuthority;
@@ -28,6 +25,11 @@ public class User implements UserDetails {
 
     @Column(nullable = false)
     private String role; // 例如: "USER", "ADMIN"
+
+    // --- 新增字段: 用户的直属上级 ---
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "manager_id") // 在数据库中创建外键列 manager_id
+    private User manager;
 
     // --- UserDetails 接口实现 ---
 

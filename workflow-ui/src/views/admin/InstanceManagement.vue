@@ -21,16 +21,24 @@
           <template v-else-if="column.key === 'processDefinitionName'">
             {{ record.processDefinitionName }} (v{{ record.version }})
           </template>
+          <template v-else-if="column.key === 'suspended'">
+            <a-tag :color="record.suspended ? 'orange' : 'green'">
+              {{ record.suspended ? '已挂起' : '运行中' }}
+            </a-tag>
+          </template>
           <template v-else-if="column.key === 'actions'">
-            <a-popconfirm
-                title="确定要终止这个流程实例吗？"
-                content="此操作不可逆，将立即停止该流程的执行。"
-                ok-text="确认终止"
-                cancel-text="取消"
-                @confirm="handleTerminate(record)"
-            >
-              <a-button type="primary" danger size="small">终止流程</a-button>
-            </a-popconfirm>
+            <a-dropdown>
+              <a class="ant-dropdown-link" @click.prevent>
+                操作 <DownOutlined />
+              </a>
+              <template #overlay>
+                <a-menu @click="({ key }) => handleMenuClick(key, record)">
+                  <a-menu-item v-if="!record.suspended" key="suspend">挂起</a-menu-item>
+                  <a-menu-item v-if="record.suspended" key="activate">激活</a-menu-item>
+                  <a-menu-item key="terminate" danger>终止</a-menu-item>
+                </a-menu>
+              </template>
+            </a-dropdown>
           </template>
         </template>
       </a-table>
@@ -40,8 +48,9 @@
 
 <script setup>
 import { ref, onMounted, h } from 'vue';
-import { getActiveInstances, terminateInstance } from '@/api';
+import { getActiveInstances, terminateInstance, suspendInstance, activateInstance } from '@/api';
 import { message, Modal, Input } from 'ant-design-vue';
+import { DownOutlined } from '@ant-design/icons-vue';
 
 const loading = ref(true);
 const instances = ref([]);
@@ -50,6 +59,7 @@ const columns = [
   { title: '实例ID', dataIndex: 'processInstanceId', key: 'processInstanceId', ellipsis: true },
   { title: '业务ID (申请)', dataIndex: 'businessKey', key: 'businessKey', align: 'center' },
   { title: '流程定义', dataIndex: 'processDefinitionName', key: 'processDefinitionName' },
+  { title: '状态', dataIndex: 'suspended', key: 'suspended', align: 'center' },
   { title: '发起人', dataIndex: 'startUserName', key: 'startUserName' },
   { title: '开始时间', dataIndex: 'startTime', key: 'startTime' },
   { title: '当前节点', dataIndex: 'currentActivityName', key: 'currentActivityName' },
@@ -68,6 +78,36 @@ const fetchInstances = async () => {
 };
 
 onMounted(fetchInstances);
+
+const handleMenuClick = async (key, record) => {
+  switch (key) {
+    case 'suspend':
+      await handleSuspend(record.processInstanceId);
+      break;
+    case 'activate':
+      await handleActivate(record.processInstanceId);
+      break;
+    case 'terminate':
+      handleTerminate(record);
+      break;
+  }
+};
+
+const handleSuspend = async (instanceId) => {
+  try {
+    await suspendInstance(instanceId);
+    message.success('流程实例已挂起');
+    await fetchInstances();
+  } catch (err) { /* Global handler */ }
+};
+
+const handleActivate = async (instanceId) => {
+  try {
+    await activateInstance(instanceId);
+    message.success('流程实例已激活');
+    await fetchInstances();
+  } catch (err) { /* Global handler */ }
+};
 
 const handleTerminate = (record) => {
   let reason = '';

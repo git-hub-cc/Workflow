@@ -32,7 +32,7 @@
               <a-button type="link" @click="goToViewer(record.id)">发起申请</a-button>
               <!-- 按钮只对管理员可见 -->
               <a-button v-if="userStore.isAdmin" type="link" @click="goToDesigner(record.id)">设计流程</a-button>
-              <a-button type="link" @click="goToSubmissions(record.id)">数据记录</a-button>
+              <a-button type="link" @click="goToSubmissions(record.id)">查看数据</a-button>
             </a-space>
           </template>
         </template>

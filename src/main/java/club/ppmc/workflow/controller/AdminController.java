@@ -10,6 +10,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 /**
  * @author 你的名字
@@ -43,6 +44,38 @@ public class AdminController {
         adminService.terminateProcessInstance(processInstanceId, reason);
         return ResponseEntity.ok().build();
     }
+
+    /**
+     * API: 挂起一个流程实例
+     */
+    @PostMapping("/instances/{processInstanceId}/suspend")
+    public ResponseEntity<Void> suspendProcessInstance(@PathVariable String processInstanceId) {
+        adminService.suspendProcessInstance(processInstanceId);
+        return ResponseEntity.ok().build();
+    }
+
+    /**
+     * API: 激活一个流程实例
+     */
+    @PostMapping("/instances/{processInstanceId}/activate")
+    public ResponseEntity<Void> activateProcessInstance(@PathVariable String processInstanceId) {
+        adminService.activateProcessInstance(processInstanceId);
+        return ResponseEntity.ok().build();
+    }
+
+    /**
+     * API: 改派一个任务
+     */
+    @PostMapping("/tasks/{taskId}/reassign")
+    public ResponseEntity<Void> reassignTask(@PathVariable String taskId, @RequestBody Map<String, String> payload) {
+        String newAssigneeId = payload.get("newAssigneeId");
+        if (newAssigneeId == null || newAssigneeId.isEmpty()) {
+            return ResponseEntity.badRequest().build();
+        }
+        adminService.reassignTask(taskId, newAssigneeId);
+        return ResponseEntity.ok().build();
+    }
+
 
     // --- 用户管理 ---
 

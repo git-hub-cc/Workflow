@@ -9,10 +9,18 @@
       >
         <template #renderItem="{ item }">
           <a-list-item>
-            <a-list-item-meta
-                :title="`${item.formName} - ${item.stepName}`"
-                :description="`提交人: ${item.submitterName || '未知'} | 到达时间: ${new Date(item.createdAt).toLocaleString()}`"
-            />
+            <a-list-item-meta>
+              <template #title>
+                <a @click="goToTaskDetail(item.camundaTaskId)">{{ item.formName }} - {{ item.stepName }}</a>
+              </template>
+              <template #description>
+                <span>提交人: {{ item.submitterName || '未知' }} | 到达时间: {{ new Date(item.createdAt).toLocaleString() }}</span>
+              </template>
+              <template #avatar>
+                <a-tag v-if="isRejectedTask(item)" color="error">待修改</a-tag>
+                <a-tag v-else color="processing">待处理</a-tag>
+              </template>
+            </a-list-item-meta>
             <template #actions>
               <a-button type="primary" @click="goToTaskDetail(item.camundaTaskId)">去处理</a-button>
             </template>
@@ -46,6 +54,11 @@ onMounted(async () => {
     loading.value = false;
   }
 });
+
+const isRejectedTask = (task) => {
+  // 简单约定：如果任务名包含“修改”或“调整”，则认为是驳回任务
+  return task.stepName.includes('修改') || task.stepName.includes('调整');
+};
 
 const goToTaskDetail = (taskId) => {
   router.push({ name: 'task-detail', params: { taskId } });

@@ -43,6 +43,13 @@ const router = createRouter({
                     meta: { title: '查看提交数据' }
                 },
                 {
+                    path: 'submission/:submissionId', // 新增：申请详情页
+                    name: 'submission-detail',
+                    component: () => import('../views/SubmissionDetail.vue'),
+                    props: true,
+                    meta: { title: '申请详情' }
+                },
+                {
                     path: 'workflow/designer/:formId',
                     name: 'workflow-designer',
                     component: () => import('../views/WorkflowDesigner.vue'),
@@ -62,7 +69,19 @@ const router = createRouter({
                     props: true,
                     meta: { title: '任务处理' }
                 },
+                {
+                    path: 'profile', // 新增：个人中心
+                    name: 'profile',
+                    component: () => import('../views/Profile.vue'),
+                    meta: { title: '个人中心' }
+                },
                 // Admin Routes
+                {
+                    path: 'admin/dashboard', // 新增：仪表盘
+                    name: 'admin-dashboard',
+                    component: () => import('../views/admin/Dashboard.vue'),
+                    meta: { title: '仪表盘', requiresAdmin: true }
+                },
                 {
                     path: 'admin/users',
                     name: 'admin-users',

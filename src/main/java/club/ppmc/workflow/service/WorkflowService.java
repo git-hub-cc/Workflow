@@ -1,23 +1,20 @@
 package club.ppmc.workflow.service;
 
 import club.ppmc.workflow.domain.*;
-import club.ppmc.workflow.dto.CompleteTaskRequest;
-import club.ppmc.workflow.dto.DeployWorkflowRequest;
-import club.ppmc.workflow.dto.HistoryActivityDto;
-import club.ppmc.workflow.dto.TaskDto;
-import club.ppmc.workflow.dto.WorkflowTemplateResponse;
+import club.ppmc.workflow.dto.*;
 import club.ppmc.workflow.exception.ResourceNotFoundException;
 import club.ppmc.workflow.repository.*;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.camunda.bpm.engine.*;
 import org.camunda.bpm.engine.history.HistoricActivityInstance;
-import org.camunda.bpm.engine.history.HistoricProcessInstance;
 import org.camunda.bpm.engine.history.HistoricTaskInstance;
 import org.camunda.bpm.engine.history.HistoricVariableInstance;
 import org.camunda.bpm.engine.repository.Deployment;
+import org.camunda.bpm.engine.repository.ProcessDefinition;
 import org.camunda.bpm.engine.runtime.ProcessInstance;
 import org.camunda.bpm.engine.task.Task;
 import org.springframework.stereotype.Service;
@@ -36,6 +33,7 @@ import java.util.stream.Stream;
 @Service
 @RequiredArgsConstructor
 @Transactional
+@Slf4j
 public class WorkflowService {
 
     private final RepositoryService repositoryService;
@@ -52,10 +50,6 @@ public class WorkflowService {
 
     private final ObjectMapper objectMapper;
 
-    /**
-     * 部署一个新的工作流定义到 Camunda 引擎
-     * @param request 包含 BPMN XML 和关联信息的请求
-     */
     public void deployWorkflow(DeployWorkflowRequest request) {
         FormDefinition formDef = formDefinitionRepository.findById(request.getFormDefinitionId())
                 .orElseThrow(() -> new ResourceNotFoundException("未找到表单定义 ID: " + request.getFormDefinitionId()));
@@ -63,7 +57,6 @@ public class WorkflowService {
         Deployment deployment = repositoryService.createDeployment()
                 .addString(request.getProcessDefinitionKey() + ".bpmn", request.getBpmnXml())
                 .name("Deployment for form: " + formDef.getName())
-                .tenantId("default")
                 .deploy();
 
         WorkflowTemplate template = templateRepository.findByFormDefinitionId(request.getFormDefinitionId())
@@ -77,22 +70,33 @@ public class WorkflowService {
         templateRepository.save(template);
     }
 
-    /**
-     * 获取或创建一个工作流模板的 DTO。
-     * 如果模板已存在，则返回它。如果不存在，则在内存中生成一个默认模板 DTO。
-     * @param formId 表单定义 ID
-     * @return WorkflowTemplateResponse
-     */
+    public WorkflowTemplateResponse updateWorkflowTemplate(Long formId, UpdateWorkflowTemplateRequest request) {
+        FormDefinition formDef = formDefinitionRepository.findById(formId)
+                .orElseThrow(() -> new ResourceNotFoundException("未找到表单定义 ID: " + formId));
+
+        WorkflowTemplate template = templateRepository.findByFormDefinitionId(formId)
+                .orElse(new WorkflowTemplate());
+
+        template.setFormDefinition(formDef);
+        template.setBpmnXml(request.getBpmnXml());
+        template.setProcessDefinitionKey(request.getProcessDefinitionKey());
+
+        WorkflowTemplate savedTemplate = templateRepository.save(template);
+
+        WorkflowTemplateResponse dto = new WorkflowTemplateResponse();
+        dto.setFormDefinitionId(savedTemplate.getFormDefinition().getId());
+        dto.setBpmnXml(savedTemplate.getBpmnXml());
+        dto.setProcessDefinitionKey(savedTemplate.getProcessDefinitionKey());
+        return dto;
+    }
+
     @Transactional(readOnly = true)
     public WorkflowTemplateResponse getOrCreateWorkflowTemplate(Long formId) {
-        // 1. 验证表单是否存在
         formDefinitionRepository.findById(formId)
                 .orElseThrow(() -> new ResourceNotFoundException("未找到表单定义 ID: " + formId));
 
-        // 2. 尝试查找已存在的模板
         return templateRepository.findByFormDefinitionId(formId)
                 .map(template -> {
-                    // 3a. 如果存在，则转换并返回
                     WorkflowTemplateResponse dto = new WorkflowTemplateResponse();
                     dto.setFormDefinitionId(template.getFormDefinition().getId());
                     dto.setBpmnXml(template.getBpmnXml());
@@ -100,17 +104,16 @@ public class WorkflowService {
                     return dto;
                 })
                 .orElseGet(() -> {
-                    // 3b. 如果不存在，则生成一个包含基础审批流程的默认 DTO
                     String processDefinitionKey = "Process_Form_" + formId;
                     String defaultXml = String.format("""
                         <?xml version="1.0" encoding="UTF-8"?>
                         <bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" xmlns:di="http://www.omg.org/spec/DD/20100524/DI" xmlns:camunda="http://camunda.org/schema/1.0/bpmn" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" id="Definitions_1" targetNamespace="http://bpmn.io/schema/bpmn" exporter="Camunda Modeler" exporterVersion="5.20.0">
-                          <bpmn:process id="%s" name="新流程" isExecutable="true">
+                          <bpmn:process id="%s" name="新流程" isExecutable="true" camunda:historyTimeToLive="P180D">
                             <bpmn:startEvent id="StartEvent_1" name="开始">
                               <bpmn:outgoing>Flow_1</bpmn:outgoing>
                             </bpmn:startEvent>
                             <bpmn:sequenceFlow id="Flow_1" sourceRef="StartEvent_1" targetRef="Activity_ManagerApprove" />
-                            <bpmn:userTask id="Activity_ManagerApprove" name="部门经理审批" camunda:assignee="manager001">
+                            <bpmn:userTask id="Activity_ManagerApprove" name="部门经理审批" camunda:assignee="${managerId}">
                               <bpmn:incoming>Flow_1</bpmn:incoming>
                               <bpmn:outgoing>Flow_2</bpmn:outgoing>
                             </bpmn:userTask>
@@ -158,31 +161,61 @@ public class WorkflowService {
     }
 
 
-    /**
-     * 启动一个新的工作流实例
-     * @param submission 触发流程的表单提交记录
-     */
     public void startWorkflow(FormSubmission submission) {
-        // 在启动流程前，设置 Camunda 的认证用户，这样 Camunda 会自动记录此用户为流程的发起人
         try {
             identityService.setAuthenticatedUserId(submission.getSubmitterId());
             templateRepository.findByFormDefinitionId(submission.getFormDefinition().getId()).ifPresent(template -> {
                 try {
+                    ProcessDefinition processDefinition = repositoryService.createProcessDefinitionQuery()
+                            .processDefinitionKey(template.getProcessDefinitionKey())
+                            .latestVersion()
+                            .singleResult();
+
+                    if (processDefinition == null) {
+                        log.warn("工作流模板存在 (form ID: {}), 但其流程定义 key '{}' 并未部署在 Camunda 引擎中。" +
+                                        "将跳过工作流启动 (submission ID: {}).",
+                                submission.getFormDefinition().getId(),
+                                template.getProcessDefinitionKey(),
+                                submission.getId());
+                        return;
+                    }
+
                     Map<String, Object> variables = objectMapper.readValue(submission.getDataJson(), new TypeReference<>() {});
                     variables.put("submitterId", submission.getSubmitterId());
                     variables.put("formSubmissionId", submission.getId());
 
-                    // 处理动态审批人: 约定如果表单数据中有名为 "nextAssignee" 的字段，则将其作为流程变量
+                    // --- 【核心修改：智能分配逻辑】 ---
+                    User submitter = userRepository.findById(submission.getSubmitterId())
+                            .orElseThrow(() -> new IllegalStateException("提交人不存在: " + submission.getSubmitterId()));
+
+                    String finalAssigneeId = null;
+
+                    // 1. 优先从表单提交的数据（nextAssignee）中获取办理人
                     if (variables.containsKey("nextAssignee")) {
-                        Object assignee = variables.get("nextAssignee");
-                        if (assignee instanceof String && !((String) assignee).isEmpty()) {
-                            variables.put("nextAssignee", assignee);
+                        Object assigneeObj = variables.get("nextAssignee");
+                        if (assigneeObj instanceof String && !((String) assigneeObj).isEmpty()) {
+                            finalAssigneeId = (String) assigneeObj;
+                            log.info("从表单 'nextAssignee' 字段中获取到下一步办理人: {}", finalAssigneeId);
                         }
                     }
 
+                    // 2. 如果表单中没有指定，则回退到使用员工的直属上级
+                    if (finalAssigneeId == null && submitter.getManager() != null) {
+                        finalAssigneeId = submitter.getManager().getId();
+                        log.info("表单未指定办理人，回退到使用直属上级: {}", finalAssigneeId);
+                    }
+
+                    // 3. 将最终确定的办理人ID放入名为 "managerId" 的流程变量中，以匹配BPMN定义
+                    if (finalAssigneeId != null) {
+                        variables.put("managerId", finalAssigneeId);
+                    } else {
+                        log.warn("无法确定下一步办理人 (表单未指定，且用户 '{}' 没有设置直属上级)。流程可能因此出错。", submitter.getId());
+                    }
+                    // --- 【修改结束】 ---
+
                     ProcessInstance camundaInstance = runtimeService.startProcessInstanceByKey(
                             template.getProcessDefinitionKey(),
-                            submission.getId().toString(), // 设置 BusinessKey 为 submissionId
+                            submission.getId().toString(),
                             variables
                     );
 
@@ -199,40 +232,47 @@ public class WorkflowService {
                 }
             });
         } finally {
-            // 清理线程局部变量，这是一个非常重要的好习惯
             identityService.clearAuthentication();
         }
     }
 
-    /**
-     * 完成一个用户任务
-     * @param camundaTaskId Camunda 中的任务 ID
-     * @param request 包含决定和评论
-     */
     public void completeUserTask(String camundaTaskId, CompleteTaskRequest request) {
         Task task = taskService.createTaskQuery().taskId(camundaTaskId).singleResult();
         if (task == null) {
             throw new ResourceNotFoundException("在 Camunda 中未找到任务 ID: " + camundaTaskId);
         }
 
-        // 将审批意见作为任务的局部变量存储
+        String processInstanceId = task.getProcessInstanceId();
+
+        if (request.getUpdatedFormData() != null && !request.getUpdatedFormData().isBlank()) {
+            WorkflowInstance instance = instanceRepository.findByProcessInstanceId(processInstanceId)
+                    .orElseThrow(() -> new IllegalStateException("数据不一致：找不到流程实例 " + processInstanceId + " 对应的本地实例"));
+
+            FormSubmission submission = instance.getFormSubmission();
+            submission.setDataJson(request.getUpdatedFormData());
+            formSubmissionRepository.save(submission);
+            log.info("已更新申请单 (ID: {}) 的表单数据。", submission.getId());
+
+            try {
+                Map<String, Object> updatedVariables = objectMapper.readValue(request.getUpdatedFormData(), new TypeReference<>() {});
+                runtimeService.setVariables(processInstanceId, updatedVariables);
+                log.info("已从重新提交的表单数据中更新流程实例 (ID: {}) 的变量。", processInstanceId);
+            } catch (JsonProcessingException e) {
+                log.error("解析更新后的表单数据失败，流程实例 ID: {}", processInstanceId, e);
+                throw new RuntimeException("无效的 JSON 格式 (updatedFormData)", e);
+            }
+        }
+
         if (request.getApprovalComment() != null && !request.getApprovalComment().isEmpty()) {
             taskService.setVariableLocal(camundaTaskId, "approvalComment", request.getApprovalComment());
         }
 
-        // 设置用于网关判断的流程变量
-        Map<String, Object> variables = Map.of(
-                "approved", request.getDecision().equals(CompleteTaskRequest.Decision.APPROVED)
-        );
+        Map<String, Object> variables = new HashMap<>();
+        variables.put("approved", request.getDecision().equals(CompleteTaskRequest.Decision.APPROVED));
 
         taskService.complete(camundaTaskId, variables);
     }
 
-    /**
-     * 根据用户ID获取其待办任务列表
-     * @param assigneeId 办理人ID
-     * @return 任务 DTO 列表
-     */
     @Transactional(readOnly = true)
     public List<TaskDto> getPendingTasksForUser(String assigneeId) {
         List<Task> camundaTasks = taskService.createTaskQuery()
@@ -246,11 +286,6 @@ public class WorkflowService {
                 .collect(Collectors.toList());
     }
 
-    /**
-     * 获取单个任务详情
-     * @param camundaTaskId 任务ID
-     * @return 任务DTO
-     */
     @Transactional(readOnly = true)
     public TaskDto getTaskDetails(String camundaTaskId) {
         Task task = taskService.createTaskQuery().taskId(camundaTaskId).singleResult();
@@ -260,9 +295,6 @@ public class WorkflowService {
         return convertCamundaTaskToDto(task);
     }
 
-    /**
-     * 内部方法，将 Camunda Task 转换为 TaskDto
-     */
     private TaskDto convertCamundaTaskToDto(Task camundaTask) {
         TaskDto dto = new TaskDto();
         dto.setCamundaTaskId(camundaTask.getId());
@@ -288,11 +320,6 @@ public class WorkflowService {
         return dto;
     }
 
-    /**
-     * 根据业务ID（FormSubmission ID）获取工作流历史记录
-     * @param submissionId 表单提交 ID
-     * @return 历史活动 DTO 列表
-     */
     @Transactional(readOnly = true)
     public List<HistoryActivityDto> getWorkflowHistoryBySubmissionId(Long submissionId) {
         FormSubmission submission = formSubmissionRepository.findById(submissionId)
@@ -304,13 +331,11 @@ public class WorkflowService {
 
         String processInstanceId = submission.getWorkflowInstance().getProcessInstanceId();
 
-        // 1. 获取所有活动实例 (事件、任务、网关等)
         List<HistoricActivityInstance> activityInstances = historyService.createHistoricActivityInstanceQuery()
                 .processInstanceId(processInstanceId)
                 .orderByHistoricActivityInstanceStartTime().asc()
                 .list();
 
-        // 2. 获取所有已完成的任务实例，用于提取审批意见
         List<HistoricTaskInstance> taskInstances = historyService.createHistoricTaskInstanceQuery()
                 .processInstanceId(processInstanceId)
                 .finished()
@@ -318,7 +343,6 @@ public class WorkflowService {
         Map<String, HistoricTaskInstance> taskInstanceMap = taskInstances.stream()
                 .collect(Collectors.toMap(HistoricTaskInstance::getId, Function.identity()));
 
-        // 3. 获取任务相关的局部变量 (审批意见)
         List<HistoricVariableInstance> variableInstances = historyService.createHistoricVariableInstanceQuery()
                 .processInstanceId(processInstanceId)
                 .variableName("approvalComment")
@@ -327,13 +351,11 @@ public class WorkflowService {
                 .filter(v -> v.getTaskId() != null)
                 .collect(Collectors.toMap(HistoricVariableInstance::getTaskId, Function.identity()));
 
-        // 4. 获取全局变量 (最终决定)
         Map<String, Object> processVariables = historyService.createHistoricVariableInstanceQuery()
                 .processInstanceId(processInstanceId)
                 .list().stream()
                 .collect(Collectors.toMap(HistoricVariableInstance::getName, HistoricVariableInstance::getValue));
 
-        // 5. 预加载所有可能的用户信息
         Set<String> userIds = Stream.concat(
                         activityInstances.stream().map(HistoricActivityInstance::getAssignee),
                         Stream.of(submission.getSubmitterId())
@@ -345,7 +367,6 @@ public class WorkflowService {
 
         List<HistoryActivityDto> historyList = new ArrayList<>();
 
-        // 6. 添加一个“发起申请”的虚拟节点
         historyList.add(HistoryActivityDto.builder()
                 .activityName("发起申请")
                 .activityType("startEvent")
@@ -355,7 +376,6 @@ public class WorkflowService {
                 .endTime(submission.getCreatedAt())
                 .build());
 
-        // 7. 组合真实活动节点数据
         for (HistoricActivityInstance activity : activityInstances) {
             if (!activity.getActivityType().equals("userTask") && !activity.getActivityType().endsWith("EndEvent")) {
                 continue;
@@ -371,7 +391,6 @@ public class WorkflowService {
                     .endTime(Optional.ofNullable(activity.getEndTime()).map(d -> d.toInstant().atZone(ZoneId.systemDefault()).toLocalDateTime()).orElse(null))
                     .durationInMillis(activity.getDurationInMillis());
 
-            // 【修正】使用 activity.getId() 来关联任务实例和变量
             if (activity.getActivityType().equals("userTask") && taskInstanceMap.containsKey(activity.getId())) {
                 HistoricVariableInstance commentVar = taskComments.get(activity.getId());
                 if (commentVar != null) {
@@ -394,24 +413,12 @@ public class WorkflowService {
         return historyList;
     }
 
-    /**
-     * 权限校验方法: 检查用户是否是指定任务的办理人
-     * @param camundaTaskId 任务ID
-     * @param username 用户名 (ID)
-     * @return 如果是，返回 true
-     */
     public boolean isTaskOwner(String camundaTaskId, String username) {
         if (username == null) return false;
         Task task = taskService.createTaskQuery().taskId(camundaTaskId).singleResult();
         return task != null && username.equals(task.getAssignee());
     }
 
-    /**
-     * 权限校验方法: 检查用户是否是指定申请的提交人
-     * @param submissionId 申请ID
-     * @param username 用户名 (ID)
-     * @return 如果是，返回 true
-     */
     public boolean isSubmissionOwner(Long submissionId, String username) {
         if (username == null) return false;
         return formSubmissionRepository.findById(submissionId)
@@ -419,4 +426,48 @@ public class WorkflowService {
                 .map(username::equals)
                 .orElse(false);
     }
+
+    // --- 【核心修改点】 ---
+    public boolean isTaskAssigneeForSubmission(Long submissionId, String username) {
+        if (username == null) {
+            return false;
+        }
+
+        Optional<String> processInstanceIdOpt = formSubmissionRepository.findById(submissionId)
+                .map(FormSubmission::getWorkflowInstance)
+                .map(WorkflowInstance::getProcessInstanceId);
+
+        if (processInstanceIdOpt.isEmpty()) {
+            return false;
+        }
+
+        String processInstanceId = processInstanceIdOpt.get();
+
+        // 1. 检查历史任务中是否包含该用户
+        long historicTaskCount = historyService.createHistoricTaskInstanceQuery()
+                .processInstanceId(processInstanceId)
+                .taskAssignee(username)
+                .count();
+
+        if (historicTaskCount > 0) {
+            log.debug("权限检查: 用户 '{}' 是申请单 #{} 的历史审批人。", username, submissionId);
+            return true;
+        }
+
+        // 2. 检查当前正在运行的任务是否分配给了该用户
+        long activeTaskCount = taskService.createTaskQuery()
+                .processInstanceId(processInstanceId)
+                .taskAssignee(username)
+                .active()
+                .count();
+
+        if (activeTaskCount > 0) {
+            log.debug("权限检查: 用户 '{}' 是申请单 #{} 的当前待办人。", username, submissionId);
+            return true;
+        }
+
+        log.debug("权限检查: 用户 '{}' 不是申请单 #{} 的任何阶段审批人。", username, submissionId);
+        return false;
+    }
+    // --- 【修改结束】 ---
 }

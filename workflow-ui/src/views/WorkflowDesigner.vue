@@ -5,8 +5,11 @@
         为表单: <strong style="color: #1890ff">{{ formName }}</strong>
       </template>
       <template #extra>
-        <a-button @click="$router.push('/')">取消</a-button>
-        <a-button type="primary" @click="saveAndDeploy" :loading="saving">保存并部署</a-button>
+        <a-space>
+          <a-button @click="$router.push('/')">取消</a-button>
+          <a-button @click="handleSaveDraft" :loading="saving">保存草稿</a-button>
+          <a-button type="primary" @click="handleDeploy" :loading="deploying">部署</a-button>
+        </a-space>
       </template>
     </a-page-header>
 
@@ -30,6 +33,11 @@
           <a-button @click="handleFitViewport"><FullscreenOutlined /></a-button>
         </a-tooltip>
         <a-divider type="vertical" />
+        <!-- 【新增】导入功能 -->
+        <input type="file" ref="fileInputRef" @change="handleFileImport" style="display: none" accept=".bpmn, .xml" />
+        <a-tooltip title="从本地文件导入">
+          <a-button @click="triggerImport"><UploadOutlined /> 导入 BPMN</a-button>
+        </a-tooltip>
         <a-tooltip title="下载为 BPMN 文件">
           <a-button @click="downloadBpmn"><DownloadOutlined /> BPMN</a-button>
         </a-tooltip>
@@ -53,11 +61,11 @@
 <script setup>
 import { ref, onMounted, onBeforeUnmount, watch, nextTick } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { message } from 'ant-design-vue';
-import { getFormById, deployWorkflow, getWorkflowTemplate } from '@/api';
+import { message, Modal } from 'ant-design-vue';
+import { getFormById, deployWorkflow, getWorkflowTemplate, updateWorkflowTemplate } from '@/api';
 import {
   UndoOutlined, RedoOutlined, ZoomInOutlined, ZoomOutOutlined,
-  FullscreenOutlined, DownloadOutlined, FileImageOutlined
+  FullscreenOutlined, DownloadOutlined, FileImageOutlined, UploadOutlined
 } from '@ant-design/icons-vue';
 
 // --- BPMN.js 核心 ---
@@ -85,8 +93,10 @@ const formId = route.params.formId;
 
 const canvasRef = ref(null);
 const propertiesPanelRef = ref(null);
+const fileInputRef = ref(null); // 【新增】文件输入引用
 const formName = ref('加载中...');
 const saving = ref(false);
+const deploying = ref(false); // 【修改】分离状态
 const loading = ref(true);
 let modeler = null;
 
@@ -112,7 +122,7 @@ async function initModeler() {
         BpmnPropertiesPanelModule,
         BpmnPropertiesProviderModule,
         CamundaPlatformPropertiesProviderModule,
-        customTranslateModule // <-- 已修正：直接使用导入的汉化模块
+        customTranslateModule
       ],
       moddleExtensions: { camunda: camundaModdleDescriptors },
     });
@@ -141,7 +151,7 @@ onMounted(async () => {
     message.error('获取表单信息失败');
     console.error(err);
   } finally {
-    loading.value = false; // 触发 watch，开始初始化 BPMN
+    loading.value = false;
   }
 });
 
@@ -153,37 +163,77 @@ onBeforeUnmount(() => {
   }
 });
 
-// --- 保存并部署 ---
-const saveAndDeploy = async () => {
-  if (!modeler) {
-    message.error('设计器未初始化！');
-    return;
-  }
+
+// --- 【私有辅助函数】 ---
+async function getModelerContent() {
+  if (!modeler) throw new Error('设计器未初始化！');
+
+  const { xml } = await modeler.saveXML({ format: true });
+  const elementRegistry = modeler.get('elementRegistry');
+  const processElement = elementRegistry.find(el => el.type === 'bpmn:Process');
+  if (!processElement) throw new Error('无法在BPMN图中找到 <bpmn:process> 元素。');
+
+  const processDefinitionKey = processElement.businessObject.id;
+  if (!processDefinitionKey) throw new Error('流程 Process ID 不能为空，请在属性面板中设置。');
+
+  return { xml, processDefinitionKey };
+}
+
+
+// --- 【核心修改】操作分离 ---
+
+/**
+ * 保存草稿
+ */
+const handleSaveDraft = async () => {
   saving.value = true;
   try {
-    const { xml } = await modeler.saveXML({ format: true });
-    const elementRegistry = modeler.get('elementRegistry');
-    const processElement = elementRegistry.find(el => el.type === 'bpmn:Process');
-    if (!processElement) throw new Error('无法在BPMN图中找到 <bpmn:process> 元素。');
-
-    const processDefinitionKey = processElement.businessObject.id;
-    if (!processDefinitionKey) throw new Error('流程 Process ID 不能为空，请在属性面板中设置。');
-
+    const { xml, processDefinitionKey } = await getModelerContent();
     const payload = {
-      formDefinitionId: parseInt(formId, 10),
       bpmnXml: xml,
       processDefinitionKey
     };
-    await deployWorkflow(payload);
-    message.success('流程部署成功！');
-    router.push('/');
+    await updateWorkflowTemplate(formId, payload);
+    message.success('流程草稿保存成功！');
   } catch (err) {
-    message.error('保存或部署流程时出错: ' + err.message);
-    console.error('Deploy Error:', err);
+    message.error('保存草稿失败: ' + err.message);
+    console.error('Save Draft Error:', err);
   } finally {
     saving.value = false;
   }
 };
+
+/**
+ * 部署流程
+ */
+const handleDeploy = () => {
+  Modal.confirm({
+    title: '确认部署',
+    content: '部署操作将更新线上正在运行的流程版本，新的申请将按照此版本执行。是否继续？',
+    okText: '确认部署',
+    cancelText: '取消',
+    onOk: async () => {
+      deploying.value = true;
+      try {
+        const { xml, processDefinitionKey } = await getModelerContent();
+        const payload = {
+          formDefinitionId: parseInt(formId, 10),
+          bpmnXml: xml,
+          processDefinitionKey
+        };
+        await deployWorkflow(payload);
+        message.success('流程部署成功！');
+        router.push('/');
+      } catch (err) {
+        message.error('部署流程时出错: ' + err.message);
+        console.error('Deploy Error:', err);
+      } finally {
+        deploying.value = false;
+      }
+    }
+  });
+};
+
 
 // --- 工具栏方法 ---
 const handleUndo = () => modeler.get('commandStack').undo();
@@ -205,7 +255,31 @@ const handleFitViewport = () => {
   modeler.get('canvas').zoom('fit-viewport');
 };
 
-// --- 文件下载 ---
+// --- 文件导入/导出 ---
+const triggerImport = () => {
+  fileInputRef.value?.click();
+};
+
+const handleFileImport = (event) => {
+  const file = event.target.files[0];
+  if (file && modeler) {
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+      try {
+        await modeler.importXML(e.target.result);
+        message.success('BPMN 文件导入成功！');
+      } catch (err) {
+        message.error('导入失败，文件格式可能无效。');
+        console.error('Import Error:', err);
+      }
+    };
+    reader.readAsText(file);
+  }
+  // 清空 input 的值，以便可以再次上传同一个文件
+  event.target.value = '';
+};
+
+
 function downloadFile(filename, data, type) {
   const a = document.createElement('a');
   const url = URL.createObjectURL(new Blob([data], { type }));

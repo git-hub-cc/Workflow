@@ -60,12 +60,14 @@ export const useUserStore = defineStore('user', () => {
 
     // --- Admin-related actions for UserManagement.vue ---
     function addUser(user) {
-        allUsers.value.push(user);
+        // 确保新用户包含 managerId 字段，即使是 null
+        allUsers.value.push({ ...user, managerId: user.managerId || null });
     }
     function updateUser(updatedUser) {
         const index = allUsers.value.findIndex(u => u.id === updatedUser.id);
         if (index !== -1) {
-            allUsers.value[index] = updatedUser;
+            // 确保更新时 managerId 字段存在
+            allUsers.value[index] = { ...updatedUser, managerId: updatedUser.managerId || null };
         }
     }
     function removeUser(userId) {

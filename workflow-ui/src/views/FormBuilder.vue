@@ -57,7 +57,7 @@
               <component
                   :is="getComponentByType(field.type)"
                   :placeholder="field.props.placeholder"
-                  :options="field.type === 'Select' ? field.props.options.map(o => ({label: o, value: o})) : undefined"
+                  :options="getOptionsForField(field)"
                   disabled
               />
             </a-form-item>
@@ -93,6 +93,12 @@
             <a-form-item v-if="selectedField.type === 'Select'" label="选项 (每行一个)">
               <a-textarea v-model:value="optionsText" :rows="4" />
             </a-form-item>
+            <!-- 特定于 UserPicker 的属性 -->
+            <a-form-item v-if="selectedField.type === 'UserPicker'" label="提示">
+              <a-typography-text type="secondary">
+                此组件将从系统中所有用户列表进行选择。
+              </a-typography-text>
+            </a-form-item>
           </a-form>
         </a-card>
       </div>
@@ -105,6 +111,7 @@ import { ref, reactive, computed } from 'vue';
 import { useRouter } from 'vue-router';
 import { message } from 'ant-design-vue';
 import { createForm } from '@/api';
+import { useUserStore } from '@/stores/user';
 
 import {
   Input as AInput,
@@ -116,6 +123,7 @@ import {
 
 
 const router = useRouter();
+const userStore = useUserStore();
 const saving = ref(false);
 
 const formDefinition = reactive({
@@ -134,6 +142,7 @@ const paletteItems = [
   { type: 'Select', label: '下拉选择' },
   { type: 'Checkbox', label: '复选框' },
   { type: 'DatePicker', label: '日期选择' },
+  { type: 'UserPicker', label: '人员选择器' },
 ];
 
 let draggedItem = null;
@@ -150,18 +159,25 @@ const handleDrop = () => {
 };
 
 const addNewField = (type) => {
-  const fieldId = `field_${fieldCounter++}`;
+  const baseId = type === 'UserPicker' ? 'nextAssignee' : `field_${fieldCounter++}`;
+  const fieldId = formDefinition.schema.fields.some(f => f.id === baseId) ? `${baseId}_${fieldCounter++}` : baseId;
+
   const newField = {
-    id: fieldId,
+    id: fieldId, // 如果是人员选择器，约定ID为 nextAssignee
     type: type,
     label: `${paletteItems.find(p => p.type === type).label}`,
     props: { placeholder: '' },
-    rules: [{ required: false, message: `请填写${type}` }],
+    rules: [{ required: false, message: `请选择${paletteItems.find(p => p.type === type).label}` }],
   };
 
   if (type === 'Select') {
     newField.props.options = ['选项1', '选项2', '选项3'];
   }
+  if (type === 'UserPicker') {
+    newField.label = '下一步审批人';
+    newField.rules[0].required = true; // 人员选择器默认为必填
+  }
+
   formDefinition.schema.fields.push(newField);
   selectField(newField);
 };
@@ -203,9 +219,21 @@ const getComponentByType = (type) => {
     Select: ASelect,
     Checkbox: ACheckbox,
     DatePicker: ADatePicker,
+    UserPicker: ASelect,
   };
   return map[type] || AInput;
 };
+
+const getOptionsForField = (field) => {
+  if (field.type === 'Select') {
+    return field.props.options.map(o => ({ label: o, value: o }));
+  }
+  if (field.type === 'UserPicker') {
+    return userStore.allUsers.map(u => ({ label: `${u.name} (${u.id})`, value: u.id }));
+  }
+  return undefined;
+};
+
 
 const saveForm = async () => {
   if (!formDefinition.name.trim()) {
