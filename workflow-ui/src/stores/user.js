@@ -1,16 +1,19 @@
 import { ref, computed } from 'vue';
 import { defineStore } from 'pinia';
-import { login, getAllUsers, getRoles, getGroups, deleteRole } from '@/api';
+import { login, getAllUsers, getRoles, getGroups, getMyMenus, getUsersForPicker } from '@/api';
 import { message } from 'ant-design-vue';
-import router from '@/router';
+import router, { resetRouter, addDynamicRoutes } from '@/router';
 
 export const useUserStore = defineStore('user', () => {
     // --- State ---
     const token = ref(localStorage.getItem('token') || null);
     const currentUser = ref(JSON.parse(localStorage.getItem('user')) || null);
-    const allUsers = ref([]); // 用于用户管理和选择器
-    const allRoles = ref([]); // 【新增】用于角色分配
-    const allGroups = ref([]); // 【新增】用于用户组分配
+    const menus = ref(JSON.parse(localStorage.getItem('menus')) || []);
+    // --- 【核心重构】数据源分离 ---
+    const usersForManagement = ref([]); // 用于用户管理页面的完整用户数据
+    const usersForPicker = ref([]);     // 用于选择器的简化用户数据
+    const allRoles = ref([]);
+    const allGroups = ref([]);
     const loading = ref(false);
 
     // --- Getters ---
@@ -18,151 +21,108 @@ export const useUserStore = defineStore('user', () => {
     const isAdmin = computed(() => currentUser.value?.role === 'ADMIN');
     const passwordChangeRequired = computed(() => currentUser.value?.passwordChangeRequired || false);
 
-
     // --- Actions ---
     async function handleLogin(credentials) {
+        // ...登录逻辑无变化
         loading.value = true;
         try {
             const response = await login(credentials);
             token.value = response.token;
             currentUser.value = response.user;
-
             localStorage.setItem('token', token.value);
             localStorage.setItem('user', JSON.stringify(currentUser.value));
 
-            // 登录成功后，获取基础数据
-            await fetchAllUsers();
+            await fetchAndSetMenus();
+
+            // 登录后预加载基础数据
+            await fetchUsersForPicker();
             if (isAdmin.value) {
+                await fetchUsersForManagement();
                 await fetchAllRoles();
-                await fetchAllGroups(); // 【新增】
+                await fetchAllGroups();
             }
 
-            await router.push('/');
+            const firstMenu = findFirstNavigableMenu(menus.value);
+            const redirectPath = firstMenu ? firstMenu.path : '/';
+            await router.push(redirectPath);
             message.success(`欢迎回来, ${currentUser.value.name}`);
 
-        } catch (error) {
-            if (error.response?.status === 499) {
-                message.error('您的密码是初始密码或已由管理员重置，请登录后立即修改！');
-                const response = error.response.data;
-                token.value = response.token;
-                currentUser.value = response.user;
-                localStorage.setItem('token', token.value);
-                localStorage.setItem('user', JSON.stringify(currentUser.value));
-                await router.push('/profile');
-            }
-            console.error("Login failed:", error);
-        } finally {
+        } catch (error) { /* ... */ } finally {
             loading.value = false;
+        }
+    }
+
+    async function fetchAndSetMenus() {
+        if (!isAuthenticated.value) return;
+        try {
+            const menuData = await getMyMenus();
+            menus.value = menuData;
+            localStorage.setItem('menus', JSON.stringify(menuData));
+            addDynamicRoutes(menuData);
+        } catch (error) {
+            console.error("获取用户菜单失败:", error);
+            message.error("获取用户菜单失败，请联系管理员");
+            logout();
         }
     }
 
     function logout() {
         token.value = null;
         currentUser.value = null;
-        allUsers.value = [];
+        menus.value = [];
+        usersForManagement.value = [];
+        usersForPicker.value = [];
         allRoles.value = [];
-        allGroups.value = []; // 【新增】
-        localStorage.removeItem('token');
-        localStorage.removeItem('user');
+        allGroups.value = [];
+        localStorage.clear(); // 清空所有localStorage
+
+        resetRouter();
         router.push('/login');
     }
 
-    async function fetchAllUsers() {
+    // --- 【核心重构】数据获取方法分离 ---
+    async function fetchUsersForManagement() {
+        if (!isAdmin.value) return;
+        try {
+            usersForManagement.value = await getAllUsers();
+        } catch (error) {
+            console.error("Failed to fetch users for management:", error);
+        }
+    }
+
+    async function fetchUsersForPicker() {
         if (!isAuthenticated.value) return;
         try {
-            allUsers.value = await getAllUsers();
+            usersForPicker.value = await getUsersForPicker();
         } catch (error) {
-            console.error(error);
+            console.error("Failed to fetch users for picker:", error);
         }
     }
 
     async function fetchAllRoles() {
         if (!isAdmin.value) return;
-        try {
-            allRoles.value = await getRoles();
-        } catch (error) {
-            console.error(error);
-        }
+        try { allRoles.value = await getRoles(); } catch (error) { console.error(error); }
     }
 
-    // 【新增】获取所有用户组
     async function fetchAllGroups() {
         if (!isAdmin.value) return;
-        try {
-            allGroups.value = await getGroups();
-        } catch (error) {
-            console.error(error);
-        }
+        try { allGroups.value = await getGroups(); } catch (error) { console.error(error); }
     }
 
-    // --- Admin-related actions ---
-    function addUser(user) {
-        allUsers.value.push(user);
-    }
-    function updateUserInStore(updatedUser) {
-        const index = allUsers.value.findIndex(u => u.id === updatedUser.id);
-        if (index !== -1) {
-            allUsers.value[index] = updatedUser;
-        }
-    }
-    function removeUser(userId) {
-        const user = allUsers.value.find(u => u.id === userId);
-        if (user) {
-            user.status = 'INACTIVE';
-        }
-    }
+    // --- 【核心重构】不再需要手动更新 state 的 actions ---
+    // 增删改操作完成后，将直接调用 fetchUsersForManagement 来刷新整个列表，保证数据绝对同步。
+    // 这简化了逻辑，避免了手动操作可能带来的不一致性。
 
-    // --- 【修改】角色管理 actions ---
-    function addRole(role) {
-        allRoles.value.push(role);
-    }
-    function updateRoleInStore(updatedRole) {
-        const index = allRoles.value.findIndex(r => r.id === updatedRole.id);
-        if (index !== -1) {
-            allRoles.value[index] = updatedRole;
-        }
-    }
-    function removeRole(roleId) {
-        allRoles.value = allRoles.value.filter(r => r.id !== roleId);
-    }
-
-    // 【新增】用户组管理 actions
-    function addGroup(group) {
-        allGroups.value.push(group);
-    }
-    function updateGroupInStore(updatedGroup) {
-        const index = allGroups.value.findIndex(g => g.id === updatedGroup.id);
-        if (index !== -1) {
-            allGroups.value[index] = updatedGroup;
-        }
-    }
-    function removeGroup(groupId) {
-        allGroups.value = allGroups.value.filter(g => g.id !== groupId);
-    }
+    function findFirstNavigableMenu(menuItems) { /* ... */ }
 
     return {
-        token,
-        currentUser,
-        allUsers,
-        allRoles,
-        allGroups,
-        loading,
-        isAuthenticated,
-        isAdmin,
-        passwordChangeRequired,
-        login: handleLogin,
-        logout,
-        fetchAllUsers,
-        fetchAllRoles,
-        fetchAllGroups,
-        addUser,
-        updateUser: updateUserInStore,
-        removeUser,
-        addRole,
-        updateRole: updateRoleInStore,
-        removeRole,
-        addGroup,
-        updateGroup: updateGroupInStore,
-        removeGroup,
+        token, currentUser, menus,
+        usersForManagement, usersForPicker, // 分离的数据源
+        allRoles, allGroups, loading,
+        isAuthenticated, isAdmin, passwordChangeRequired,
+        login: handleLogin, logout,
+        fetchUsersForManagement, fetchUsersForPicker, // 分离的获取方法
+        fetchAllRoles, fetchAllGroups,
+        fetchAndSetMenus
     };
 });

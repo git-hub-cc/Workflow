@@ -28,4 +28,9 @@ public class Role {
 
     @ManyToMany(mappedBy = "roles")
     private Set<User> users = new HashSet<>();
+
+    // --- 【新增】 ---
+    // 反向关联，表示哪些菜单被这个角色所拥有。由 Menu 实体的 roles 字段维护关系。
+    @ManyToMany(mappedBy = "roles")
+    private Set<Menu> menus = new HashSet<>();
 }

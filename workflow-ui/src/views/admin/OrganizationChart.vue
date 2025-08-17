@@ -113,6 +113,7 @@ const initChart = async () => {
             right: '20%',
             symbolSize: 10,
             symbol: 'circle',
+            roam: true, // 开启缩放和平移
             label: {
               position: 'left',
               verticalAlign: 'middle',

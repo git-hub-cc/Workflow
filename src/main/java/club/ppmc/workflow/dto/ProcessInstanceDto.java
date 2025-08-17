@@ -19,4 +19,6 @@ public class ProcessInstanceDto {
     private String startUserId;
     private String startUserName;
     private String currentActivityName;
+    // --- 【新增】 ---
+    private boolean suspended; // 是否挂起
 }

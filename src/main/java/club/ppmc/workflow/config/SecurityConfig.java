@@ -20,7 +20,7 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 
 @Configuration
 @EnableWebSecurity
-@EnableMethodSecurity(prePostEnabled = true, securedEnabled = true) // 启用方法级安全注解, 如 @PreAuthorize
+@EnableMethodSecurity(prePostEnabled = true, securedEnabled = true)
 @RequiredArgsConstructor
 public class SecurityConfig {
 
@@ -30,32 +30,25 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
-                .csrf(csrf -> csrf.disable()) // 禁用 CSRF，因为我们使用无状态的 JWT
+                .csrf(csrf -> csrf.disable())
                 .authorizeHttpRequests(auth -> auth
-                        // 公开访问端点：登录接口和 H2 数据库控制台
-                        // todo camunda为临时添加
                         .requestMatchers("/api/auth/**", "/h2-console/**",  "/camunda/**").permitAll()
-                        // 允许已认证用户访问文件上传和下载接口
+                        .requestMatchers("/api/menus/my-menus").authenticated()
                         .requestMatchers("/api/files/**").authenticated()
                         .requestMatchers(HttpMethod.POST, "/api/users/me/change-password").authenticated()
-                        // --- 【新增】为流程设计器提供用户组列表 ---
+                        // --- 【核心重构】明确API权限 ---
+                        // 流程设计器中的用户选择器，所有认证用户可用
+                        .requestMatchers("/api/workflows/users").authenticated()
                         .requestMatchers("/api/workflows/groups").authenticated()
-                        // --- 【新增】保护 Word 导入接口，仅限管理员 ---
                         .requestMatchers(HttpMethod.POST, "/api/forms/import-word").hasRole("ADMIN")
-                        // 【修改】明确 /api/admin/** 下的所有请求都需要 ADMIN 角色
-                        .requestMatchers("/api/admin/groups/**").hasRole("ADMIN")
-                        .requestMatchers("/api/admin/logs/**").hasRole("ADMIN")
+                        // 所有 /api/admin/ 下的请求都需要ADMIN角色
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
-                        // 其他所有请求都需要经过认证
                         .anyRequest().authenticated()
                 )
-                // 配置会话管理为无状态 (STATELESS)，因为我们不使用 session
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authenticationProvider(authenticationProvider())
-                // 在标准的 UsernamePasswordAuthenticationFilter 之前添加我们的 JWT 过滤器
                 .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
 
-        // 为了 H2 控制台能在 iframe 中正常显示
         http.headers(headers -> headers.frameOptions(frameOptions -> frameOptions.sameOrigin()));
 
         return http.build();
@@ -64,9 +57,7 @@ public class SecurityConfig {
     @Bean
     public AuthenticationProvider authenticationProvider() {
         DaoAuthenticationProvider authProvider = new DaoAuthenticationProvider();
-        // 设置自定义的 UserDetailsService，用于从数据库加载用户信息
         authProvider.setUserDetailsService(userDetailsService);
-        // 设置密码编码器，用于密码校验
         authProvider.setPasswordEncoder(passwordEncoder());
         return authProvider;
     }
@@ -76,11 +67,8 @@ public class SecurityConfig {
         return config.getAuthenticationManager();
     }
 
-
-
     @Bean
     public PasswordEncoder passwordEncoder() {
-        // 使用 BCrypt 算法进行密码加密
         return new BCryptPasswordEncoder();
     }
 }

@@ -10,16 +10,20 @@ import club.ppmc.workflow.dto.CreateFormSubmissionRequest;
 import club.ppmc.workflow.dto.FormDefinitionResponse;
 import club.ppmc.workflow.dto.FormSubmissionResponse;
 import club.ppmc.workflow.exception.ResourceNotFoundException;
-import club.ppmc.workflow.repository.FileAttachmentRepository;
-import club.ppmc.workflow.repository.FormDefinitionRepository;
-import club.ppmc.workflow.repository.FormSubmissionRepository;
-import club.ppmc.workflow.repository.UserRepository;
+import club.ppmc.workflow.repository.*;
+import jakarta.persistence.criteria.Predicate;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.CollectionUtils;
+import org.springframework.util.StringUtils;
 
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 /**
@@ -35,9 +39,10 @@ public class FormService {
     private final FormSubmissionRepository formSubmissionRepository;
     private final WorkflowService workflowService;
     private final UserRepository userRepository;
-    // --- 【新增】 ---
     private final FileAttachmentRepository fileAttachmentRepository;
     private final FileService fileService;
+    private final MenuRepository menuRepository; // 【新增】
+    private final WorkflowTemplateRepository workflowTemplateRepository; // 【新增】
 
     @LogOperation(module = "表单管理", action = "创建表单定义", targetIdExpression = "#result.name")
     public FormDefinitionResponse createFormDefinition(CreateFormDefinitionRequest request) {
@@ -64,6 +69,31 @@ public class FormService {
     }
 
     /**
+     * 【新增】删除一个表单定义
+     * @param id 表单定义ID
+     */
+    @LogOperation(module = "表单管理", action = "删除表单定义", targetIdExpression = "#id")
+    public void deleteFormDefinition(Long id) {
+        // 1. 检查表单是否存在
+        if (!formDefinitionRepository.existsById(id)) {
+            throw new ResourceNotFoundException("未找到表单定义 ID: " + id);
+        }
+        // 2. 检查是否有工作流模板关联
+        if (workflowTemplateRepository.findByFormDefinitionId(id).isPresent()) {
+            throw new IllegalStateException("无法删除：该表单已关联一个工作流模板。请先在流程设计器中解除关联或删除流程。");
+        }
+        // 3. 检查是否有菜单项关联
+        if (menuRepository.existsByFormDefinitionId(id)) {
+            throw new IllegalStateException("无法删除：该表单已被一个或多个菜单项使用。请先在菜单管理中解除关联。");
+        }
+        // 4. (可选) 检查是否已有提交数据
+        // if (formSubmissionRepository.findByFormDefinitionId(id).count() > 0) { ... }
+
+        // 5. 执行删除
+        formDefinitionRepository.deleteById(id);
+    }
+
+    /**
      * 为指定的表单创建一条提交记录，并可能启动工作流。
      * @param formDefinitionId 表单定义 ID
      * @param request 包含提交数据和附件ID的 DTO
@@ -82,41 +112,55 @@ public class FormService {
 
         FormSubmission savedSubmission = formSubmissionRepository.save(submission);
 
-        // --- 【核心修改：关联附件】 ---
         if (!CollectionUtils.isEmpty(request.getAttachmentIds())) {
             List<FileAttachment> attachments = fileAttachmentRepository.findAllById(request.getAttachmentIds());
             for (FileAttachment attachment : attachments) {
-                // 将附件与此次提交关联起来
                 attachment.setFormSubmission(savedSubmission);
             }
-            // JPA 会自动处理更新
             fileAttachmentRepository.saveAll(attachments);
         }
-        // --- 【修改结束】 ---
 
-        // 尝试启动工作流
         workflowService.startWorkflow(savedSubmission);
 
-        // 重新从数据库获取最新的 submission 状态
         FormSubmission finalSubmission = formSubmissionRepository.findById(savedSubmission.getId())
                 .orElseThrow(() -> new IllegalStateException("刚保存的提交记录找不到了")); // 理论上不会发生
         return convertToSubmissionResponse(finalSubmission);
     }
 
     /**
-     * 根据表单 ID 获取其所有提交记录
+     * 【修改】根据表单 ID 和动态查询条件获取其所有提交记录
      * @param formDefinitionId 表单定义 ID
-     * @return 该表单的所有提交记录列表
+     * @param filters 查询过滤器
+     * @param pageable 分页信息
+     * @return 分页后的提交记录列表
      */
     @Transactional(readOnly = true)
-    public List<FormSubmissionResponse> getSubmissionsByFormId(Long formDefinitionId) {
+    public Page<FormSubmissionResponse> getSubmissionsByFormId(Long formDefinitionId, Map<String, String> filters, Pageable pageable) {
         if (!formDefinitionRepository.existsById(formDefinitionId)) {
             throw new ResourceNotFoundException("未找到 ID 为 " + formDefinitionId + " 的表单定义");
         }
-        return formSubmissionRepository.findByFormDefinitionId(formDefinitionId).stream()
-                .map(this::convertToSubmissionResponse)
-                .collect(Collectors.toList());
+
+        Specification<FormSubmission> spec = (root, query, cb) -> {
+            List<Predicate> predicates = new ArrayList<>();
+            predicates.add(cb.equal(root.get("formDefinition").get("id"), formDefinitionId));
+
+            if (filters != null) {
+                filters.forEach((key, value) -> {
+                    if (StringUtils.hasText(value)) {
+                        // 示例：可以根据特定字段进行查询，如提交人
+                        if ("submitterId".equalsIgnoreCase(key)) {
+                            predicates.add(cb.like(root.get("submitterId"), "%" + value + "%"));
+                        }
+                        // 更多查询条件可在此扩展...
+                    }
+                });
+            }
+            return cb.and(predicates.toArray(new Predicate[0]));
+        };
+
+        return formSubmissionRepository.findAll(spec, pageable).map(this::convertToSubmissionResponse);
     }
+
 
     public FormDefinitionResponse convertToDefinitionResponse(FormDefinition entity) {
         FormDefinitionResponse dto = new FormDefinitionResponse();
@@ -136,13 +180,11 @@ public class FormService {
         dto.setDataJson(entity.getDataJson());
         dto.setCreatedAt(entity.getCreatedAt());
 
-        // --- 【新增：转换附件信息】 ---
         List<FileAttachment> attachments = fileAttachmentRepository.findByFormSubmissionId(entity.getId());
         if (!attachments.isEmpty()) {
             dto.setAttachments(fileService.getFilesBySubmissionId(entity.getId()));
         }
 
-        // 设置提交人姓名
         userRepository.findById(entity.getSubmitterId())
                 .ifPresent(user -> dto.setSubmitterName(user.getName()));
 

@@ -121,17 +121,15 @@ const handleOk = async () => {
     modalConfirmLoading.value = true;
 
     if (isEditing.value) {
-      const updatedRole = await updateRole(formState.id, formState);
-      userStore.updateRole(updatedRole);
+      await updateRole(formState.id, formState);
       message.success('角色更新成功！');
     } else {
-      const newRole = await createRole(formState);
-      userStore.addRole(newRole);
+      await createRole(formState);
       message.success('角色创建成功！');
     }
     modalVisible.value = false;
+    await userStore.fetchAllRoles();
   } catch (error) {
-    // API 错误已全局处理
     console.error('Form validation/submission failed:', error);
   } finally {
     modalConfirmLoading.value = false;
@@ -151,8 +149,8 @@ const resetForm = () => {
 const handleDelete = async (roleId) => {
   try {
     await deleteRole(roleId);
-    userStore.removeRole(roleId);
     message.success('角色删除成功！');
+    await userStore.fetchAllRoles();
   } catch (error) {
     // API 错误已全局处理
   }

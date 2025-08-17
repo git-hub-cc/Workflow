@@ -50,61 +50,49 @@ public class AdminService {
     private final TaskService taskService;
     private final PasswordEncoder passwordEncoder;
     private final EntityManager entityManager;
-    // --- 【新增】 ---
     private final LoginLogRepository loginLogRepository;
     private final OperationLogRepository operationLogRepository;
+    private final MenuService menuService;
 
-    // ... [流程实例管理相关方法保持不变] ...
+    // --- 流程实例管理 ---
     public List<ProcessInstanceDto> getActiveProcessInstances() {
-        // 1. 获取所有正在运行的流程实例
         List<ProcessInstance> instances = runtimeService.createProcessInstanceQuery().active().list();
         if (instances.isEmpty()) {
-            return List.of();
+            return Collections.emptyList();
         }
 
-        List<String> processInstanceIds = instances.stream()
+        Set<String> processInstanceIdSet = instances.stream()
                 .map(ProcessInstance::getProcessInstanceId)
-                .collect(Collectors.toList());
+                .collect(Collectors.toSet());
 
-        // 2. 批量获取这些实例的历史信息 (包含发起人等)
-        // 【修正】使用 .processInstanceIds(Set<String>) 方法，它接受一个 Set 集合，兼容性更好。
-        Set<String> processInstanceIdSet = new HashSet<>(processInstanceIds);
         Map<String, HistoricProcessInstance> historicInstanceMap = historyService.createHistoricProcessInstanceQuery()
                 .processInstanceIds(processInstanceIdSet)
                 .list()
                 .stream()
                 .collect(Collectors.toMap(HistoricProcessInstance::getId, Function.identity()));
 
-        // 3. 预加载所有相关的用户信息
         List<String> userIds = historicInstanceMap.values().stream()
                 .map(HistoricProcessInstance::getStartUserId)
-                .filter(Objects::nonNull) // 过滤掉可能为 null 的 startUserId
+                .filter(Objects::nonNull)
                 .distinct()
                 .collect(Collectors.toList());
         Map<String, User> userMap = userRepository.findAllById(userIds).stream()
                 .collect(Collectors.toMap(User::getId, Function.identity()));
 
-        // 4. 组合最终结果
         return instances.stream()
                 .map(instance -> {
                     HistoricProcessInstance historicInstance = historicInstanceMap.get(instance.getProcessInstanceId());
-                    if (historicInstance == null) {
-                        return null; // 数据不一致，跳过
-                    }
+                    if (historicInstance == null) return null;
 
                     ActivityInstance activityInstance = runtimeService.getActivityInstance(instance.getProcessInstanceId());
-                    String activityName = "未知";
+                    String activityName = "进行中";
                     if (activityInstance != null && activityInstance.getChildActivityInstances().length > 0) {
-                        // 通常当前活动是子实例, 比如用户任务
                         activityName = Arrays.stream(activityInstance.getChildActivityInstances())
                                 .map(ActivityInstance::getActivityName)
                                 .filter(Objects::nonNull)
                                 .collect(Collectors.joining(", "));
-                    } else if (activityInstance != null) {
+                    } else if (activityInstance != null && activityInstance.getActivityName() != null) {
                         activityName = activityInstance.getActivityName();
-                    }
-                    if (activityName == null || activityName.isEmpty()){
-                        activityName = "进行中";
                     }
 
                     String startUserName = Optional.ofNullable(historicInstance.getStartUserId())
@@ -121,6 +109,7 @@ public class AdminService {
                             .startUserId(historicInstance.getStartUserId())
                             .startUserName(startUserName)
                             .currentActivityName(activityName)
+                            .suspended(instance.isSuspended())
                             .build();
                 })
                 .filter(Objects::nonNull)
@@ -147,18 +136,24 @@ public class AdminService {
         if (!userRepository.existsById(newAssigneeId)) {
             throw new ResourceNotFoundException("新的办理人ID不存在: " + newAssigneeId);
         }
-        // Camunda API 内部会检查 task 是否存在
         taskService.setAssignee(taskId, newAssigneeId);
     }
 
-    // --- 用户管理 (已更新) ---
+
+    // --- 用户管理 ---
 
     /**
-     * 创建一个新用户
-     * @param userDto 用户数据
-     * @return 创建后的用户DTO
+     * 获取所有用户列表，用于管理页面
+     * @return 包含完整信息的用户DTO列表
      */
-    @LogOperation(module = "用户管理", action = "创建用户", targetIdExpression = "#userDto.id")
+    @Transactional(readOnly = true)
+    public List<UserDto> getAllUsers() {
+        return userRepository.findAll().stream()
+                .map(this::toUserDto)
+                .collect(Collectors.toList());
+    }
+
+    @LogOperation(module = "用户管理", action = "创建用户", targetIdExpression = "#result.id")
     public UserDto createUser(UserDto userDto) {
         if (userRepository.existsById(userDto.getId())) {
             throw new IllegalArgumentException("用户ID '" + userDto.getId() + "' 已存在");
@@ -167,24 +162,16 @@ public class AdminService {
         user.setId(userDto.getId());
         user.setName(userDto.getName());
         user.setDepartment(userDto.getDepartment());
-        user.setStatus(UserStatus.ACTIVE); // 新用户默认为激活状态
+        user.setStatus(UserStatus.ACTIVE);
 
-        // 新用户默认密码为 'password'，并强制首次登录修改
         user.setPassword(passwordEncoder.encode("password"));
         user.setPasswordChangeRequired(true);
 
         updateUserRelations(user, userDto);
-
         User savedUser = userRepository.save(user);
         return toUserDto(savedUser);
     }
 
-    /**
-     * 更新用户信息 (不允许更新ID和密码)
-     * @param id 用户ID
-     * @param userDto 更新数据
-     * @return 更新后的用户DTO
-     */
     @LogOperation(module = "用户管理", action = "更新用户", targetIdExpression = "#id")
     public UserDto updateUser(String id, UserDto userDto) {
         User user = userRepository.findById(id)
@@ -196,16 +183,11 @@ public class AdminService {
         }
 
         updateUserRelations(user, userDto);
-
         User updatedUser = userRepository.save(user);
         return toUserDto(updatedUser);
     }
 
-    /**
-     * 更新用户的关联关系 (上级、角色、用户组)
-     */
     private void updateUserRelations(User user, UserDto userDto) {
-        // 更新上级
         if (StringUtils.hasText(userDto.getManagerId())) {
             if (user.getId() != null && user.getId().equals(userDto.getManagerId())) {
                 throw new IllegalArgumentException("用户不能将自己设置为上级");
@@ -214,30 +196,22 @@ public class AdminService {
                     .orElseThrow(() -> new ResourceNotFoundException("未找到上级用户: " + userDto.getManagerId()));
             user.setManager(manager);
         } else {
-            user.setManager(null); // 清除上级
+            user.setManager(null);
         }
 
-        // 更新角色
         if (!CollectionUtils.isEmpty(userDto.getRoleNames())) {
-            Set<Role> roles = roleRepository.findByNameIn(userDto.getRoleNames());
-            user.setRoles(roles);
+            user.setRoles(roleRepository.findByNameIn(userDto.getRoleNames()));
         } else {
             user.getRoles().clear();
         }
 
-        // 【新增】更新用户组
         if (!CollectionUtils.isEmpty(userDto.getGroupNames())) {
-            Set<UserGroup> groups = userGroupRepository.findByNameIn(userDto.getGroupNames());
-            user.setUserGroups(groups);
+            user.setUserGroups(userGroupRepository.findByNameIn(userDto.getGroupNames()));
         } else {
             user.getUserGroups().clear();
         }
     }
 
-    /**
-     * 删除用户 (逻辑删除，将状态改为 INACTIVE)
-     * @param id 用户ID
-     */
     @LogOperation(module = "用户管理", action = "禁用用户", targetIdExpression = "#id")
     public void deleteUser(String id) {
         User user = userRepository.findById(id)
@@ -246,7 +220,7 @@ public class AdminService {
         userRepository.save(user);
     }
 
-    // --- 【新增与完善】角色与用户组管理 ---
+    // --- 角色管理 ---
     @LogOperation(module = "角色管理", action = "创建角色", targetIdExpression = "#result.name")
     public RoleDto createRole(RoleDto roleDto) {
         if(roleRepository.findByName(roleDto.getName()).isPresent()) {
@@ -266,7 +240,6 @@ public class AdminService {
     public RoleDto updateRole(Long id, RoleDto roleDto) {
         Role role = roleRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("未找到角色ID: " + id));
-        // 通常不应修改角色名称，因为它可能是硬编码的权限标识
         role.setDescription(roleDto.getDescription());
         return toRoleDto(roleRepository.save(role));
     }
@@ -276,7 +249,6 @@ public class AdminService {
         Role role = roleRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("未找到角色ID: " + id));
 
-        // 刷新实体状态以加载 users 集合
         entityManager.refresh(role);
 
         if (!role.getUsers().isEmpty()) {
@@ -285,6 +257,8 @@ public class AdminService {
         roleRepository.delete(role);
     }
 
+
+    // --- 用户组管理 ---
     @LogOperation(module = "用户组管理", action = "创建用户组", targetIdExpression = "#result.name")
     public UserGroupDto createGroup(UserGroupDto groupDto) {
         if(userGroupRepository.findByName(groupDto.getName()).isPresent()) {
@@ -304,7 +278,7 @@ public class AdminService {
     public UserGroupDto updateGroup(Long id, UserGroupDto groupDto) {
         UserGroup group = userGroupRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("未找到用户组ID: " + id));
-        group.setName(groupDto.getName()); // 用户组名称通常可以修改
+        group.setName(groupDto.getName());
         group.setDescription(groupDto.getDescription());
         return toUserGroupDto(userGroupRepository.save(group));
     }
@@ -323,8 +297,7 @@ public class AdminService {
     }
 
 
-    // --- 转换器 ---
-
+    // --- DTO 转换器 ---
     private UserDto toUserDto(User user) {
         UserDto dto = new UserDto();
         dto.setId(user.getId());
@@ -337,7 +310,6 @@ public class AdminService {
         if (user.getRoles() != null) {
             dto.setRoleNames(user.getRoles().stream().map(Role::getName).collect(Collectors.toList()));
         }
-        // 【新增】
         if (user.getUserGroups() != null) {
             dto.setGroupNames(user.getUserGroups().stream().map(UserGroup::getName).collect(Collectors.toList()));
         }
@@ -361,27 +333,21 @@ public class AdminService {
     }
 
 
-    // --- 组织架构 (保持不变) ---
-    /**
-     * 获取组织架构树 (用于Ant Design Tree)
-     * @return 部门和用户的树形结构列表
-     */
+    // --- 组织架构与日志 ---
     @Transactional(readOnly = true)
     public List<DepartmentTreeNode> getOrganizationTree() {
         List<User> allUsers = userRepository.findAll();
 
-        // 1. 按部门对所有用户进行分组
         Map<String, List<User>> usersByDepartment = allUsers.stream()
                 .filter(user -> user.getDepartment() != null)
                 .collect(Collectors.groupingBy(User::getDepartment));
 
-        // 2. 提取所有唯一的部门名称，并为每个部门创建一个树节点
         Map<String, DepartmentTreeNode> departmentNodeMap = usersByDepartment.keySet().stream()
                 .distinct()
                 .map(deptName -> {
                     DepartmentTreeNode node = new DepartmentTreeNode();
                     node.setTitle(deptName);
-                    node.setKey("dept_" + deptName); // 构造唯一的 key
+                    node.setKey("dept_" + deptName);
                     node.setValue(deptName);
                     node.setType("department");
                     node.setLeaf(false);
@@ -389,7 +355,6 @@ public class AdminService {
                 })
                 .collect(Collectors.toMap(DepartmentTreeNode::getValue, Function.identity()));
 
-        // 3. 将用户作为叶子节点添加到对应的部门节点下
         usersByDepartment.forEach((deptName, users) -> {
             DepartmentTreeNode parentNode = departmentNodeMap.get(deptName);
             if (parentNode != null) {
@@ -403,22 +368,17 @@ public class AdminService {
                             userNode.setLeaf(true);
                             return userNode;
                         })
-                        .sorted(Comparator.comparing(DepartmentTreeNode::getTitle)) // 按姓名排序
+                        .sorted(Comparator.comparing(DepartmentTreeNode::getTitle))
                         .collect(Collectors.toList());
                 parentNode.getChildren().addAll(userNodes);
             }
         });
 
-        // 4. 返回所有部门节点，并按部门名称排序
         return departmentNodeMap.values().stream()
                 .sorted(Comparator.comparing(DepartmentTreeNode::getTitle))
                 .collect(Collectors.toList());
     }
 
-    /**
-     * 获取部门-用户树形结构 (用于 a-tree-select)
-     * @return 符合 TreeNodeDto 结构的列表
-     */
     @Transactional(readOnly = true)
     public List<TreeNodeDto> getDepartmentTree() {
         List<User> allUsers = userRepository.findAll();
@@ -432,18 +392,16 @@ public class AdminService {
                     String deptName = entry.getKey();
                     List<User> usersInDept = entry.getValue();
 
-                    // 创建部门节点 (父节点)
                     TreeNodeDto deptNode = new TreeNodeDto();
                     deptNode.setTitle(deptName);
-                    deptNode.setValue("dept_" + deptName); // 部门节点的值是唯一的，但通常不可选
+                    deptNode.setValue("dept_" + deptName);
                     deptNode.setKey("dept_" + deptName);
 
-                    // 创建用户节点 (子节点)
                     List<TreeNodeDto> userNodes = usersInDept.stream()
                             .map(user -> {
                                 TreeNodeDto userNode = new TreeNodeDto();
                                 userNode.setTitle(user.getName());
-                                userNode.setValue(user.getId()); // 用户节点的值是用户的ID
+                                userNode.setValue(user.getId());
                                 userNode.setKey(user.getId());
                                 return userNode;
                             })
@@ -456,8 +414,6 @@ public class AdminService {
                 .sorted(Comparator.comparing(TreeNodeDto::getTitle))
                 .collect(Collectors.toList());
     }
-
-    // --- 【新增】日志查询逻辑 ---
 
     @Transactional(readOnly = true)
     public Page<LoginLogDto> getLoginLogs(String userId, String status, LocalDateTime startTime, LocalDateTime endTime, Pageable pageable) {

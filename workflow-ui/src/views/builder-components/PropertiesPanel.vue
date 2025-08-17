@@ -4,8 +4,7 @@
       <div v-if="!selectedField" class="properties-placeholder">
         选中一个组件以编辑其属性
       </div>
-      <a-form v-else :model="localField" layout="vertical">
-        <!-- 【核心修改】: 动态渲染属性表单 -->
+      <a-form v-else :key="selectedField.id" :model="localField" layout="vertical">
         <component :is="propertiesComponent" :field="localField" :all-fields="allFields" />
       </a-form>
     </a-card>
@@ -20,8 +19,13 @@ const emit = defineEmits(['update:field']);
 
 const localField = ref(null);
 let isInternalUpdate = false;
+// 【新增】用于防抖的计时器变量
+let debounceTimer = null;
 
 watch(() => props.selectedField, (newField) => {
+  // 当选中的字段改变时，清除可能存在的待处理的更新，防止旧的更新覆盖新的状态
+  clearTimeout(debounceTimer);
+
   isInternalUpdate = true;
   if (newField) {
     localField.value = JSON.parse(JSON.stringify(newField));
@@ -33,10 +37,16 @@ watch(() => props.selectedField, (newField) => {
   });
 }, { deep: true, immediate: true });
 
+// 【修改】对 localField 的侦听器进行防抖处理
 watch(localField, (newVal) => {
   if (isInternalUpdate) return;
   if (newVal) {
-    emit('update:field', newVal);
+    // 清除上一个计时器，以确保只有在用户停止输入后才触发
+    clearTimeout(debounceTimer);
+    // 设置一个新的计时器，延迟 100 毫秒后 emit 更新
+    debounceTimer = setTimeout(() => {
+      emit('update:field', newVal);
+    }, 100);
   }
 }, { deep: true });
 
@@ -67,10 +77,8 @@ const propertiesComponent = computed(() => {
       return defineAsyncComponent(() => import('./props/IconPickerProps.vue'));
     case 'TreeSelect':
       return defineAsyncComponent(() => import('./props/GenericProps.vue'));
-      // --- 【新增】 ---
     case 'StaticText':
       return defineAsyncComponent(() => import('./props/StaticTextProps.vue'));
-      // --- 【新增结束】 ---
     default:
       return defineAsyncComponent(() => import('./props/GenericProps.vue'));
   }

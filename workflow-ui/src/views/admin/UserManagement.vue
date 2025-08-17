@@ -12,7 +12,7 @@
     <div style="padding: 0 24px;">
       <a-table
           :columns="columns"
-          :data-source="userStore.allUsers"
+          :data-source="userStore.usersForManagement"
           :loading="loading"
           row-key="id"
       >
@@ -140,14 +140,13 @@ import { PlusOutlined, DownOutlined, EditOutlined, ReloadOutlined, UserDeleteOut
 
 const userStore = useUserStore();
 const loading = ref(false);
-
 const orgTreeData = ref([]);
 
 const fetchInitialData = async () => {
   loading.value = true;
   try {
     const promises = [
-      userStore.allUsers.length === 0 ? userStore.fetchAllUsers() : Promise.resolve(),
+      userStore.usersForManagement.length === 0 ? userStore.fetchUsersForManagement() : Promise.resolve(),
       userStore.allRoles.length === 0 ? userStore.fetchAllRoles() : Promise.resolve(),
       userStore.allGroups.length === 0 ? userStore.fetchAllGroups() : Promise.resolve(),
       getOrganizationTree().then(data => { orgTreeData.value = data; })
@@ -171,11 +170,9 @@ const orgTreeDataForSelector = computed(() => {
       if (node.type === 'department') {
         const processedChildren = filterAndProcessTree(node.children);
         if (processedChildren.length > 0) {
-          // Department is kept, but make it unselectable
           acc.push({ ...node, children: processedChildren, disabled: true });
         }
       } else if (node.type === 'user' && node.value !== currentUserId) {
-        // User node is kept as is (it's selectable)
         acc.push(node);
       }
       return acc;
@@ -206,7 +203,7 @@ const getStatusColor = (status) => {
 const getStatusText = (status) => ({ ACTIVE: '正常', INACTIVE: '禁用', LOCKED: '锁定' }[status] || '未知');
 const getManagerName = (managerId) => {
   if (!managerId) return '-';
-  const manager = userStore.allUsers.find(u => u.id === managerId);
+  const manager = userStore.usersForPicker.find(u => u.id === managerId);
   return manager ? manager.name : managerId;
 };
 
@@ -269,15 +266,15 @@ const handleOk = async () => {
     const payload = { ...formState, managerId: rawManagerId };
 
     if (isEditing.value) {
-      const updatedUser = await updateUser(payload.id, payload);
-      userStore.updateUser(updatedUser);
+      await updateUser(payload.id, payload);
       message.success('用户更新成功！');
     } else {
-      const newUser = await createUser(payload);
-      userStore.addUser(newUser);
+      await createUser(payload);
       message.success('用户创建成功！');
     }
     modalVisible.value = false;
+    await userStore.fetchUsersForManagement();
+    await userStore.fetchUsersForPicker();
   } catch (error) {
     console.error('Form validation/submission failed:', error);
   } finally {
@@ -291,12 +288,7 @@ const handleCancel = () => {
 
 const resetForm = () => {
   Object.assign(formState, {
-    id: '',
-    name: '',
-    department: '',
-    managerId: null,
-    roleNames: [],
-    groupNames: []
+    id: '', name: '', department: '', managerId: null, roleNames: [], groupNames: []
   });
 };
 
@@ -310,8 +302,8 @@ const handleDelete = (userId) => {
     onOk: async () => {
       try {
         await deleteUser(userId);
-        userStore.removeUser(userId);
         message.success('用户禁用成功！');
+        await userStore.fetchUsersForManagement();
       } catch (error) {}
     },
   });

@@ -30,7 +30,6 @@ public class WorkflowApplication {
 
     public static void main(String[] args) {
         SpringApplication.run(WorkflowApplication.class, args);
-        // ... (省略日志输出) ...
     }
 
     @Bean

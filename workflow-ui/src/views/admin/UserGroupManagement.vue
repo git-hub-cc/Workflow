@@ -121,15 +121,14 @@ const handleOk = async () => {
     modalConfirmLoading.value = true;
 
     if (isEditing.value) {
-      const updatedGroup = await updateGroup(formState.id, formState);
-      userStore.updateGroup(updatedGroup);
+      await updateGroup(formState.id, formState);
       message.success('用户组更新成功！');
     } else {
-      const newGroup = await createGroup(formState);
-      userStore.addGroup(newGroup);
+      await createGroup(formState);
       message.success('用户组创建成功！');
     }
     modalVisible.value = false;
+    await userStore.fetchAllGroups();
   } catch (error) {
     console.error('Form validation/submission failed:', error);
   } finally {
@@ -150,8 +149,8 @@ const resetForm = () => {
 const handleDelete = async (groupId) => {
   try {
     await deleteGroup(groupId);
-    userStore.removeGroup(groupId);
     message.success('用户组删除成功！');
+    await userStore.fetchAllGroups();
   } catch (error) {
     // API 错误已全局处理
   }

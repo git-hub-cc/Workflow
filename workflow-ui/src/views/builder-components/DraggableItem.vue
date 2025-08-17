@@ -13,25 +13,28 @@
       <component
           :is="getComponentByType(field.type)"
           :placeholder="field.props.placeholder"
-      :options="getOptionsForField(field)"
-      :tree-data="getOptionsForField(field)"
-      disabled
-      style="pointer-events: none;"
+          :options="getOptionsForField(field)"
+          :tree-data="getOptionsForField(field)"
+          disabled
+          style="pointer-events: none;"
       >
-      <!-- 特殊组件的静态预览 -->
-      <template v-if="field.type === 'DataPicker'">
-        <a-input-search placeholder="点击选择" disabled>
-          <template #enterButton><a-button disabled>选择</a-button></template>
-        </a-input-search>
-      </template>
-      <template v-if="field.type === 'IconPicker'">
-        <a-input placeholder="点击选择图标" disabled>
-          <template #addonAfter><a-button disabled><SmileOutlined /></a-button></template>
-        </a-input>
-      </template>
-      <template v-if="field.type === 'KeyValue'">
-        <div class="kv-preview">键值对编辑器</div>
-      </template>
+        <!-- 特殊组件的静态预览 -->
+        <template v-if="field.type === 'DataPicker'">
+          <a-input-search placeholder="点击选择" disabled>
+            <template #enterButton><a-button disabled>选择</a-button></template>
+          </a-input-search>
+        </template>
+        <template v-if="field.type === 'IconPicker'">
+          <a-input placeholder="点击选择图标" disabled>
+            <template #addonAfter><a-button disabled><SmileOutlined /></a-button></template>
+          </a-input>
+        </template>
+        <template v-if="field.type === 'KeyValue'">
+          <div class="kv-preview">键值对编辑器</div>
+        </template>
+        <template v-if="field.type === 'StaticText'">
+          <div v-html="field.props.content" class="static-text-preview"></div>
+        </template>
       </component>
     </a-form-item>
 
@@ -54,7 +57,7 @@
     <a-row v-if="field.type === 'GridRow'" :gutter="field.props.gutter">
       <a-col v-for="(col, colIndex) in field.columns" :key="colIndex" :span="col.props.span">
         <div :class="['layout-dropzone', { selected: selectedFieldId === col }]" @click.stop="selectField(col)" @dragover.prevent.stop @drop.prevent.stop="handleDropInContainer($event, col.fields)">
-          <DraggableItem v-for="(childField, childIndex) in col.fields" :key="childField.id" :field="childField" :index="childIndex" :fields="col.fields" :selected-field-id="selectedFieldId" @select="selectField" @delete="(...args) => emit('delete', ...args)" @component-dropped="(payload) => emit('component-dropped', payload)" />
+          <DraggableItem v-for="(childField, childIndex) in col.fields" :key="childField.id || childIndex" :field="childField" :index="childIndex" :fields="col.fields" :selected-field-id="selectedFieldId" @select="selectField" @delete="(...args) => emit('delete', ...args)" @component-dropped="(payload) => emit('component-dropped', payload)" />
           <div v-if="!col.fields || col.fields.length === 0" class="dropzone-placeholder">拖拽组件到此列</div>
         </div>
       </a-col>
@@ -64,7 +67,7 @@
     <a-collapse v-if="field.type === 'Collapse'" :accordion="field.props.accordion" :activeKey="alwaysOpenKey">
       <a-collapse-panel v-for="panel in field.panels" :key="panel.id" :header="panel.props.header">
         <div :class="['layout-dropzone', { selected: selectedFieldId === panel.id }]" @click.stop="selectField(panel)" @dragover.prevent.stop @drop.prevent.stop="handleDropInContainer($event, panel.fields)">
-          <DraggableItem v-for="(childField, childIndex) in panel.fields" :key="childField.id" :field="childField" :index="childIndex" :fields="panel.fields" :selected-field-id="selectedFieldId" @select="selectField" @delete="(...args) => emit('delete', ...args)" @component-dropped="(payload) => emit('component-dropped', payload)" />
+          <DraggableItem v-for="(childField, childIndex) in panel.fields" :key="childField.id || childIndex" :field="childField" :index="childIndex" :fields="panel.fields" :selected-field-id="selectedFieldId" @select="selectField" @delete="(...args) => emit('delete', ...args)" @component-dropped="(payload) => emit('component-dropped', payload)" />
           <div v-if="!panel.fields || panel.fields.length === 0" class="dropzone-placeholder">拖拽组件到此面板</div>
         </div>
       </a-collapse-panel>
@@ -81,7 +84,6 @@
       <a-button type="text" size="small" @click.stop="deleteField(index, fields)" danger>删除</a-button>
     </div>
   </div>
-
 </template>
 
 <script setup>
@@ -90,7 +92,6 @@ import { useUserStore } from '@/stores/user';
 import { SmileOutlined } from "@ant-design/icons-vue";
 
 const userStore = useUserStore();
-
 const props = defineProps(['field', 'index', 'fields', 'selectedFieldId']);
 const emit = defineEmits(['select', 'delete', 'component-dropped']);
 
@@ -109,14 +110,16 @@ const getComponentByType = (type) => {
   const map = {
     Input: 'a-input', Textarea: 'a-textarea', Select: 'a-select', Checkbox: 'a-checkbox',
     DatePicker: 'a-date-picker', UserPicker: 'a-select', FileUpload: 'a-upload',
-    RichText: 'div', Subform: 'a-table', TreeSelect: 'a-tree-select',
+    RichText: 'div', Subform: 'a-table', TreeSelect: 'a-tree-select', StaticText: 'div'
   };
   return map[type] || 'a-input';
 };
 
 const getOptionsForField = (field) => {
   if (field.dataSource?.type === 'static') return field.dataSource.options;
-  if (field.dataSource?.type === 'system-users') return userStore.allUsers.map(u => ({ label: `${u.name} (${u.id})`, value: u.id }));
+  if (field.dataSource?.type === 'system-users') {
+    return userStore.usersForPicker.map(u => ({ label: `${u.name} (${u.id})`, value: u.id }));
+  }
   return undefined;
 };
 
@@ -165,4 +168,5 @@ const handleDropInContainer = (event, targetContainerFields) => {
 .collapse-container :deep(.ant-collapse) { background-color: #fff; }
 
 .kv-preview { padding: 8px; border: 1px dashed #d9d9d9; text-align: center; color: #888; background: #fafafa; }
+.static-text-preview { padding: 8px; border: 1px dashed #d9d9d9; background: #fafafa; }
 </style>

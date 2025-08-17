@@ -24,22 +24,20 @@ import java.util.Map;
 @RequestMapping("/api/admin")
 @RequiredArgsConstructor
 @CrossOrigin(origins = "*")
-@PreAuthorize("hasRole('ADMIN')") // 在类级别上要求所有接口调用者都必须拥有 ADMIN 角色
+@PreAuthorize("hasRole('ADMIN')")
 public class AdminController {
 
     private final AdminService adminService;
-    private final UserService userService; // 注入 UserService
+    private final UserService userService;
 
-    // --- 流程实例管理 (保持不变) ---
-
+    // --- 流程实例管理 ---
     @GetMapping("/instances")
     public ResponseEntity<List<ProcessInstanceDto>> getActiveProcessInstances() {
         return ResponseEntity.ok(adminService.getActiveProcessInstances());
     }
 
     @DeleteMapping("/instances/{processInstanceId}")
-    public ResponseEntity<Void> terminateProcessInstance(@PathVariable String processInstanceId,
-                                                         @RequestParam String reason) {
+    public ResponseEntity<Void> terminateProcessInstance(@PathVariable String processInstanceId, @RequestParam String reason) {
         adminService.terminateProcessInstance(processInstanceId, reason);
         return ResponseEntity.ok().build();
     }
@@ -67,7 +65,15 @@ public class AdminController {
     }
 
 
-    // --- 用户管理 (已更新) ---
+    // --- 【核心重构】用户管理 ---
+
+    /**
+     * API: (管理员)获取所有用户的完整列表，用于用户管理页面
+     */
+    @GetMapping("/users")
+    public ResponseEntity<List<UserDto>> getAllUsersForAdmin() {
+        return ResponseEntity.ok(adminService.getAllUsers());
+    }
 
     @PostMapping("/users")
     public ResponseEntity<UserDto> createUser(@RequestBody UserDto userDto) {
@@ -81,63 +87,42 @@ public class AdminController {
         return ResponseEntity.ok(updatedUser);
     }
 
-    /**
-     * API: 删除一个用户 (逻辑删除)
-     */
     @DeleteMapping("/users/{id}")
     public ResponseEntity<Void> deleteUser(@PathVariable String id) {
         adminService.deleteUser(id);
         return ResponseEntity.noContent().build();
     }
 
-    /**
-     * API: (管理员)重置用户密码
-     */
     @PostMapping("/users/{id}/reset-password")
     public ResponseEntity<Void> resetPassword(@PathVariable String id) {
         userService.resetPassword(id);
         return ResponseEntity.ok().build();
     }
 
-    // --- 角色管理 (新增与完善) ---
-
-    /**
-     * API: 创建一个新角色
-     */
+    // --- 角色管理 ---
     @PostMapping("/roles")
     public ResponseEntity<RoleDto> createRole(@RequestBody RoleDto roleDto) {
         RoleDto createdRole = adminService.createRole(roleDto);
         return new ResponseEntity<>(createdRole, HttpStatus.CREATED);
     }
 
-    /**
-     * API: 获取所有角色列表
-     */
     @GetMapping("/roles")
     public ResponseEntity<List<RoleDto>> getAllRoles() {
         return ResponseEntity.ok(adminService.getAllRoles());
     }
 
-    /**
-     * API: 更新角色信息
-     */
     @PutMapping("/roles/{id}")
     public ResponseEntity<RoleDto> updateRole(@PathVariable Long id, @RequestBody RoleDto roleDto) {
         return ResponseEntity.ok(adminService.updateRole(id, roleDto));
     }
 
-    /**
-     * API: 删除角色
-     */
     @DeleteMapping("/roles/{id}")
     public ResponseEntity<Void> deleteRole(@PathVariable Long id) {
         adminService.deleteRole(id);
         return ResponseEntity.noContent().build();
     }
 
-
-    // --- 【新增】用户组管理 ---
-
+    // --- 用户组管理 ---
     @PostMapping("/groups")
     public ResponseEntity<UserGroupDto> createGroup(@RequestBody UserGroupDto groupDto) {
         UserGroupDto createdGroup = adminService.createGroup(groupDto);
@@ -160,11 +145,9 @@ public class AdminController {
         return ResponseEntity.noContent().build();
     }
 
-
-    // --- 组织架构与数据源 (保持不变) ---
-
+    // --- 组织架构与数据源 ---
     @GetMapping("/organization-tree")
-    @PreAuthorize("isAuthenticated()") // 覆盖类级别的 'ADMIN' 限制
+    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<List<DepartmentTreeNode>> getOrganizationTree() {
         return ResponseEntity.ok(adminService.getOrganizationTree());
     }
@@ -178,11 +161,7 @@ public class AdminController {
         return ResponseEntity.badRequest().build();
     }
 
-    // --- 【新增】日志管理 ---
-
-    /**
-     * API: 分页查询登录日志
-     */
+    // --- 日志管理 ---
     @GetMapping("/logs/login")
     public ResponseEntity<Page<LoginLogDto>> getLoginLogs(
             @RequestParam(required = false) String userId,
@@ -193,9 +172,6 @@ public class AdminController {
         return ResponseEntity.ok(adminService.getLoginLogs(userId, status, startTime, endTime, pageable));
     }
 
-    /**
-     * API: 分页查询操作日志
-     */
     @GetMapping("/logs/operation")
     public ResponseEntity<Page<OperationLogDto>> getOperationLogs(
             @RequestParam(required = false) String operatorId,

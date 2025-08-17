@@ -8,17 +8,20 @@ import club.ppmc.workflow.dto.FormSubmissionResponse;
 import club.ppmc.workflow.exception.ResourceNotFoundException;
 import club.ppmc.workflow.repository.FormSubmissionRepository;
 import club.ppmc.workflow.service.FormService;
-import club.ppmc.workflow.service.WordImportService; // 【新增】导入
+import club.ppmc.workflow.service.WordImportService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.multipart.MultipartFile; // 【新增】导入
+import org.springframework.web.multipart.MultipartFile;
 
-import java.io.IOException; // 【新增】导入
+import java.io.IOException;
 import java.security.Principal;
 import java.util.List;
+import java.util.Map;
 
 /**
  * @author cc
@@ -32,7 +35,7 @@ public class FormController {
 
     private final FormService formService;
     private final FormSubmissionRepository formSubmissionRepository;
-    private final WordImportService wordImportService; // 【新增】注入服务
+    private final WordImportService wordImportService;
 
     /**
      * API: 创建一个新的表单定义
@@ -46,7 +49,7 @@ public class FormController {
     }
 
     /**
-     * 【新增】API: 从 Word 文档导入并创建表单定义
+     * API: 从 Word 文档导入并创建表单定义
      * 权限: 仅限管理员
      * @param file 上传的 .docx 文件
      * @return 解析后的表单定义响应 DTO
@@ -69,8 +72,6 @@ public class FormController {
         return ResponseEntity.ok(responses);
     }
 
-    // ... 其他方法保持不变 ...
-
     /**
      * API: 根据 ID 获取单个表单定义
      * 权限: 已认证用户
@@ -79,6 +80,17 @@ public class FormController {
     public ResponseEntity<FormDefinitionResponse> getFormDefinitionById(@PathVariable Long id) {
         FormDefinitionResponse response = formService.getFormDefinitionById(id);
         return ResponseEntity.ok(response);
+    }
+
+    /**
+     * 【新增】API: 删除一个表单定义
+     * 权限: 仅限管理员
+     */
+    @DeleteMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<Void> deleteFormDefinition(@PathVariable Long id) {
+        formService.deleteFormDefinition(id);
+        return ResponseEntity.noContent().build();
     }
 
     /**
@@ -98,12 +110,15 @@ public class FormController {
     }
 
     /**
-     * API: 获取指定表单的所有提交数据
+     * 【修改】API: 获取指定表单的所有提交数据 (支持分页和过滤)
      * 权限: 已认证用户
      */
     @GetMapping("/{formId}/submissions")
-    public ResponseEntity<List<FormSubmissionResponse>> getSubmissionsByFormId(@PathVariable Long formId) {
-        List<FormSubmissionResponse> responses = formService.getSubmissionsByFormId(formId);
+    public ResponseEntity<Page<FormSubmissionResponse>> getSubmissionsByFormId(
+            @PathVariable Long formId,
+            @RequestParam(required = false) Map<String, String> filters,
+            Pageable pageable) {
+        Page<FormSubmissionResponse> responses = formService.getSubmissionsByFormId(formId, filters, pageable);
         return ResponseEntity.ok(responses);
     }
 

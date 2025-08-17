@@ -1,124 +1,128 @@
 <template>
   <div class="page-container">
-    <a-page-header :title="formDefinition.name || '申请详情'" @back="() => $router.go(-1)" />
-
-    <a-spin :spinning="loading" tip="正在加载详情...">
-      <div v-if="!loading" style="padding: 24px;">
-        <a-row :gutter="[24, 24]">
-          <!-- 左侧：表单数据 -->
-          <a-col :span="14">
-            <a-card title="表单数据">
-              <form-item-renderer
-                  v-for="field in formDefinition.schema.fields"
-                  :key="field.id"
-                  :field="field"
-                  :form-data="formData"
-                  :mode="'readonly'"
-              />
-            </a-card>
-          </a-col>
-
-          <!-- 右侧：审批历史 -->
-          <a-col :span="10">
-            <a-card title="审批历史">
-              <a-timeline v-if="history.length > 0">
-                <a-timeline-item
-                    v-for="item in history"
-                    :key="item.activityId"
-                    :color="getTimelineColor(item)"
-                >
-                  <p><strong>{{ item.activityName }}</strong></p>
-                  <p v-if="item.assigneeName">处理人: {{ item.assigneeName }}</p>
-                  <p v-if="item.startTime">
-                    时间: {{ new Date(item.startTime).toLocaleString() }}
-                    <span v-if="item.durationInMillis"> (耗时: {{ formatDuration(item.durationInMillis) }})</span>
-                  </p>
-                  <p v-if="item.decision">
-                    审批决定:
-                    <a-tag :color="item.decision === 'APPROVED' ? 'green' : 'red'">
-                      {{ item.decision === 'APPROVED' ? '通过' : '拒绝' }}
-                    </a-tag>
-                  </p>
-                  <p v-if="item.comment">审批意见: {{ item.comment }}</p>
-                </a-timeline-item>
-              </a-timeline>
-              <a-empty v-else description="暂无审批历史记录" />
-            </a-card>
-          </a-col>
-        </a-row>
-      </div>
-    </a-spin>
+    <a-page-header :title="`“${formName}” 的提交记录`" @back="() => $router.go(-1)" />
+    <a-table
+        :columns="columns"
+        :data-source="submissions"
+        :loading="loading"
+        :pagination="pagination"
+        row-key="id"
+        style="margin: 24px;"
+        @change="handleTableChange"
+    >
+      <template #bodyCell="{ column, record }">
+        <template v-if="column.key === 'workflowStatus'">
+          <a-tag :color="getStatusColor(record.workflowStatus)">{{ record.workflowStatus }}</a-tag>
+        </template>
+        <template v-else-if="column.key === 'createdAt'">
+          {{ new Date(record.createdAt).toLocaleString() }}
+        </template>
+        <template v-else-if="column.key === 'actions'">
+          <a-button type="link" @click="goToDetail(record.id)">查看详情</a-button>
+        </template>
+        <template v-else>
+          {{ getRecordValue(record, column.dataIndex) }}
+        </template>
+      </template>
+    </a-table>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue';
-import { getSubmissionById, getFormById, getWorkflowHistory } from '@/api';
+import { ref, onMounted, computed, reactive } from 'vue';
+import { useRouter } from 'vue-router';
+import { getSubmissions, getFormById } from '@/api';
 import { message } from 'ant-design-vue';
-import FormItemRenderer from './viewer-components/FormItemRenderer.vue';
 
-const props = defineProps({ submissionId: String });
+const props = defineProps({ formId: String });
+const router = useRouter();
 const loading = ref(true);
-const formDefinition = ref({ schema: { fields: [] } });
-const formData = ref({});
-const history = ref([]);
+const submissions = ref([]);
+const formSchema = ref({ fields: [] });
+const formName = ref('');
 
-const formatDuration = (ms) => {
-  if (!ms) return '';
-  const seconds = Math.floor(ms / 1000);
-  const minutes = Math.floor(seconds / 60);
-  const hours = Math.floor(minutes / 60);
-  const days = Math.floor(hours / 24);
+// 【新增】分页状态
+const pagination = reactive({
+  current: 1,
+  pageSize: 10,
+  total: 0,
+});
 
-  if (days > 0) return `${days}天 ${hours % 24}小时`;
-  if (hours > 0) return `${hours}小时 ${minutes % 60}分钟`;
-  if (minutes > 0) return `${minutes}分钟 ${seconds % 60}秒`;
-  return `${seconds}秒`;
+
+const columns = computed(() => {
+  const baseColumns = [
+    { title: '提交人', dataIndex: 'submitterName', key: 'submitterName', width: 120 },
+    { title: '流程状态', dataIndex: 'workflowStatus', key: 'workflowStatus', width: 120, align: 'center' },
+  ];
+  // 只显示前 3 个字段作为预览
+  const dynamicColumns = formSchema.value.fields.slice(0, 3).map(field => ({
+    title: field.label,
+    dataIndex: field.id, // 使用字段ID
+    key: field.id,
+    ellipsis: true,
+  }));
+  const finalColumns = [
+    { title: '提交时间', dataIndex: 'createdAt', key: 'createdAt', width: 180 },
+    { title: '操作', key: 'actions', width: 120, align: 'center' },
+  ];
+  return [...baseColumns, ...dynamicColumns, ...finalColumns];
+});
+
+const getStatusColor = (status) => {
+  if (status === '审批中') return 'processing';
+  if (status === '已通过') return 'success';
+  if (status === '已拒绝') return 'error';
+  return 'default';
 };
 
-const getTimelineColor = (item) => {
-  if (item.activityType.endsWith('EndEvent')) {
-    return item.decision === 'APPROVED' ? 'green' : 'red';
-  }
-  if (!item.endTime && (item.activityType === 'userTask' || item.activityType === 'serviceTask')) {
-    return 'blue'; // 当前活动节点
-  }
-  return 'gray'; // 已完成
+const goToDetail = (submissionId) => {
+  router.push({ name: 'submission-detail', params: { submissionId } });
 };
+
+// 【修改】获取数据函数，以支持分页
+const fetchData = async () => {
+  loading.value = true;
+  try {
+    const params = {
+      page: pagination.current - 1,
+      size: pagination.pageSize,
+      sort: 'createdAt,desc'
+    };
+    const subRes = await getSubmissions(props.formId, params);
+    submissions.value = subRes.content.map(s => ({
+      ...s,
+      ...JSON.parse(s.dataJson) // 展开 dataJson
+    }));
+    pagination.total = subRes.totalElements;
+  } catch (error) {
+    message.error('加载数据失败');
+  } finally {
+    loading.value = false;
+  }
+}
+
+// 【新增】处理表格变化事件（分页、排序等）
+const handleTableChange = (pager) => {
+  pagination.current = pager.current;
+  pagination.pageSize = pager.pageSize;
+  fetchData();
+}
+
+const getRecordValue = (record, dataIndex) => {
+  return record[dataIndex];
+}
 
 onMounted(async () => {
+  loading.value = true;
   try {
-    const [subRes, historyRes] = await Promise.all([
-      getSubmissionById(props.submissionId),
-      getWorkflowHistory(props.submissionId)
-    ]);
-
-    formData.value = JSON.parse(subRes.dataJson);
-    // 将附件信息也注入到formData中，以便渲染器可以找到
-    if (subRes.attachments) {
-      formData.value.__attachments = subRes.attachments;
-    }
-    history.value = historyRes;
-
-    const formRes = await getFormById(subRes.formDefinitionId);
-    formDefinition.value = {
-      ...formRes,
-      schema: JSON.parse(formRes.schemaJson),
-    };
-
+    const formRes = await getFormById(props.formId);
+    formName.value = formRes.name;
+    formSchema.value = JSON.parse(formRes.schemaJson);
+    await fetchData(); // 初始加载
   } catch (error) {
-    message.error('加载申请详情失败');
+    message.error('加载表单信息失败');
   } finally {
     loading.value = false;
   }
 });
 </script>
-
-<style scoped>
-.page-container {
-  background-color: #fff;
-}
-.ant-timeline-item p {
-  margin-bottom: 4px;
-}
-</style>
