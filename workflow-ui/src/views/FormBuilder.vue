@@ -43,13 +43,13 @@
       </div>
 
       <!-- 中间: 画布 -->
-      <!-- 【修复 1】: 明确 drop 事件处理，使用 .prevent.stop 并传递事件对象 -->
+      <!-- 【修复】: 明确 drop 事件处理，使用 .prevent.stop 并传递事件对象 -->
       <div class="canvas" @dragover.prevent @drop.prevent.stop="handleCanvasDrop($event)">
         <a-form layout="vertical">
           <div v-if="formDefinition.schema.fields.length === 0" class="canvas-placeholder">
             从左侧拖拽组件到这里
           </div>
-          <!-- 【修复 2】: 监听子组件发出的 'component-dropped' 事件 -->
+          <!-- 【修复】: 监听子组件发出的 'component-dropped' 事件 -->
           <draggable-item
               v-for="(field, index) in formDefinition.schema.fields"
               :key="field.id"
@@ -113,32 +113,76 @@ const handleDragStart = (item) => {
   draggedItem = item;
 };
 
-// 【修复 3】: 新增 handleCanvasDrop，专门处理在主画布空白区域的 drop
+// 【修复】: 新增 handleCanvasDrop，处理在主画布空白区域的 drop
 const handleCanvasDrop = (event) => {
-  // 检查是否是从组件面板拖拽过来的新组件
-  if (draggedItem) {
-    // 直接在根列表末尾添加
-    handleDrop(formDefinition.schema.fields);
-  }
+  const targetList = formDefinition.schema.fields;
+  const targetIndex = targetList.length; // 默认添加到末尾
+  handleDrop(event, targetList, targetIndex);
 };
 
-// 【修复 4】: 统一的 drop 逻辑处理器
-const handleDrop = (targetList, index = -1) => {
+// 【修复】: 创建一个新的处理器来接收子组件的 drop 事件
+const handleComponentDrop = ({ event, targetList, index }) => {
+  handleDrop(event, targetList, index);
+};
+
+
+/**
+ * 【修复】: 递归查找并移除字段
+ * @param {string} fieldId - 要查找的字段ID
+ * @param {Array} list - 当前要搜索的字段列表
+ * @returns {Object|null} - 返回被移除的字段对象，如果未找到则返回 null
+ */
+function findAndRemoveField(fieldId, list = formDefinition.schema.fields) {
+  for (let i = 0; i < list.length; i++) {
+    const field = list[i];
+    if (field.id === fieldId) {
+      const [removedField] = list.splice(i, 1);
+      return removedField;
+    }
+    if (field.type === 'Layout' && field.props.columns) {
+      for (const col of field.props.columns) {
+        const found = findAndRemoveField(fieldId, col);
+        if (found) return found;
+      }
+    }
+  }
+  return null;
+}
+
+/**
+ * 【修复】: 统一的 drop 逻辑处理器，能区分“新增”和“移动”
+ * @param {DragEvent} event - DOM 拖拽事件
+ * @param {Array} targetList - 目标容器的字段列表
+ * @param {number} index - 在目标列表中插入的位置
+ */
+const handleDrop = (event, targetList, index) => {
+  // 优先处理“移动”操作
+  const moveData = event.dataTransfer.getData('text/plain');
+  if (moveData) {
+    try {
+      const { sourceFieldId } = JSON.parse(moveData);
+      if (sourceFieldId) {
+        // 这是移动操作
+        const fieldToMove = findAndRemoveField(sourceFieldId);
+        if (fieldToMove) {
+          targetList.splice(index, 0, fieldToMove);
+          selectField(fieldToMove); // 移动后保持选中
+        }
+        draggedItem = null; // 清理拖拽状态
+        return; // 操作完成
+      }
+    } catch (e) {
+      // dataTransfer 不是有效的JSON，说明不是内部移动操作，忽略错误继续执行
+    }
+  }
+
+  // 如果不是移动操作，则处理“新增”操作
   if (draggedItem) {
     const newField = createNewField(draggedItem.type);
-    if (index === -1) {
-      targetList.push(newField);
-    } else {
-      targetList.splice(index, 0, newField);
-    }
+    targetList.splice(index, 0, newField);
     selectField(newField);
     draggedItem = null;
   }
-};
-
-// 【修复 5】: 创建一个新的处理器来接收子组件的 drop 事件
-const handleComponentDrop = ({ targetList, index }) => {
-  handleDrop(targetList, index);
 };
 
 

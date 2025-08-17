@@ -3,7 +3,7 @@
       :class="['form-field', { selected: selectedFieldId === field.id }]"
       @click.stop="selectField(field)"
       draggable="true"
-      @dragstart.stop="handleDragStart"
+      @dragstart.stop="handleDragStart($event)"
       @dragover.prevent.stop="handleDragOver"
       @dragleave.stop="handleDragLeave"
       @drop.prevent.stop="handleDropOnItem($event)"
@@ -26,7 +26,7 @@
       <div class="layout-container">
         <a-row :gutter="16">
           <a-col v-for="(col, colIndex) in field.props.columns" :key="colIndex" :span="24 / field.props.columns.length">
-            <!-- 【核心修复 1】: 明确传递 $event 和目标列 col -->
+            <!-- 【修复】: 明确传递 $event 和目标列 col -->
             <div
                 class="layout-column-dropzone"
                 @dragover.prevent.stop
@@ -62,7 +62,7 @@ import { useUserStore } from '@/stores/user';
 const userStore = useUserStore();
 
 const props = defineProps(['field', 'index', 'fields', 'selectedFieldId']);
-// 【核心修复 2】: 更改 emit 的事件名称，使其更具描述性
+// 【修复】: 更改 emit 的事件名称，使其更具描述性
 const emit = defineEmits(['select', 'delete', 'component-dropped']);
 
 const DraggableItem = defineAsyncComponent(() => import('./DraggableItem.vue'));
@@ -85,8 +85,10 @@ const getOptionsForField = (field) => {
 const selectField = (field) => emit('select', field);
 const deleteField = (index, list) => emit('delete', index, list);
 
+
+// 【修复】: 拖拽开始时，将当前字段ID存入 dataTransfer，用于“移动”操作
 const handleDragStart = (e) => {
-  e.dataTransfer.setData('text/plain', JSON.stringify({ fieldId: props.field.id }));
+  e.dataTransfer.setData('text/plain', JSON.stringify({ sourceFieldId: props.field.id }));
   e.dataTransfer.effectAllowed = 'move';
 };
 
@@ -94,19 +96,16 @@ const handleDragOver = (e) => { e.currentTarget.classList.add('drag-over'); };
 const handleDragLeave = (e) => { e.currentTarget.classList.remove('drag-over'); };
 
 
-// 【核心修复 3】: 创建新的事件处理器，用于在组件本身上释放
+// 【修复】: 当有组件在此组件上释放时，触发事件，表示要插入到此组件“之前”
 const handleDropOnItem = (event) => {
   event.currentTarget.classList.remove('drag-over');
   // 向上级（FormBuilder）发出事件，告知需要在当前组件的位置插入新组件
-  emit('component-dropped', { targetList: props.fields, index: props.index });
+  emit('component-dropped', { event, targetList: props.fields, index: props.index });
 };
 
-// 【核心修复 4】: 修正处理函数，正确接收 event 和 col
+// 【修复】: 当有组件在布局列中释放时，触发事件，表示要插入到该列的“末尾”
 const handleDropOnColumn = (event, targetColumn) => {
-  // event 参数现在是有效的事件对象，但由于模板中已经使用了 .prevent 和 .stop，
-  // 我们不需要在这里再次调用 event.preventDefault() 或 event.stopPropagation()。
-  // 我们只关心目标列 targetColumn。
-  emit('component-dropped', { targetList: targetColumn, index: -1 }); // index -1 表示添加到末尾
+  emit('component-dropped', { event, targetList: targetColumn, index: targetColumn.length });
 };
 
 </script>

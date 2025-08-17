@@ -61,7 +61,6 @@ public class WorkflowService {
         Deployment deployment = repositoryService.createDeployment()
                 .addString(request.getProcessDefinitionKey() + ".bpmn", request.getBpmnXml())
                 .name("Deployment for form: " + formDef.getName())
-                .tenantId("default")
                 .deploy();
 
         WorkflowTemplate template = templateRepository.findByFormDefinitionId(request.getFormDefinitionId())
@@ -112,63 +111,47 @@ public class WorkflowService {
                     // --- 【修改】默认模板现在使用服务任务来动态查找审批人 ---
                     String processDefinitionKey = "Process_Form_" + formId;
                     String defaultXml = String.format("""
+
                         <?xml version="1.0" encoding="UTF-8"?>
-                        <bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" xmlns:camunda="http://camunda.org/schema/1.0/bpmn" xmlns:di="http://www.omg.org/spec/DD/20100524/DI" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" id="Definitions_0z3f9b2" targetNamespace="http://bpmn.io/schema/bpmn" exporter="Camunda Modeler" exporterVersion="5.22.0">
+                        <bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" xmlns:di="http://www.omg.org/spec/DD/20100524/DI" xmlns:camunda="http://camunda.org/schema/1.0/bpmn" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" id="Definitions_1" targetNamespace="http://bpmn.io/schema/bpmn" exporter="Camunda Modeler" exporterVersion="5.20.0">
                           <bpmn:process id="%s" name="新流程" isExecutable="true" camunda:historyTimeToLive="P180D">
                             <bpmn:startEvent id="StartEvent_1" name="开始">
-                              <bpmn:outgoing>Flow_Start_FindManager</bpmn:outgoing>
+                              <bpmn:outgoing>Flow_1</bpmn:outgoing>
                             </bpmn:startEvent>
-                            <bpmn:serviceTask id="Task_FindManager" name="查找审批人" camunda:delegateExpression="${findManagerDelegate}">
-                              <bpmn:extensionElements>
-                                <camunda:inputOutput>
-                                  <camunda:inputParameter name="managerLevel">1</camunda:inputParameter>
-                                </camunda:inputOutput>
-                              </bpmn:extensionElements>
-                              <bpmn:incoming>Flow_Start_FindManager</bpmn:incoming>
-                              <bpmn:outgoing>Flow_FindManager_Approve</bpmn:outgoing>
-                            </bpmn:serviceTask>
-                            <bpmn:userTask id="Task_ManagerApprove" name="上级审批" camunda:assignee="${assignee}">
-                              <bpmn:incoming>Flow_FindManager_Approve</bpmn:incoming>
-                              <bpmn:outgoing>Flow_Approve_End</bpmn:outgoing>
+                            <bpmn:sequenceFlow id="Flow_1" sourceRef="StartEvent_1" targetRef="Activity_ManagerApprove" />
+                            <bpmn:userTask id="Activity_ManagerApprove" name="部门经理审批" camunda:assignee="${managerId}">
+                              <bpmn:incoming>Flow_1</bpmn:incoming>
+                              <bpmn:outgoing>Flow_2</bpmn:outgoing>
                             </bpmn:userTask>
                             <bpmn:endEvent id="EndEvent_1" name="结束">
-                              <bpmn:incoming>Flow_Approve_End</bpmn:incoming>
+                              <bpmn:incoming>Flow_2</bpmn:incoming>
                             </bpmn:endEvent>
-                            <bpmn:sequenceFlow id="Flow_Start_FindManager" sourceRef="StartEvent_1" targetRef="Task_FindManager" />
-                            <bpmn:sequenceFlow id="Flow_FindManager_Approve" sourceRef="Task_FindManager" targetRef="Task_ManagerApprove" />
-                            <bpmn:sequenceFlow id="Flow_Approve_End" sourceRef="Task_ManagerApprove" targetRef="EndEvent_1" />
+                            <bpmn:sequenceFlow id="Flow_2" sourceRef="Activity_ManagerApprove" targetRef="EndEvent_1" />
                           </bpmn:process>
                           <bpmndi:BPMNDiagram id="BPMNDiagram_1">
                             <bpmndi:BPMNPlane id="BPMNPlane_1" bpmnElement="%s">
-                              <bpmndi:BPMNShape id="_BPMNShape_StartEvent_2" bpmnElement="StartEvent_1">
-                                <dc:Bounds x="179" y="99" width="36" height="36" />
+                              <bpmndi:BPMNShape id="StartEvent_1_di" bpmnElement="StartEvent_1">
+                                <dc:Bounds x="179" y="102" width="36" height="36" />
                                 <bpmndi:BPMNLabel>
-                                  <dc:Bounds x="185" y="142" width="22" height="14" />
+                                  <dc:Bounds x="185" y="145" width="22" height="14" />
                                 </bpmndi:BPMNLabel>
                               </bpmndi:BPMNShape>
-                              <bpmndi:BPMNShape id="Activity_1c8n5n3_di" bpmnElement="Task_FindManager">
-                                <dc:Bounds x="270" y="77" width="100" height="80" />
+                              <bpmndi:BPMNShape id="Activity_ManagerApprove_di" bpmnElement="Activity_ManagerApprove">
+                                <dc:Bounds x="270" y="80" width="100" height="80" />
                               </bpmndi:BPMNShape>
-                              <bpmndi:BPMNShape id="Activity_0k3xje3_di" bpmnElement="Task_ManagerApprove">
-                                <dc:Bounds x="430" y="77" width="100" height="80" />
-                              </bpmndi:BPMNShape>
-                              <bpmndi:BPMNShape id="Event_1k297se_di" bpmnElement="EndEvent_1">
-                                <dc:Bounds x="592" y="99" width="36" height="36" />
+                              <bpmndi:BPMNShape id="EndEvent_1_di" bpmnElement="EndEvent_1">
+                                <dc:Bounds x="432" y="102" width="36" height="36" />
                                 <bpmndi:BPMNLabel>
-                                  <dc:Bounds x="598" y="142" width="22" height="14" />
+                                  <dc:Bounds x="438" y="145" width="22" height="14" />
                                 </bpmndi:BPMNLabel>
                               </bpmndi:BPMNShape>
-                              <bpmndi:BPMNEdge id="Flow_0d6k7k4_di" bpmnElement="Flow_Start_FindManager">
-                                <di:waypoint x="215" y="117" />
-                                <di:waypoint x="270" y="117" />
+                              <bpmndi:BPMNEdge id="Flow_1_di" bpmnElement="Flow_1">
+                                <di:waypoint x="215" y="120" />
+                                <di:waypoint x="270" y="120" />
                               </bpmndi:BPMNEdge>
-                              <bpmndi:BPMNEdge id="Flow_0y1b99a_di" bpmnElement="Flow_FindManager_Approve">
-                                <di:waypoint x="370" y="117" />
-                                <di:waypoint x="430" y="117" />
-                              </bpmndi:BPMNEdge>
-                              <bpmndi:BPMNEdge id="Flow_11x042r_di" bpmnElement="Flow_Approve_End">
-                                <di:waypoint x="530" y="117" />
-                                <di:waypoint x="592" y="117" />
+                              <bpmndi:BPMNEdge id="Flow_2_di" bpmnElement="Flow_2">
+                                <di:waypoint x="370" y="120" />
+                                <di:waypoint x="432" y="120" />
                               </bpmndi:BPMNEdge>
                             </bpmndi:BPMNPlane>
                           </bpmndi:BPMNDiagram>
@@ -204,12 +187,23 @@ public class WorkflowService {
                     }
 
                     Map<String, Object> variables = objectMapper.readValue(submission.getDataJson(), new TypeReference<>() {});
-                    // --- 【核心修改：简化变量设置】 ---
-                    // 启动时只设置最核心的、业务无关的变量。
-                    // 审批人查找等业务逻辑已移入BPMN流程定义中（通过Delegate）。
+
                     variables.put("submitterId", submission.getSubmitterId());
                     variables.put("formSubmissionId", submission.getId());
-                    // --- 【修改结束】 ---
+
+                    // --- 【核心修复：在启动流程前，查找并设置 managerId 变量】 ---
+                    User submitter = userRepository.findById(submission.getSubmitterId())
+                            .orElseThrow(() -> new IllegalStateException("数据异常：找不到提交人，ID: " + submission.getSubmitterId()));
+
+                    if (submitter.getManager() != null) {
+                        String managerId = submitter.getManager().getId();
+                        variables.put("managerId", managerId);
+                        log.info("已为提交者 '{}' 找到上级经理 '{}'，并设置为流程变量 'managerId'。", submission.getSubmitterId(), managerId);
+                    } else {
+                        // 如果找不到上级，流程将无法启动，这里应抛出明确的异常
+                        throw new IllegalStateException("提交者 '" + submitter.getName() + "' 没有设置上级经理，无法启动需要上级审批的流程。");
+                    }
+                    // --- 【修复结束】 ---
 
                     ProcessInstance camundaInstance = runtimeService.startProcessInstanceByKey(
                             template.getProcessDefinitionKey(),
@@ -246,7 +240,7 @@ public class WorkflowService {
                 .orElseThrow(() -> new IllegalStateException("数据不一致：找不到流程实例 " + processInstanceId + " 对应的本地实例"));
         FormSubmission submission = instance.getFormSubmission();
 
-        // --- 【核心修改：处理表单和附件更新】 ---
+        // --- 【核心修改：处理表单数据更新】 ---
         if (request.getUpdatedFormData() != null && !request.getUpdatedFormData().isBlank()) {
             submission.setDataJson(request.getUpdatedFormData());
             log.info("已更新申请单 (ID: {}) 的表单数据。", submission.getId());
@@ -261,20 +255,45 @@ public class WorkflowService {
             }
         }
 
-        if (!CollectionUtils.isEmpty(request.getAttachmentIds())) {
-            // 1. 解除旧附件的关联
-            submission.getAttachments().clear();
+        // --- 【修复】重构附件更新逻辑，防止数据丢失 ---
+        if (request.getAttachmentIds() != null) {
+            // 1. 获取当前数据库中关联的附件ID集合
+            Set<Long> existingIds = submission.getAttachments().stream()
+                    .map(FileAttachment::getId)
+                    .collect(Collectors.toSet());
 
-            // 2. 关联新附件
-            List<FileAttachment> newAttachments = fileAttachmentRepository.findAllById(request.getAttachmentIds());
-            for (FileAttachment attachment : newAttachments) {
-                attachment.setFormSubmission(submission);
+            // 2. 获取前端最新提交的附件ID集合
+            Set<Long> newIds = new HashSet<>(request.getAttachmentIds());
+
+            // 3. 计算需要被移除的附件 (存在于旧集合，但不存在于新集合)
+            List<FileAttachment> toRemove = submission.getAttachments().stream()
+                    .filter(att -> !newIds.contains(att.getId()))
+                    .collect(Collectors.toList());
+
+            // 4. 计算需要被新增关联的附件ID (存在于新集合，但不存在于旧集合)
+            Set<Long> toAddIds = new HashSet<>(newIds);
+            toAddIds.removeAll(existingIds);
+
+            // 5. 执行移除操作
+            if (!toRemove.isEmpty()) {
+                // 从 submission 的集合中移除，由于 orphanRemoval=true，JPA会自动删除这些附件记录
+                submission.getAttachments().removeAll(toRemove);
+                log.info("从申请单 #{} 中移除了 {} 个旧附件。", submission.getId(), toRemove.size());
             }
-            submission.getAttachments().addAll(newAttachments);
-            log.info("已更新申请单 (ID: {}) 的附件列表。", submission.getId());
+
+            // 6. 执行新增关联操作
+            if (!toAddIds.isEmpty()) {
+                List<FileAttachment> attachmentsToAdd = fileAttachmentRepository.findAllById(toAddIds);
+                for (FileAttachment att : attachmentsToAdd) {
+                    att.setFormSubmission(submission); // 建立双向关联
+                    submission.getAttachments().add(att);
+                }
+                log.info("为申请单 #{} 新增了 {} 个附件关联。", submission.getId(), attachmentsToAdd.size());
+            }
         }
+        // --- 【修复结束】 ---
+
         formSubmissionRepository.save(submission);
-        // --- 【修改结束】 ---
 
 
         if (request.getApprovalComment() != null && !request.getApprovalComment().isEmpty()) {
