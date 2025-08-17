@@ -20,7 +20,7 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 
 @Configuration
 @EnableWebSecurity
-@EnableMethodSecurity // 启用方法级别的安全注解, 如 @PreAuthorize
+@EnableMethodSecurity(prePostEnabled = true, securedEnabled = true) // 启用方法级安全注解, 如 @PreAuthorize
 @RequiredArgsConstructor
 public class SecurityConfig {
 
@@ -38,6 +38,9 @@ public class SecurityConfig {
                         // 【新增】允许已认证用户访问文件上传和下载接口
                         .requestMatchers("/api/files/**").authenticated()
                         .requestMatchers(HttpMethod.POST, "/api/users/me/change-password").authenticated()
+                        // 【修改】明确 /api/admin/** 下的所有请求都需要 ADMIN 角色
+                        // @PreAuthorize 在 Controller 级别已经做了更细粒度的控制，这里作为一道额外的防线
+                        .requestMatchers("/api/admin/**").hasRole("ADMIN")
                         // 其他所有请求都需要经过认证
                         .anyRequest().authenticated()
                 )

@@ -1,11 +1,10 @@
 package club.ppmc.workflow.service;
 
-import club.ppmc.workflow.domain.User;
-import club.ppmc.workflow.dto.DepartmentTreeNode;
-import club.ppmc.workflow.dto.ProcessInstanceDto;
-import club.ppmc.workflow.dto.TreeNodeDto; // 【新增】导入
-import club.ppmc.workflow.dto.UserDto;
+import club.ppmc.workflow.domain.*;
+import club.ppmc.workflow.dto.*;
 import club.ppmc.workflow.exception.ResourceNotFoundException;
+import club.ppmc.workflow.repository.RoleRepository;
+import club.ppmc.workflow.repository.UserGroupRepository;
 import club.ppmc.workflow.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.camunda.bpm.engine.HistoryService;
@@ -17,6 +16,7 @@ import org.camunda.bpm.engine.runtime.ProcessInstance;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.CollectionUtils;
 import org.springframework.util.StringUtils;
 
 import java.time.ZoneId;
@@ -34,12 +34,14 @@ import java.util.stream.Collectors;
 public class AdminService {
 
     private final UserRepository userRepository;
+    private final RoleRepository roleRepository;
+    private final UserGroupRepository userGroupRepository;
     private final RuntimeService runtimeService;
     private final HistoryService historyService;
-    private final TaskService taskService; // 新增注入
+    private final TaskService taskService;
     private final PasswordEncoder passwordEncoder;
 
-    // ... [getActiveProcessInstances, terminateProcessInstance, etc. methods remain unchanged] ...
+    // ... [流程实例管理相关方法保持不变] ...
     public List<ProcessInstanceDto> getActiveProcessInstances() {
         // 1. 获取所有正在运行的流程实例
         List<ProcessInstance> instances = runtimeService.createProcessInstanceQuery().active().list();
@@ -132,6 +134,8 @@ public class AdminService {
         taskService.setAssignee(taskId, newAssigneeId);
     }
 
+    // --- 用户管理 (已更新) ---
+
     /**
      * 创建一个新用户
      * @param userDto 用户数据
@@ -144,18 +148,14 @@ public class AdminService {
         User user = new User();
         user.setId(userDto.getId());
         user.setName(userDto.getName());
-        user.setRole(userDto.getRole() != null ? userDto.getRole() : "USER");
-        // --- 【修改】 ---
         user.setDepartment(userDto.getDepartment());
-        // 默认密码为 'password'，在真实项目中应有更安全的处理方式
-        user.setPassword(passwordEncoder.encode("password"));
+        user.setStatus(UserStatus.ACTIVE); // 新用户默认为激活状态
 
-        // 设置上级
-        if (StringUtils.hasText(userDto.getManagerId())) {
-            User manager = userRepository.findById(userDto.getManagerId())
-                    .orElseThrow(() -> new ResourceNotFoundException("未找到上级用户: " + userDto.getManagerId()));
-            user.setManager(manager);
-        }
+        // 新用户默认密码为 'password'，并强制首次登录修改
+        user.setPassword(passwordEncoder.encode("password"));
+        user.setPasswordChangeRequired(true);
+
+        updateUserRelations(user, userDto);
 
         User savedUser = userRepository.save(user);
         return toUserDto(savedUser);
@@ -171,47 +171,97 @@ public class AdminService {
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("未找到用户: " + id));
         user.setName(userDto.getName());
-        user.setRole(userDto.getRole());
-        // --- 【修改】 ---
         user.setDepartment(userDto.getDepartment());
-
-        // 更新上级
-        if (StringUtils.hasText(userDto.getManagerId())) {
-            User manager = userRepository.findById(userDto.getManagerId())
-                    .orElseThrow(() -> new ResourceNotFoundException("未找到上级用户: " + userDto.getManagerId()));
-            user.setManager(manager);
-        } else {
-            user.setManager(null); // 如果 managerId 为空，则清除上级
+        if (StringUtils.hasText(userDto.getStatus())) {
+            user.setStatus(UserStatus.valueOf(userDto.getStatus().toUpperCase()));
         }
+
+        updateUserRelations(user, userDto);
 
         User updatedUser = userRepository.save(user);
         return toUserDto(updatedUser);
     }
 
     /**
-     * 删除用户
+     * 更新用户的关联关系 (上级、角色、用户组)
+     */
+    private void updateUserRelations(User user, UserDto userDto) {
+        // 更新上级
+        if (StringUtils.hasText(userDto.getManagerId())) {
+            if (user.getId() != null && user.getId().equals(userDto.getManagerId())) {
+                throw new IllegalArgumentException("用户不能将自己设置为上级");
+            }
+            User manager = userRepository.findById(userDto.getManagerId())
+                    .orElseThrow(() -> new ResourceNotFoundException("未找到上级用户: " + userDto.getManagerId()));
+            user.setManager(manager);
+        } else {
+            user.setManager(null); // 清除上级
+        }
+
+        // 更新角色
+        if (!CollectionUtils.isEmpty(userDto.getRoleNames())) {
+            Set<Role> roles = roleRepository.findByNameIn(userDto.getRoleNames());
+            user.setRoles(roles);
+        } else {
+            user.getRoles().clear();
+        }
+    }
+
+    /**
+     * 删除用户 (逻辑删除，将状态改为 INACTIVE)
      * @param id 用户ID
      */
     public void deleteUser(String id) {
-        if (!userRepository.existsById(id)) {
-            throw new ResourceNotFoundException("未找到用户: " + id);
-        }
-        userRepository.deleteById(id);
+        User user = userRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("未找到用户: " + id));
+        user.setStatus(UserStatus.INACTIVE);
+        userRepository.save(user);
     }
+
+    // --- 【新增】角色与用户组管理 ---
+    public RoleDto createRole(RoleDto roleDto) {
+        if(roleRepository.findByName(roleDto.getName()).isPresent()) {
+            throw new IllegalArgumentException("角色名称已存在: " + roleDto.getName());
+        }
+        Role role = new Role();
+        role.setName(roleDto.getName());
+        role.setDescription(roleDto.getDescription());
+        return toRoleDto(roleRepository.save(role));
+    }
+
+    public List<RoleDto> getAllRoles() {
+        return roleRepository.findAll().stream().map(this::toRoleDto).collect(Collectors.toList());
+    }
+    // ... 可以添加更新和删除角色的方法 ...
+
+
+    // --- 转换器 ---
 
     private UserDto toUserDto(User user) {
         UserDto dto = new UserDto();
         dto.setId(user.getId());
         dto.setName(user.getName());
-        dto.setRole(user.getRole());
-        // --- 【修改】 ---
         dto.setDepartment(user.getDepartment());
+        dto.setStatus(user.getStatus().name());
         if (user.getManager() != null) {
             dto.setManagerId(user.getManager().getId());
+        }
+        if (user.getRoles() != null) {
+            dto.setRoleNames(user.getRoles().stream().map(Role::getName).collect(Collectors.toList()));
         }
         return dto;
     }
 
+    private RoleDto toRoleDto(Role role) {
+        RoleDto dto = new RoleDto();
+        dto.setId(role.getId());
+        dto.setName(role.getName());
+        dto.setDescription(role.getDescription());
+        return dto;
+    }
+
+
+    // --- 组织架构 (保持不变) ---
     /**
      * 获取组织架构树 (用于Ant Design Tree)
      * @return 部门和用户的树形结构列表
@@ -265,7 +315,6 @@ public class AdminService {
                 .collect(Collectors.toList());
     }
 
-    // --- 【新增方法】 ---
     /**
      * 获取部门-用户树形结构 (用于 a-tree-select)
      * @return 符合 TreeNodeDto 结构的列表

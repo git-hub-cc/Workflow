@@ -52,7 +52,8 @@
 <script setup>
 import { computed } from 'vue';
 import { DeleteOutlined, PlusOutlined } from '@ant-design/icons-vue';
-import { flattenFields } from '@/views/viewer-components/formUtils';
+// --- 【路径已修改】 ---
+import { flattenFields } from '@/utils/formUtils.js';
 import GenericProps from './GenericProps.vue'; // Re-use generic part
 
 const props = defineProps(['field', 'allFields']);

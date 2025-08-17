@@ -40,8 +40,23 @@ public class UserService {
             throw new IllegalArgumentException("新密码长度不能少于6位");
         }
 
-        // 更新密码
+        // 更新密码，并清除“强制修改密码”标志
         user.setPassword(passwordEncoder.encode(newPassword));
+        user.setPasswordChangeRequired(false);
+        userRepository.save(user);
+    }
+
+    /**
+     * (管理员)重置用户密码
+     * @param userId 用户ID
+     */
+    public void resetPassword(String userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("未找到用户: " + userId));
+
+        // 重置为默认密码 'password'，并设置强制修改标志
+        user.setPassword(passwordEncoder.encode("password"));
+        user.setPasswordChangeRequired(true);
         userRepository.save(user);
     }
 }

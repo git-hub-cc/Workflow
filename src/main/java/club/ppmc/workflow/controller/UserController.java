@@ -4,6 +4,7 @@ import club.ppmc.workflow.dto.ChangePasswordRequest;
 import club.ppmc.workflow.service.UserService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.security.Principal;
@@ -27,6 +28,7 @@ public class UserController {
      * @return 成功或失败的响应
      */
     @PostMapping("/me/change-password")
+    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<Void> changePassword(@RequestBody ChangePasswordRequest request, Principal principal) {
         String userId = principal.getName();
         userService.changePassword(userId, request.getOldPassword(), request.getNewPassword());

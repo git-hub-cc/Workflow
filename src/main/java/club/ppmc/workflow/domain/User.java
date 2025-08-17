@@ -8,7 +8,9 @@ import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 
 import java.util.Collection;
-import java.util.List;
+import java.util.HashSet;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 @Entity
 @Getter
@@ -23,22 +25,46 @@ public class User implements UserDetails {
     @Column(nullable = false)
     private String password; // 存储编码后的密码
 
-    @Column(nullable = false)
-    private String role; // 例如: "USER", "ADMIN"
-
-    // --- 【新增字段】 ---
     private String department; // 用户所属部门
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "manager_id") // 在数据库中创建外键列 manager_id
+    @JoinColumn(name = "manager_id")
     private User manager;
 
-    // --- UserDetails 接口实现 ---
+    // --- 【新增字段】 ---
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private UserStatus status = UserStatus.ACTIVE; // 默认状态为 ACTIVE
+
+    @Column(nullable = false)
+    private boolean passwordChangeRequired = false; // 是否需要强制修改密码
+
+    // --- 【关系修改】 ---
+    @ManyToMany(fetch = FetchType.EAGER) // EAGER a an EAGER fetch for roles is often practical for authorization
+    @JoinTable(
+            name = "user_roles",
+            joinColumns = @JoinColumn(name = "user_id"),
+            inverseJoinColumns = @JoinColumn(name = "role_id")
+    )
+    private Set<Role> roles = new HashSet<>();
+
+    @ManyToMany(fetch = FetchType.LAZY)
+    @JoinTable(
+            name = "user_groups",
+            joinColumns = @JoinColumn(name = "user_id"),
+            inverseJoinColumns = @JoinColumn(name = "group_id")
+    )
+    private Set<UserGroup> userGroups = new HashSet<>();
+
+
+    // --- UserDetails 接口实现 (已更新) ---
 
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
-        // 角色需要以 "ROLE_" 为前缀，这是 Spring Security 的约定
-        return List.of(new SimpleGrantedAuthority("ROLE_" + this.role));
+        // 从 roles 集合动态构建权限列表
+        return this.roles.stream()
+                .map(role -> new SimpleGrantedAuthority("ROLE_" + role.getName()))
+                .collect(Collectors.toList());
     }
 
     @Override
@@ -58,16 +84,19 @@ public class User implements UserDetails {
 
     @Override
     public boolean isAccountNonLocked() {
-        return true; // 账户永不锁定
+        // 根据 status 字段判断
+        return this.status != UserStatus.LOCKED;
     }
 
     @Override
     public boolean isCredentialsNonExpired() {
-        return true; // 凭证永不过期
+        // 如果需要强制修改密码，则认为凭证已过期
+        return !this.passwordChangeRequired;
     }
 
     @Override
     public boolean isEnabled() {
-        return true; // 账户启用
+        // 根据 status 字段判断
+        return this.status == UserStatus.ACTIVE;
     }
 }

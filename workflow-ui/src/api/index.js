@@ -38,6 +38,12 @@ service.interceptors.response.use(
     },
     error => {
         console.error('API Error:', error);
+
+        // 【修改】针对登录时需要修改密码的特殊状态码，不在此处全局处理
+        if (error.response?.status === 499) {
+            return Promise.reject(error);
+        }
+
         if (error.response?.status === 401 || error.response?.status === 403) {
             message.error('认证失败或权限不足，请重新登录。');
             // 如果认证失败，强制登出
@@ -58,7 +64,6 @@ export const getSubmissions = (formId) => service.get(`/forms/${formId}/submissi
 export const getSubmissionById = (submissionId) => service.get(`/forms/submissions/${submissionId}`);
 export const submitForm = (formId, data) => service.post(`/forms/${formId}/submissions`, data);
 export const fetchTableData = (url, params) => service.get(url, { params });
-// 【新增】获取树形数据
 export const fetchTreeData = (source) => service.get('/admin/tree-data-source', { params: { source } });
 
 
@@ -84,7 +89,7 @@ export const updateWorkflowTemplate = (formId, data) => service.put(`/workflows/
 
 
 // --- 任务 API ---
-export const getPendingTasks = () => service.get('/tasks/pending'); // assigneeId is determined by backend via JWT
+export const getPendingTasks = () => service.get('/tasks/pending');
 export const getTaskById = (taskId) => service.get(`/tasks/${taskId}`);
 export const completeTask = (taskId, data) => service.post(`/tasks/${taskId}/complete`, data);
 
@@ -93,10 +98,18 @@ export const getAllUsers = () => service.get('/workflows/users');
 export const changePassword = (data) => service.post('/users/me/change-password', data);
 export const getOrganizationTree = () => service.get('/admin/organization-tree');
 
-// Admin User Management
+// Admin User Management (已更新)
 export const createUser = (data) => service.post('/admin/users', data);
 export const updateUser = (id, data) => service.put(`/admin/users/${id}`, data);
-export const deleteUser = (id) => service.delete(`/admin/users/${id}`);
+export const deleteUser = (id) => service.delete(`/admin/users/${id}`); // 后端已改为逻辑删除
+export const resetPassword = (id) => service.post(`/admin/users/${id}/reset-password`);
+
+// --- 【新增】角色管理 API ---
+export const getRoles = () => service.get('/admin/roles');
+export const createRole = (data) => service.post('/admin/roles', data);
+// export const updateRole = (id, data) => service.put(`/admin/roles/${id}`, data);
+// export const deleteRole = (id) => service.delete(`/admin/roles/${id}`);
+
 
 // Admin Instance Management
 export const getActiveInstances = () => service.get('/admin/instances');

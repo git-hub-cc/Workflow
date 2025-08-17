@@ -44,7 +44,6 @@ public class WorkflowController {
         return ResponseEntity.ok().build();
     }
 
-    // --- 【新增】 ---
     /**
      * API: 更新工作流模板（仅保存，不部署）
      * @param formId 表单ID
@@ -59,7 +58,6 @@ public class WorkflowController {
         WorkflowTemplateResponse response = workflowService.updateWorkflowTemplate(formId, request);
         return ResponseEntity.ok(response);
     }
-    // --- 【新增结束】 ---
 
     /**
      * API: 根据表单ID获取其工作流模板
@@ -67,7 +65,6 @@ public class WorkflowController {
      */
     @GetMapping("/templates")
     public ResponseEntity<WorkflowTemplateResponse> getTemplateByFormId(@RequestParam Long formId) {
-        // 【修改】调用新的 Service 方法，该方法永远不会导致 404
         WorkflowTemplateResponse templateResponse = workflowService.getOrCreateWorkflowTemplate(formId);
         return ResponseEntity.ok(templateResponse);
     }
@@ -79,15 +76,32 @@ public class WorkflowController {
     @GetMapping("/users")
     public ResponseEntity<List<UserDto>> getAllUsers() {
         List<User> users = userRepository.findAll();
-        List<UserDto> userDtos = users.stream().map(user -> {
-            UserDto dto = new UserDto();
-            dto.setId(user.getId());
-            dto.setName(user.getName());
-            dto.setRole(user.getRole());
-            return dto;
-        }).collect(Collectors.toList());
+        // 【修改】使用新的转换逻辑
+        List<UserDto> userDtos = users.stream().map(this::toUserDto).collect(Collectors.toList());
         return ResponseEntity.ok(userDtos);
     }
+
+    /**
+     * 将 User 实体转换为 UserDto
+     * @param user User 实体
+     * @return UserDto
+     */
+    private UserDto toUserDto(User user) {
+        UserDto dto = new UserDto();
+        dto.setId(user.getId());
+        dto.setName(user.getName());
+        dto.setDepartment(user.getDepartment());
+        if (user.getManager() != null) {
+            dto.setManagerId(user.getManager().getId());
+        }
+        if (user.getRoles() != null) {
+            dto.setRoleNames(user.getRoles().stream()
+                    .map(role -> role.getName()) // 【修正】直接获取角色名
+                    .collect(Collectors.toList()));
+        }
+        return dto;
+    }
+
 
     /**
      * API: 获取当前用户提交的所有申请

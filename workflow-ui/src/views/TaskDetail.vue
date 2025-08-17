@@ -48,7 +48,8 @@ import { getTaskById, getSubmissionById, getFormById, completeTask } from '@/api
 import { message } from 'ant-design-vue';
 import { useRouter } from 'vue-router';
 import FormItemRenderer from './viewer-components/FormItemRenderer.vue';
-import { flattenFields, initFormData } from './viewer-components/formUtils.js';
+// --- 【路径已修改】 ---
+import { flattenFields, initFormData } from '@/utils/formUtils.js';
 
 const props = defineProps({ taskId: String });
 const router = useRouter();

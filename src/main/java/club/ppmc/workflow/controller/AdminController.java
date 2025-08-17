@@ -1,10 +1,8 @@
 package club.ppmc.workflow.controller;
 
-import club.ppmc.workflow.dto.DepartmentTreeNode;
-import club.ppmc.workflow.dto.ProcessInstanceDto;
-import club.ppmc.workflow.dto.TreeNodeDto; // 【新增】导入
-import club.ppmc.workflow.dto.UserDto;
+import club.ppmc.workflow.dto.*;
 import club.ppmc.workflow.service.AdminService;
+import club.ppmc.workflow.service.UserService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -26,20 +24,15 @@ import java.util.Map;
 public class AdminController {
 
     private final AdminService adminService;
+    private final UserService userService; // 注入 UserService
 
-    // --- 流程实例管理 ---
+    // --- 流程实例管理 (保持不变) ---
 
-    /**
-     * API: 获取所有正在运行的流程实例
-     */
     @GetMapping("/instances")
     public ResponseEntity<List<ProcessInstanceDto>> getActiveProcessInstances() {
         return ResponseEntity.ok(adminService.getActiveProcessInstances());
     }
 
-    /**
-     * API: 终止一个正在运行的流程实例
-     */
     @DeleteMapping("/instances/{processInstanceId}")
     public ResponseEntity<Void> terminateProcessInstance(@PathVariable String processInstanceId,
                                                          @RequestParam String reason) {
@@ -47,27 +40,18 @@ public class AdminController {
         return ResponseEntity.ok().build();
     }
 
-    /**
-     * API: 挂起一个流程实例
-     */
     @PostMapping("/instances/{processInstanceId}/suspend")
     public ResponseEntity<Void> suspendProcessInstance(@PathVariable String processInstanceId) {
         adminService.suspendProcessInstance(processInstanceId);
         return ResponseEntity.ok().build();
     }
 
-    /**
-     * API: 激活一个流程实例
-     */
     @PostMapping("/instances/{processInstanceId}/activate")
     public ResponseEntity<Void> activateProcessInstance(@PathVariable String processInstanceId) {
         adminService.activateProcessInstance(processInstanceId);
         return ResponseEntity.ok().build();
     }
 
-    /**
-     * API: 改派一个任务
-     */
     @PostMapping("/tasks/{taskId}/reassign")
     public ResponseEntity<Void> reassignTask(@PathVariable String taskId, @RequestBody Map<String, String> payload) {
         String newAssigneeId = payload.get("newAssigneeId");
@@ -79,20 +63,14 @@ public class AdminController {
     }
 
 
-    // --- 用户管理 ---
+    // --- 用户管理 (已更新) ---
 
-    /**
-     * API: 创建一个新用户
-     */
     @PostMapping("/users")
     public ResponseEntity<UserDto> createUser(@RequestBody UserDto userDto) {
         UserDto createdUser = adminService.createUser(userDto);
         return new ResponseEntity<>(createdUser, HttpStatus.CREATED);
     }
 
-    /**
-     * API: 更新一个用户信息
-     */
     @PutMapping("/users/{id}")
     public ResponseEntity<UserDto> updateUser(@PathVariable String id, @RequestBody UserDto userDto) {
         UserDto updatedUser = adminService.updateUser(id, userDto);
@@ -100,7 +78,7 @@ public class AdminController {
     }
 
     /**
-     * API: 删除一个用户
+     * API: 删除一个用户 (逻辑删除)
      */
     @DeleteMapping("/users/{id}")
     public ResponseEntity<Void> deleteUser(@PathVariable String id) {
@@ -108,31 +86,50 @@ public class AdminController {
         return ResponseEntity.noContent().build();
     }
 
-    // --- 组织架构与数据源 ---
     /**
-     * API: 获取组织架构树 (部门+用户, Ant Design Tree 使用)
-     * 权限: 已认证用户 (因为用户选择器所有人都可能用到)
+     * API: (管理员)重置用户密码
      */
+    @PostMapping("/users/{id}/reset-password")
+    public ResponseEntity<Void> resetPassword(@PathVariable String id) {
+        userService.resetPassword(id);
+        return ResponseEntity.ok().build();
+    }
+
+    // --- 角色管理 (新增) ---
+
+    /**
+     * API: 创建一个新角色
+     */
+    @PostMapping("/roles")
+    public ResponseEntity<RoleDto> createRole(@RequestBody RoleDto roleDto) {
+        RoleDto createdRole = adminService.createRole(roleDto);
+        return new ResponseEntity<>(createdRole, HttpStatus.CREATED);
+    }
+
+    /**
+     * API: 获取所有角色列表
+     */
+    @GetMapping("/roles")
+    public ResponseEntity<List<RoleDto>> getAllRoles() {
+        return ResponseEntity.ok(adminService.getAllRoles());
+    }
+    // ... 可以添加更新和删除角色的端点 ...
+
+
+    // --- 组织架构与数据源 (保持不变) ---
+
     @GetMapping("/organization-tree")
     @PreAuthorize("isAuthenticated()") // 覆盖类级别的 'ADMIN' 限制
     public ResponseEntity<List<DepartmentTreeNode>> getOrganizationTree() {
         return ResponseEntity.ok(adminService.getOrganizationTree());
     }
 
-    // --- 【新增API：用于树形选择器】 ---
-    /**
-     * API: 获取指定类型的树形结构数据
-     * @param source 数据源标识, 例如 "departments"
-     * @return 树形节点列表
-     */
     @GetMapping("/tree-data-source")
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<List<TreeNodeDto>> getTreeDataSource(@RequestParam String source) {
         if ("departments".equalsIgnoreCase(source)) {
             return ResponseEntity.ok(adminService.getDepartmentTree());
         }
-        // 未来可以扩展其他数据源, 如商品分类等
-        // else if ("categories".equalsIgnoreCase(source)) { ... }
         return ResponseEntity.badRequest().build();
     }
 }

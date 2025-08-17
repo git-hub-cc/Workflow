@@ -36,7 +36,7 @@
 <script setup>
 import { reactive, watchEffect } from 'vue';
 import FormItemRenderer from '@/views/viewer-components/FormItemRenderer.vue';
-import { initFormData } from '@/views/viewer-components/formUtils.js';
+import { initFormData } from '@/utils/formUtils.js';
 
 const props = defineProps({
   open: Boolean,

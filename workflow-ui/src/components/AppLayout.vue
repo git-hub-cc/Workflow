@@ -8,9 +8,11 @@
         </div>
         <div class="user-actions">
           <a-space>
-            <a-button type="primary" ghost @click="$router.push({ name: 'task-list' })">
-              我的待办
-            </a-button>
+            <a-badge :dot="hasPendingTasks">
+              <a-button type="primary" ghost @click="$router.push({ name: 'task-list' })">
+                我的待办
+              </a-button>
+            </a-badge>
             <a-dropdown v-if="userStore.currentUser">
               <a class="ant-dropdown-link" @click.prevent>
                 <a-avatar style="background-color: #1890ff; margin-right: 8px;">
@@ -22,20 +24,28 @@
               <template #overlay>
                 <a-menu>
                   <a-menu-item v-if="userStore.isAdmin" key="admin-dashboard" @click="$router.push({ name: 'admin-dashboard' })">
-                    仪表盘
-                  </a-menu-item>
-                  <a-menu-item v-if="userStore.isAdmin" key="admin-users" @click="$router.push({ name: 'admin-users' })">
-                    用户管理
-                  </a-menu-item>
-                  <a-menu-item v-if="userStore.isAdmin" key="admin-instances" @click="$router.push({ name: 'admin-instances' })">
-                    实例管理
+                    <DashboardOutlined /> 仪表盘
                   </a-menu-item>
                   <a-menu-divider v-if="userStore.isAdmin" />
-                  <a-menu-item key="profile" @click="$router.push({ name: 'profile' })">
-                    个人中心
+                  <a-menu-item v-if="userStore.isAdmin" key="admin-users" @click="$router.push({ name: 'admin-users' })">
+                    <TeamOutlined /> 用户管理
                   </a-menu-item>
-                  <a-menu-item key="logout" @click="userStore.logout">
-                    退出登录
+                  <!-- 【新增菜单项】 -->
+                  <a-menu-item v-if="userStore.isAdmin" key="admin-roles" @click="$router.push({ name: 'admin-roles' })">
+                    <SafetyCertificateOutlined /> 角色管理
+                  </a-menu-item>
+                  <a-menu-item v-if="userStore.isAdmin" key="admin-org-chart" @click="$router.push({ name: 'admin-org-chart' })">
+                    <ApartmentOutlined /> 组织架构
+                  </a-menu-item>
+                  <a-menu-item v-if="userStore.isAdmin" key="admin-instances" @click="$router.push({ name: 'admin-instances' })">
+                    <NodeIndexOutlined /> 实例管理
+                  </a-menu-item>
+                  <a-menu-divider />
+                  <a-menu-item key="profile" @click="$router.push({ name: 'profile' })">
+                    <UserOutlined /> 个人中心
+                  </a-menu-item>
+                  <a-menu-item key="logout" @click="handleLogout">
+                    <LogoutOutlined /> 退出登录
                   </a-menu-item>
                 </a-menu>
               </template>
@@ -57,19 +67,51 @@
 </template>
 
 <script setup>
-import { onMounted } from 'vue';
+import { onMounted, ref } from 'vue';
 import { useUserStore } from '@/stores/user';
-import { DownOutlined } from '@ant-design/icons-vue';
+import { getPendingTasks } from "@/api";
+import {
+  DownOutlined,
+  DashboardOutlined,
+  TeamOutlined,
+  SafetyCertificateOutlined,
+  ApartmentOutlined,
+  NodeIndexOutlined,
+  UserOutlined,
+  LogoutOutlined
+} from '@ant-design/icons-vue';
+import { Modal } from "ant-design-vue";
 
 const userStore = useUserStore();
+const hasPendingTasks = ref(false);
+
+const checkTasks = async () => {
+  if (!userStore.isAuthenticated) return;
+  try {
+    const tasks = await getPendingTasks();
+    hasPendingTasks.value = tasks.length > 0;
+  } catch (e) {
+    // ignore
+  }
+};
 
 onMounted(() => {
-  // Fetch users for dropdowns if needed, only if logged in
   if (userStore.isAuthenticated) {
     userStore.fetchAllUsers();
+    if(userStore.isAdmin) userStore.fetchAllRoles();
+    checkTasks();
   }
 });
 
+const handleLogout = () => {
+  Modal.confirm({
+    title: '确认退出',
+    content: '您确定要退出登录吗？',
+    onOk: () => {
+      userStore.logout();
+    }
+  });
+};
 </script>
 
 <style scoped>
@@ -100,5 +142,8 @@ onMounted(() => {
 .fade-enter-from,
 .fade-leave-to {
   opacity: 0;
+}
+.ant-menu-item .anticon {
+  margin-right: 8px;
 }
 </style>

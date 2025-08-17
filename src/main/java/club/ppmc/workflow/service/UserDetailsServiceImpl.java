@@ -1,7 +1,11 @@
 package club.ppmc.workflow.service;
 
+import club.ppmc.workflow.domain.User;
+import club.ppmc.workflow.domain.UserStatus;
 import club.ppmc.workflow.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.authentication.DisabledException;
+import org.springframework.security.authentication.LockedException;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
@@ -24,8 +28,19 @@ public class UserDetailsServiceImpl implements UserDetailsService {
      */
     @Override
     public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
-        // 直接从 UserRepository 查找 User 实体，因为它已经实现了 UserDetails 接口
-        return userRepository.findById(username)
+        User user = userRepository.findById(username)
                 .orElseThrow(() -> new UsernameNotFoundException("未找到用户: " + username));
+
+        // --- 【新增】检查用户状态 ---
+        if (user.getStatus() == UserStatus.INACTIVE) {
+            throw new DisabledException("用户账号已被禁用");
+        }
+        if (user.getStatus() == UserStatus.LOCKED) {
+            throw new LockedException("用户账号已被锁定");
+        }
+        // User 实体类中 isEnabled() 和 isAccountNonLocked() 已经处理了这些逻辑，
+        // 但在这里提前抛出更明确的异常，可以提供更好的错误信息。
+
+        return user;
     }
 }

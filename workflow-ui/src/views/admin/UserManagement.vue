@@ -13,33 +13,43 @@
       <a-table
           :columns="columns"
           :data-source="userStore.allUsers"
-          :loading="userStore.loading"
+          :loading="loading"
           row-key="id"
       >
         <template #bodyCell="{ column, record }">
-          <template v-if="column.key === 'role'">
-            <a-tag :color="record.role === 'ADMIN' ? 'gold' : 'blue'">
-              {{ record.role }}
+          <template v-if="column.key === 'roleNames'">
+            <a-tag v-for="role in record.roleNames" :key="role" :color="getRoleColor(role)">
+              {{ role }}
             </a-tag>
           </template>
-          <template v-if="column.key === 'managerName'">
+          <template v-else-if="column.key === 'status'">
+            <a-tag :color="getStatusColor(record.status)">{{ getStatusText(record.status) }}</a-tag>
+          </template>
+          <template v-else-if="column.key === 'managerName'">
             {{ getManagerName(record.managerId) }}
           </template>
           <template v-else-if="column.key === 'actions'">
-            <a-space>
-              <a-button type="link" @click="showModal(record)">编辑</a-button>
-              <a-popconfirm
-                  title="确定要删除这个用户吗？"
-                  ok-text="确认删除"
-                  cancel-text="取消"
-                  @confirm="handleDelete(record.id)"
-                  :disabled="record.id === userStore.currentUser.id"
-              >
-                <a-button type="link" danger :disabled="record.id === userStore.currentUser.id">
-                  删除
-                </a-button>
-              </a-popconfirm>
-            </a-space>
+            <a-dropdown>
+              <a-button type="link">操作 <DownOutlined /></a-button>
+              <template #overlay>
+                <a-menu>
+                  <a-menu-item @click="showModal(record)">
+                    <EditOutlined /> 编辑
+                  </a-menu-item>
+                  <a-menu-item @click="handleResetPassword(record.id)">
+                    <ReloadOutlined /> 重置密码
+                  </a-menu-item>
+                  <a-menu-divider />
+                  <a-menu-item
+                      @click="handleDelete(record.id)"
+                      danger
+                      :disabled="record.id === userStore.currentUser.id || record.status === 'INACTIVE'"
+                  >
+                    <UserDeleteOutlined /> 禁用
+                  </a-menu-item>
+                </a-menu>
+              </template>
+            </a-dropdown>
           </template>
         </template>
       </a-table>
@@ -52,35 +62,54 @@
         :confirm-loading="modalConfirmLoading"
         @ok="handleOk"
         @cancel="handleCancel"
+        width="600px"
     >
       <a-form :model="formState" :rules="rules" ref="formRef" layout="vertical">
-        <a-form-item label="用户ID (登录名)" name="id">
-          <a-input v-model:value="formState.id" :disabled="isEditing" />
-        </a-form-item>
-        <a-form-item label="用户姓名" name="name">
-          <a-input v-model:value="formState.name" />
-        </a-form-item>
-        <a-form-item label="角色" name="role">
-          <a-select v-model:value="formState.role" placeholder="请选择角色">
-            <a-select-option value="USER">普通用户 (USER)</a-select-option>
-            <a-select-option value="ADMIN">管理员 (ADMIN)</a-select-option>
-          </a-select>
-        </a-form-item>
-        <a-form-item label="直属上级" name="managerId">
-          <a-select
-              v-model:value="formState.managerId"
-              placeholder="请选择直属上级 (可选)"
-              allow-clear
-              show-search
-              :filter-option="filterOption"
-          >
-            <!-- 过滤掉用户自己，防止自己是自己的上级 -->
-            <a-select-option v-for="user in availableManagers" :key="user.id" :value="user.id">
-              {{ user.name }} ({{ user.id }})
-            </a-select-option>
-          </a-select>
-        </a-form-item>
-        <a-alert v-if="!isEditing" message="新用户默认密码为 'password'，请提醒用户及时修改。" type="info" show-icon />
+        <a-row :gutter="16">
+          <a-col :span="12">
+            <a-form-item label="用户ID (登录名)" name="id">
+              <a-input v-model:value="formState.id" :disabled="isEditing" />
+            </a-form-item>
+          </a-col>
+          <a-col :span="12">
+            <a-form-item label="用户姓名" name="name">
+              <a-input v-model:value="formState.name" />
+            </a-form-item>
+          </a-col>
+          <a-col :span="12">
+            <a-form-item label="部门" name="department">
+              <a-input v-model:value="formState.department" />
+            </a-form-item>
+          </a-col>
+          <a-col :span="12">
+            <a-form-item label="直属上级" name="managerId">
+              <a-tree-select
+                  v-model:value="formState.managerId"
+                  show-search
+                  style="width: 100%"
+                  :dropdown-style="{ maxHeight: '400px', overflow: 'auto' }"
+                  placeholder="请选择直属上级"
+                  allow-clear
+                  tree-default-expand-all
+                  :tree-data="orgTreeDataForSelector"
+                  :field-names="{ children: 'children', label: 'title', value: 'key' }"
+                  :tree-node-filter-prop="'title'"
+                  @change="handleManagerChange"
+              />
+            </a-form-item>
+          </a-col>
+          <a-col :span="24">
+            <a-form-item label="角色" name="roleNames">
+              <a-select
+                  v-model:value="formState.roleNames"
+                  mode="multiple"
+                  placeholder="请分配角色"
+                  :options="userStore.allRoles.map(r => ({ label: `${r.name} (${r.description})`, value: r.name }))"
+              />
+            </a-form-item>
+          </a-col>
+        </a-row>
+        <a-alert v-if="!isEditing" message="新用户默认密码为 'password'，用户首次登录将被要求修改。" type="info" show-icon />
       </a-form>
     </a-modal>
   </div>
@@ -89,68 +118,102 @@
 <script setup>
 import { ref, reactive, onMounted, computed } from 'vue';
 import { useUserStore } from '@/stores/user';
-import { createUser, updateUser, deleteUser } from '@/api';
-import { message } from 'ant-design-vue';
-import { PlusOutlined } from '@ant-design/icons-vue';
+import { createUser, updateUser, deleteUser, resetPassword, getOrganizationTree } from '@/api';
+import { message, Modal } from 'ant-design-vue';
+import { PlusOutlined, DownOutlined, EditOutlined, ReloadOutlined, UserDeleteOutlined } from '@ant-design/icons-vue';
 
 const userStore = useUserStore();
+const loading = ref(false);
 
-onMounted(() => {
-  if (userStore.allUsers.length === 0) {
-    userStore.fetchAllUsers();
+const orgTreeData = ref([]);
+
+const fetchInitialData = async () => {
+  loading.value = true;
+  try {
+    await Promise.all([
+      userStore.allUsers.length === 0 ? userStore.fetchAllUsers() : Promise.resolve(),
+      userStore.allRoles.length === 0 ? userStore.fetchAllRoles() : Promise.resolve(),
+      getOrganizationTree().then(data => {
+        orgTreeData.value = data;
+      })
+    ]);
+  } catch (error) {
+    message.error("初始化页面数据失败");
+  } finally {
+    loading.value = false;
   }
+};
+
+onMounted(fetchInitialData);
+
+const orgTreeDataForSelector = computed(() => {
+  const currentUserId = isEditing.value ? formState.id : null;
+
+  const filterAndProcessTree = (nodes) => {
+    if (!nodes) return [];
+    return nodes.reduce((acc, node) => {
+      if (node.type === 'department') {
+        const processedChildren = filterAndProcessTree(node.children);
+        if (processedChildren.length > 0) {
+          // Department is kept, but make it unselectable
+          acc.push({ ...node, children: processedChildren, disabled: true });
+        }
+      } else if (node.type === 'user' && node.value !== currentUserId) {
+        // User node is kept as is (it's selectable)
+        acc.push(node);
+      }
+      return acc;
+    }, []);
+  };
+
+  return filterAndProcessTree(orgTreeData.value);
 });
+
 
 const columns = [
   { title: '用户ID', dataIndex: 'id', key: 'id' },
   { title: '姓名', dataIndex: 'name', key: 'name' },
-  { title: '角色', dataIndex: 'role', key: 'role', align: 'center' },
+  { title: '角色', dataIndex: 'roleNames', key: 'roleNames' },
+  { title: '状态', dataIndex: 'status', key: 'status', align: 'center' },
   { title: '直属上级', dataIndex: 'managerId', key: 'managerName', align: 'center' },
   { title: '操作', key: 'actions', align: 'center' },
 ];
 
-// Modal state
-const modalVisible = ref(false);
-const modalConfirmLoading = ref(false);
-const isEditing = ref(false);
-const formRef = ref();
-const formState = reactive({
-  id: '',
-  name: '',
-  role: 'USER',
-  managerId: null,
-});
-
-const rules = {
-  id: [{ required: true, message: '请输入用户ID' }],
-  name: [{ required: true, message: '请输入用户姓名' }],
-  role: [{ required: true, message: '请选择角色' }],
+const getRoleColor = (role) => (role === 'ADMIN' ? 'gold' : 'blue');
+const getStatusColor = (status) => {
+  if (status === 'ACTIVE') return 'success';
+  if (status === 'INACTIVE') return 'default';
+  if (status === 'LOCKED') return 'warning';
+  return 'default';
 };
-
-const availableManagers = computed(() => {
-  if (!isEditing.value) {
-    return userStore.allUsers;
-  }
-  // 编辑时，从列表中排除自己
-  return userStore.allUsers.filter(u => u.id !== formState.id);
-});
-
+const getStatusText = (status) => ({ ACTIVE: '正常', INACTIVE: '禁用', LOCKED: '锁定' }[status] || '未知');
 const getManagerName = (managerId) => {
   if (!managerId) return '-';
   const manager = userStore.allUsers.find(u => u.id === managerId);
   return manager ? manager.name : managerId;
 };
 
-const filterOption = (input, option) => {
-  // 允许通过姓名或ID搜索
-  const label = option.children()[0].children.toLowerCase();
-  return label.includes(input.toLowerCase());
+const modalVisible = ref(false);
+const modalConfirmLoading = ref(false);
+const isEditing = ref(false);
+const formRef = ref();
+const formState = reactive({
+  id: '', name: '', department: '', managerId: null, roleNames: [],
+});
+
+const rules = {
+  id: [{ required: true, message: '请输入用户ID' }],
+  name: [{ required: true, message: '请输入用户姓名' }],
+  roleNames: [{ required: true, message: '请至少选择一个角色', type: 'array' }],
 };
 
 const showModal = (user) => {
   if (user) {
     isEditing.value = true;
-    Object.assign(formState, { ...user, managerId: user.managerId || null });
+    // The TreeSelect now uses the 'key' (e.g., 'user_jsmith') as its value.
+    // We need to construct this key from the raw managerId ('jsmith').
+    const managerKey = user.managerId ? `user_${user.managerId}` : null;
+    Object.assign(formState, { ...user, managerId: managerKey });
   } else {
     isEditing.value = false;
     resetForm();
@@ -158,13 +221,37 @@ const showModal = (user) => {
   modalVisible.value = true;
 };
 
+// --- 【FIX】: Refactored to remove dependency on deprecated `triggerNode` ---
+const handleManagerChange = (value) => {
+  // Only auto-fill department if a user is selected and the department is currently empty.
+  // We check the prefix of the `value` (which is the node's `key`) to determine its type.
+  if (value && value.startsWith('user_') && !formState.department) {
+    const findParent = (tree, childKey) => {
+      for (const node of tree) {
+        if (node.children?.some(child => child.key === childKey)) {
+          return node;
+        }
+      }
+      return null;
+    };
+    const deptNode = findParent(orgTreeData.value, value);
+    if (deptNode) {
+      formState.department = deptNode.title;
+    }
+  }
+};
+
 const handleOk = async () => {
   try {
     await formRef.value.validate();
     modalConfirmLoading.value = true;
 
-    // 准备提交的数据，如果 managerId 为空，确保发送 null 或 undefined 而不是空字符串
-    const payload = { ...formState, managerId: formState.managerId || null };
+    // The TreeSelect v-model now holds the 'key' (e.g., 'user_jsmith').
+    // We need to extract the raw ID ('jsmith') for the API.
+    const rawManagerId = formState.managerId && formState.managerId.startsWith('user_')
+        ? formState.managerId.substring(5)
+        : null;
+    const payload = { ...formState, managerId: rawManagerId };
 
     if (isEditing.value) {
       const updatedUser = await updateUser(payload.id, payload);
@@ -176,6 +263,7 @@ const handleOk = async () => {
       message.success('用户创建成功！');
     }
     modalVisible.value = false;
+    await fetchInitialData();
   } catch (error) {
     console.error('Form validation/submission failed:', error);
   } finally {
@@ -183,26 +271,38 @@ const handleOk = async () => {
   }
 };
 
-const handleCancel = () => {
-  modalVisible.value = false;
+const handleCancel = () => modalVisible.value = false;
+const resetForm = () => { Object.assign(formState, { id: '', name: '', department: '', managerId: null, roleNames: [] }); formRef.value?.clearValidate(); };
+
+const handleDelete = (userId) => {
+  Modal.confirm({
+    title: '确认禁用用户',
+    content: `确定要禁用用户 ${userId} 吗？该用户将无法登录系统。`,
+    okText: '确认禁用',
+    okType: 'danger',
+    cancelText: '取消',
+    onOk: async () => {
+      try {
+        await deleteUser(userId);
+        userStore.removeUser(userId);
+        message.success('用户禁用成功！');
+      } catch (error) {}
+    },
+  });
 };
 
-const resetForm = () => {
-  formState.id = '';
-  formState.name = '';
-  formState.role = 'USER';
-  formState.managerId = null;
-  formRef.value?.clearValidate();
-};
-
-const handleDelete = async (userId) => {
-  try {
-    await deleteUser(userId);
-    userStore.removeUser(userId);
-    message.success('用户删除成功！');
-  } catch (error) {
-    // API 错误已全局处理
-  }
+const handleResetPassword = (userId) => {
+  Modal.confirm({
+    title: '确认重置密码',
+    content: `确定要将用户 ${userId} 的密码重置为默认密码 'password' 吗？`,
+    okText: '确认重置',
+    onOk: async () => {
+      try {
+        await resetPassword(userId);
+        message.success('密码重置成功！用户下次登录时将被要求修改。');
+      } catch (error) {}
+    },
+  });
 };
 </script>
 

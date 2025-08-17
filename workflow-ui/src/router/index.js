@@ -1,6 +1,7 @@
 import { createRouter, createWebHistory } from 'vue-router';
 import AppLayout from '@/components/AppLayout.vue';
 import { useUserStore } from '@/stores/user';
+import { message } from "ant-design-vue";
 
 const router = createRouter({
     history: createWebHistory(import.meta.env.BASE_URL),
@@ -43,7 +44,7 @@ const router = createRouter({
                     meta: { title: '查看提交数据' }
                 },
                 {
-                    path: 'submission/:submissionId', // 新增：申请详情页
+                    path: 'submission/:submissionId',
                     name: 'submission-detail',
                     component: () => import('../views/SubmissionDetail.vue'),
                     props: true,
@@ -70,14 +71,14 @@ const router = createRouter({
                     meta: { title: '任务处理' }
                 },
                 {
-                    path: 'profile', // 新增：个人中心
+                    path: 'profile',
                     name: 'profile',
                     component: () => import('../views/Profile.vue'),
                     meta: { title: '个人中心' }
                 },
-                // Admin Routes
+                // Admin Routes (已更新)
                 {
-                    path: 'admin/dashboard', // 新增：仪表盘
+                    path: 'admin/dashboard',
                     name: 'admin-dashboard',
                     component: () => import('../views/admin/Dashboard.vue'),
                     meta: { title: '仪表盘', requiresAdmin: true }
@@ -93,26 +94,44 @@ const router = createRouter({
                     name: 'admin-instances',
                     component: () => import('../views/admin/InstanceManagement.vue'),
                     meta: { title: '实例管理', requiresAdmin: true }
+                },
+                // --- 【新增路由】 ---
+                {
+                    path: 'admin/roles',
+                    name: 'admin-roles',
+                    component: () => import('../views/admin/RoleManagement.vue'),
+                    meta: { title: '角色管理', requiresAdmin: true }
+                },
+                {
+                    path: 'admin/org-chart',
+                    name: 'admin-org-chart',
+                    component: () => import('../views/admin/OrganizationChart.vue'),
+                    meta: { title: '组织架构', requiresAdmin: true }
                 }
             ]
         }
     ]
 });
 
-// Global navigation guard
+// 全局导航守卫 (已更新)
 router.beforeEach((to, from, next) => {
     document.title = to.meta.title || '表单工作流引擎';
     const userStore = useUserStore();
 
     if (to.meta.requiresAuth && !userStore.isAuthenticated) {
-        // Redirect to login if trying to access a protected page without being logged in
+        // 未登录访问受保护页面，跳转到登录页
         next({ name: 'login' });
     } else if (to.name === 'login' && userStore.isAuthenticated) {
-        // Redirect to home if trying to access login page while already logged in
+        // 已登录访问登录页，跳转到首页
         next({ name: 'home' });
     } else if (to.meta.requiresAdmin && !userStore.isAdmin) {
-        // Optional: Redirect if a non-admin tries to access an admin page
+        // 非管理员访问管理员页面，跳转到首页
+        message.warn('您没有权限访问此页面');
         next({ name: 'home' });
+    } else if (userStore.isAuthenticated && userStore.passwordChangeRequired && to.name !== 'profile') {
+        // 【新增】如果需要强制修改密码，且目标页面不是个人中心，则强制跳转
+        message.warn('为了您的账户安全，请先修改初始密码。');
+        next({ name: 'profile' });
     } else {
         next();
     }

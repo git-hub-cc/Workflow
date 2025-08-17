@@ -37,6 +37,7 @@
       <template v-if="mode === 'edit'">
         <QuillEditor v-if="field.type === 'RichText'" v-model:content="localValue" :placeholder="field.props.placeholder" content-type="html" theme="snow" />
         <a-select v-else-if="field.type === 'Select'" v-model:value="localValue" :placeholder="field.props.placeholder" :options="dynamicOptions" :loading="loadingOptions" show-search :filter-option="filterOption" />
+        <!-- 【修复】UserPicker 之前被误删，现在加回来 -->
         <template v-else-if="field.type === 'UserPicker'">
           <a-select :value="localValue" :placeholder="field.props.placeholder" :options="dynamicOptions" @click.prevent="showUserSelectorModal = true" :open="false">
             <template #suffixIcon><UserOutlined/></template>
@@ -47,7 +48,6 @@
         <DataPicker v-else-if="field.type === 'DataPicker'" v-model:value="localValue" :field="field" @update:form-data="(mappings) => handleDataPickerUpdate(mappings)" />
         <EditableSubform v-else-if="field.type === 'Subform'" v-model:value="localValue" :field="field" />
         <KeyValueEditor v-else-if="field.type === 'KeyValue'" v-model:value="localValue" :field-id="field.id" :key-placeholder="field.props.keyPlaceholder" :value-placeholder="field.props.valuePlaceholder" />
-        <!-- 【修复】修改图标选择器的渲染方式 -->
         <a-input v-else-if="field.type === 'IconPicker'" :value="localValue" :placeholder="field.props.placeholder" readonly @click="showIconPickerModal = true">
           <template #addonAfter>
             <a-button @click="showIconPickerModal = true">
@@ -71,7 +71,6 @@
         <a-descriptions v-if="field.type === 'KeyValue'" :column="1" size="small" bordered>
           <a-descriptions-item v-for="(item, idx) in localValue" :key="idx" :label="item.key">{{ item.value }}</a-descriptions-item>
         </a-descriptions>
-        <!-- 【修复】修改只读图标的渲染方式 -->
         <component v-if="field.type === 'IconPicker' && localValue" :is="iconMap[localValue]" style="font-size: 20px;" />
       </template>
     </a-form-item>
@@ -88,7 +87,6 @@ import FileUploader from '@/components/FileUploader.vue';
 import DataPicker from './DataPicker.vue';
 import { QuillEditor } from '@vueup/vue-quill';
 import '@vueup/vue-quill/dist/vue-quill.snow.css';
-// 【修复】从新的图标库导入 iconMap
 import { iconMap } from '@/utils/iconLibrary.js';
 
 import EditableSubform from './EditableSubform.vue';

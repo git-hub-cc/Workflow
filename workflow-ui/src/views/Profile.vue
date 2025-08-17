@@ -2,6 +2,14 @@
   <div class="page-container">
     <a-page-header title="个人中心" />
     <div style="padding: 24px; max-width: 600px; margin: auto;">
+      <a-alert
+          v-if="userStore.passwordChangeRequired"
+          message="强制密码修改"
+          description="您的密码为初始密码或已被管理员重置，为了账户安全，请立即修改密码后再进行其他操作。"
+          type="warning"
+          show-icon
+          style="margin-bottom: 24px;"
+      />
       <a-card title="修改密码">
         <a-form
             :model="formState"
@@ -35,8 +43,10 @@ import { ref, reactive } from 'vue';
 import { useUserStore } from '@/stores/user';
 import { changePassword } from '@/api';
 import { message } from 'ant-design-vue';
+import { useRouter } from "vue-router";
 
 const userStore = useUserStore();
+const router = useRouter();
 const loading = ref(false);
 const formRef = ref();
 const formState = reactive({

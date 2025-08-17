@@ -1,5 +1,6 @@
 package club.ppmc.workflow.service;
 
+import club.ppmc.workflow.domain.Role;
 import club.ppmc.workflow.domain.User;
 import club.ppmc.workflow.dto.AuthRequest;
 import club.ppmc.workflow.dto.AuthResponse;
@@ -10,6 +11,8 @@ import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
+
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -27,6 +30,8 @@ public class AuthService {
     public AuthResponse authenticate(AuthRequest request) {
         // 使用 Spring Security 的 AuthenticationManager 进行认证
         // 它会自动调用 UserDetailsServiceImpl 和 PasswordEncoder
+        // 如果需要强制修改密码，UserDetailsServiceImpl 中的 isCredentialsNonExpired 会返回 false，
+        // authenticationManager 将抛出 CredentialsExpiredException
         authenticationManager.authenticate(
                 new UsernamePasswordAuthenticationToken(
                         request.getUserId(),
@@ -45,11 +50,18 @@ public class AuthService {
         UserDto userDto = new UserDto();
         userDto.setId(user.getId());
         userDto.setName(user.getName());
-        userDto.setRole(user.getRole());
+        // 【修改】返回角色列表
+        userDto.setRoleNames(user.getRoles().stream().map(Role::getName).collect(Collectors.toList()));
+        // 【新增】判断是否为管理员
+        boolean isAdmin = user.getRoles().stream().anyMatch(role -> "ADMIN".equals(role.getName()));
 
         return AuthResponse.builder()
                 .token(jwtToken)
-                .user(userDto)
+                .user(new AuthResponse.UserAuthInfo(
+                        user.getId(),
+                        user.getName(),
+                        isAdmin ? "ADMIN" : "USER" // 为了兼容旧前端，仍然保留一个主 role
+                ))
                 .build();
     }
 }

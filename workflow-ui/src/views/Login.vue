@@ -41,6 +41,13 @@
             <li>部门经理: <code>manager001</code> / <code>password</code></li>
             <li>财务总监: <code>hr001</code> / <code>password</code></li>
           </ul>
+          <p style="margin-top: 8px;">
+            <a-alert
+                message="管理员创建的新用户或重置密码的用户，默认密码均为 'password'，登录后会被要求强制修改。"
+                type="info"
+                show-icon
+            />
+          </p>
         </div>
       </a-form>
     </div>
@@ -59,7 +66,7 @@ const formState = reactive({
 });
 
 const handleLogin = async () => {
-  // The store action now handles errors and redirection
+  // store action 现在会处理所有登录逻辑，包括强制密码修改的场景
   await userStore.login(formState);
 };
 </script>
@@ -107,5 +114,9 @@ const handleLogin = async () => {
   padding: 2px 4px;
   border-radius: 4px;
   color: #c41d7f;
+}
+:deep(.ant-alert) {
+  padding: 8px 12px;
+  font-size: 12px;
 }
 </style>
