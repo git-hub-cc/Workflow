@@ -19,6 +19,7 @@ import org.camunda.bpm.engine.runtime.ProcessInstance;
 import org.camunda.bpm.engine.task.Task;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.CollectionUtils;
 
 import java.time.ZoneId;
 import java.util.*;
@@ -47,9 +48,12 @@ public class WorkflowService {
     private final FormDefinitionRepository formDefinitionRepository;
     private final FormSubmissionRepository formSubmissionRepository;
     private final UserRepository userRepository;
+    // --- 【新增】 ---
+    private final FileAttachmentRepository fileAttachmentRepository;
 
     private final ObjectMapper objectMapper;
 
+    // ... [deployWorkflow, updateWorkflowTemplate, getOrCreateWorkflowTemplate methods remain unchanged] ...
     public void deployWorkflow(DeployWorkflowRequest request) {
         FormDefinition formDef = formDefinitionRepository.findById(request.getFormDefinitionId())
                 .orElseThrow(() -> new ResourceNotFoundException("未找到表单定义 ID: " + request.getFormDefinitionId()));
@@ -57,6 +61,7 @@ public class WorkflowService {
         Deployment deployment = repositoryService.createDeployment()
                 .addString(request.getProcessDefinitionKey() + ".bpmn", request.getBpmnXml())
                 .name("Deployment for form: " + formDef.getName())
+                .tenantId("default")
                 .deploy();
 
         WorkflowTemplate template = templateRepository.findByFormDefinitionId(request.getFormDefinitionId())
@@ -104,48 +109,66 @@ public class WorkflowService {
                     return dto;
                 })
                 .orElseGet(() -> {
+                    // --- 【修改】默认模板现在使用服务任务来动态查找审批人 ---
                     String processDefinitionKey = "Process_Form_" + formId;
                     String defaultXml = String.format("""
                         <?xml version="1.0" encoding="UTF-8"?>
-                        <bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" xmlns:di="http://www.omg.org/spec/DD/20100524/DI" xmlns:camunda="http://camunda.org/schema/1.0/bpmn" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" id="Definitions_1" targetNamespace="http://bpmn.io/schema/bpmn" exporter="Camunda Modeler" exporterVersion="5.20.0">
+                        <bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" xmlns:camunda="http://camunda.org/schema/1.0/bpmn" xmlns:di="http://www.omg.org/spec/DD/20100524/DI" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" id="Definitions_0z3f9b2" targetNamespace="http://bpmn.io/schema/bpmn" exporter="Camunda Modeler" exporterVersion="5.22.0">
                           <bpmn:process id="%s" name="新流程" isExecutable="true" camunda:historyTimeToLive="P180D">
                             <bpmn:startEvent id="StartEvent_1" name="开始">
-                              <bpmn:outgoing>Flow_1</bpmn:outgoing>
+                              <bpmn:outgoing>Flow_Start_FindManager</bpmn:outgoing>
                             </bpmn:startEvent>
-                            <bpmn:sequenceFlow id="Flow_1" sourceRef="StartEvent_1" targetRef="Activity_ManagerApprove" />
-                            <bpmn:userTask id="Activity_ManagerApprove" name="部门经理审批" camunda:assignee="${managerId}">
-                              <bpmn:incoming>Flow_1</bpmn:incoming>
-                              <bpmn:outgoing>Flow_2</bpmn:outgoing>
+                            <bpmn:serviceTask id="Task_FindManager" name="查找审批人" camunda:delegateExpression="${findManagerDelegate}">
+                              <bpmn:extensionElements>
+                                <camunda:inputOutput>
+                                  <camunda:inputParameter name="managerLevel">1</camunda:inputParameter>
+                                </camunda:inputOutput>
+                              </bpmn:extensionElements>
+                              <bpmn:incoming>Flow_Start_FindManager</bpmn:incoming>
+                              <bpmn:outgoing>Flow_FindManager_Approve</bpmn:outgoing>
+                            </bpmn:serviceTask>
+                            <bpmn:userTask id="Task_ManagerApprove" name="上级审批" camunda:assignee="${assignee}">
+                              <bpmn:incoming>Flow_FindManager_Approve</bpmn:incoming>
+                              <bpmn:outgoing>Flow_Approve_End</bpmn:outgoing>
                             </bpmn:userTask>
                             <bpmn:endEvent id="EndEvent_1" name="结束">
-                              <bpmn:incoming>Flow_2</bpmn:incoming>
+                              <bpmn:incoming>Flow_Approve_End</bpmn:incoming>
                             </bpmn:endEvent>
-                            <bpmn:sequenceFlow id="Flow_2" sourceRef="Activity_ManagerApprove" targetRef="EndEvent_1" />
+                            <bpmn:sequenceFlow id="Flow_Start_FindManager" sourceRef="StartEvent_1" targetRef="Task_FindManager" />
+                            <bpmn:sequenceFlow id="Flow_FindManager_Approve" sourceRef="Task_FindManager" targetRef="Task_ManagerApprove" />
+                            <bpmn:sequenceFlow id="Flow_Approve_End" sourceRef="Task_ManagerApprove" targetRef="EndEvent_1" />
                           </bpmn:process>
                           <bpmndi:BPMNDiagram id="BPMNDiagram_1">
                             <bpmndi:BPMNPlane id="BPMNPlane_1" bpmnElement="%s">
-                              <bpmndi:BPMNShape id="StartEvent_1_di" bpmnElement="StartEvent_1">
-                                <dc:Bounds x="179" y="102" width="36" height="36" />
+                              <bpmndi:BPMNShape id="_BPMNShape_StartEvent_2" bpmnElement="StartEvent_1">
+                                <dc:Bounds x="179" y="99" width="36" height="36" />
                                 <bpmndi:BPMNLabel>
-                                  <dc:Bounds x="185" y="145" width="22" height="14" />
+                                  <dc:Bounds x="185" y="142" width="22" height="14" />
                                 </bpmndi:BPMNLabel>
                               </bpmndi:BPMNShape>
-                              <bpmndi:BPMNShape id="Activity_ManagerApprove_di" bpmnElement="Activity_ManagerApprove">
-                                <dc:Bounds x="270" y="80" width="100" height="80" />
+                              <bpmndi:BPMNShape id="Activity_1c8n5n3_di" bpmnElement="Task_FindManager">
+                                <dc:Bounds x="270" y="77" width="100" height="80" />
                               </bpmndi:BPMNShape>
-                              <bpmndi:BPMNShape id="EndEvent_1_di" bpmnElement="EndEvent_1">
-                                <dc:Bounds x="432" y="102" width="36" height="36" />
+                              <bpmndi:BPMNShape id="Activity_0k3xje3_di" bpmnElement="Task_ManagerApprove">
+                                <dc:Bounds x="430" y="77" width="100" height="80" />
+                              </bpmndi:BPMNShape>
+                              <bpmndi:BPMNShape id="Event_1k297se_di" bpmnElement="EndEvent_1">
+                                <dc:Bounds x="592" y="99" width="36" height="36" />
                                 <bpmndi:BPMNLabel>
-                                  <dc:Bounds x="438" y="145" width="22" height="14" />
+                                  <dc:Bounds x="598" y="142" width="22" height="14" />
                                 </bpmndi:BPMNLabel>
                               </bpmndi:BPMNShape>
-                              <bpmndi:BPMNEdge id="Flow_1_di" bpmnElement="Flow_1">
-                                <di:waypoint x="215" y="120" />
-                                <di:waypoint x="270" y="120" />
+                              <bpmndi:BPMNEdge id="Flow_0d6k7k4_di" bpmnElement="Flow_Start_FindManager">
+                                <di:waypoint x="215" y="117" />
+                                <di:waypoint x="270" y="117" />
                               </bpmndi:BPMNEdge>
-                              <bpmndi:BPMNEdge id="Flow_2_di" bpmnElement="Flow_2">
-                                <di:waypoint x="370" y="120" />
-                                <di:waypoint x="432" y="120" />
+                              <bpmndi:BPMNEdge id="Flow_0y1b99a_di" bpmnElement="Flow_FindManager_Approve">
+                                <di:waypoint x="370" y="117" />
+                                <di:waypoint x="430" y="117" />
+                              </bpmndi:BPMNEdge>
+                              <bpmndi:BPMNEdge id="Flow_11x042r_di" bpmnElement="Flow_Approve_End">
+                                <di:waypoint x="530" y="117" />
+                                <di:waypoint x="592" y="117" />
                               </bpmndi:BPMNEdge>
                             </bpmndi:BPMNPlane>
                           </bpmndi:BPMNDiagram>
@@ -181,36 +204,11 @@ public class WorkflowService {
                     }
 
                     Map<String, Object> variables = objectMapper.readValue(submission.getDataJson(), new TypeReference<>() {});
+                    // --- 【核心修改：简化变量设置】 ---
+                    // 启动时只设置最核心的、业务无关的变量。
+                    // 审批人查找等业务逻辑已移入BPMN流程定义中（通过Delegate）。
                     variables.put("submitterId", submission.getSubmitterId());
                     variables.put("formSubmissionId", submission.getId());
-
-                    // --- 【核心修改：智能分配逻辑】 ---
-                    User submitter = userRepository.findById(submission.getSubmitterId())
-                            .orElseThrow(() -> new IllegalStateException("提交人不存在: " + submission.getSubmitterId()));
-
-                    String finalAssigneeId = null;
-
-                    // 1. 优先从表单提交的数据（nextAssignee）中获取办理人
-                    if (variables.containsKey("nextAssignee")) {
-                        Object assigneeObj = variables.get("nextAssignee");
-                        if (assigneeObj instanceof String && !((String) assigneeObj).isEmpty()) {
-                            finalAssigneeId = (String) assigneeObj;
-                            log.info("从表单 'nextAssignee' 字段中获取到下一步办理人: {}", finalAssigneeId);
-                        }
-                    }
-
-                    // 2. 如果表单中没有指定，则回退到使用员工的直属上级
-                    if (finalAssigneeId == null && submitter.getManager() != null) {
-                        finalAssigneeId = submitter.getManager().getId();
-                        log.info("表单未指定办理人，回退到使用直属上级: {}", finalAssigneeId);
-                    }
-
-                    // 3. 将最终确定的办理人ID放入名为 "managerId" 的流程变量中，以匹配BPMN定义
-                    if (finalAssigneeId != null) {
-                        variables.put("managerId", finalAssigneeId);
-                    } else {
-                        log.warn("无法确定下一步办理人 (表单未指定，且用户 '{}' 没有设置直属上级)。流程可能因此出错。", submitter.getId());
-                    }
                     // --- 【修改结束】 ---
 
                     ProcessInstance camundaInstance = runtimeService.startProcessInstanceByKey(
@@ -244,13 +242,13 @@ public class WorkflowService {
 
         String processInstanceId = task.getProcessInstanceId();
 
-        if (request.getUpdatedFormData() != null && !request.getUpdatedFormData().isBlank()) {
-            WorkflowInstance instance = instanceRepository.findByProcessInstanceId(processInstanceId)
-                    .orElseThrow(() -> new IllegalStateException("数据不一致：找不到流程实例 " + processInstanceId + " 对应的本地实例"));
+        WorkflowInstance instance = instanceRepository.findByProcessInstanceId(processInstanceId)
+                .orElseThrow(() -> new IllegalStateException("数据不一致：找不到流程实例 " + processInstanceId + " 对应的本地实例"));
+        FormSubmission submission = instance.getFormSubmission();
 
-            FormSubmission submission = instance.getFormSubmission();
+        // --- 【核心修改：处理表单和附件更新】 ---
+        if (request.getUpdatedFormData() != null && !request.getUpdatedFormData().isBlank()) {
             submission.setDataJson(request.getUpdatedFormData());
-            formSubmissionRepository.save(submission);
             log.info("已更新申请单 (ID: {}) 的表单数据。", submission.getId());
 
             try {
@@ -263,6 +261,22 @@ public class WorkflowService {
             }
         }
 
+        if (!CollectionUtils.isEmpty(request.getAttachmentIds())) {
+            // 1. 解除旧附件的关联
+            submission.getAttachments().clear();
+
+            // 2. 关联新附件
+            List<FileAttachment> newAttachments = fileAttachmentRepository.findAllById(request.getAttachmentIds());
+            for (FileAttachment attachment : newAttachments) {
+                attachment.setFormSubmission(submission);
+            }
+            submission.getAttachments().addAll(newAttachments);
+            log.info("已更新申请单 (ID: {}) 的附件列表。", submission.getId());
+        }
+        formSubmissionRepository.save(submission);
+        // --- 【修改结束】 ---
+
+
         if (request.getApprovalComment() != null && !request.getApprovalComment().isEmpty()) {
             taskService.setVariableLocal(camundaTaskId, "approvalComment", request.getApprovalComment());
         }
@@ -273,6 +287,7 @@ public class WorkflowService {
         taskService.complete(camundaTaskId, variables);
     }
 
+    // ... [getPendingTasksForUser, getTaskDetails, convertCamundaTaskToDto, getWorkflowHistoryBySubmissionId, isTaskOwner, etc. methods remain unchanged] ...
     @Transactional(readOnly = true)
     public List<TaskDto> getPendingTasksForUser(String assigneeId) {
         List<Task> camundaTasks = taskService.createTaskQuery()
@@ -377,7 +392,7 @@ public class WorkflowService {
                 .build());
 
         for (HistoricActivityInstance activity : activityInstances) {
-            if (!activity.getActivityType().equals("userTask") && !activity.getActivityType().endsWith("EndEvent")) {
+            if (!activity.getActivityType().equals("userTask") && !activity.getActivityType().endsWith("EndEvent") && !activity.getActivityType().equals("serviceTask")) {
                 continue;
             }
 
@@ -427,7 +442,6 @@ public class WorkflowService {
                 .orElse(false);
     }
 
-    // --- 【核心修改点】 ---
     public boolean isTaskAssigneeForSubmission(Long submissionId, String username) {
         if (username == null) {
             return false;
@@ -443,7 +457,6 @@ public class WorkflowService {
 
         String processInstanceId = processInstanceIdOpt.get();
 
-        // 1. 检查历史任务中是否包含该用户
         long historicTaskCount = historyService.createHistoricTaskInstanceQuery()
                 .processInstanceId(processInstanceId)
                 .taskAssignee(username)
@@ -454,7 +467,6 @@ public class WorkflowService {
             return true;
         }
 
-        // 2. 检查当前正在运行的任务是否分配给了该用户
         long activeTaskCount = taskService.createTaskQuery()
                 .processInstanceId(processInstanceId)
                 .taskAssignee(username)
@@ -469,5 +481,4 @@ public class WorkflowService {
         log.debug("权限检查: 用户 '{}' 不是申请单 #{} 的任何阶段审批人。", username, submissionId);
         return false;
     }
-    // --- 【修改结束】 ---
 }

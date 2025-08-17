@@ -4,6 +4,8 @@ import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 
 @Entity
 @Getter
@@ -31,6 +33,14 @@ public class FormSubmission {
 
     @Column
     private String submitterId;
+
+    // --- 【新增：与文件附件的一对多关系】 ---
+    @OneToMany(
+            mappedBy = "formSubmission",
+            cascade = CascadeType.ALL,
+            orphanRemoval = true
+    )
+    private List<FileAttachment> attachments = new ArrayList<>();
 
     @PrePersist
     protected void onCreate() {

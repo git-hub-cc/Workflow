@@ -2,6 +2,7 @@ package club.ppmc.workflow.dto;
 
 import lombok.Data;
 import java.time.LocalDateTime;
+import java.util.List;
 
 /**
  * @author 你的名字
@@ -16,4 +17,6 @@ public class FormSubmissionResponse {
     private LocalDateTime createdAt;
     private String workflowStatus;
     private String submitterName; // 提交人姓名
+    // --- 【新增】 ---
+    private List<FileAttachmentDto> attachments;
 }

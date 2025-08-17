@@ -1,5 +1,6 @@
 package club.ppmc.workflow.service;
 
+import club.ppmc.workflow.domain.FileAttachment;
 import club.ppmc.workflow.domain.FormDefinition;
 import club.ppmc.workflow.domain.FormSubmission;
 import club.ppmc.workflow.domain.WorkflowInstance;
@@ -8,12 +9,14 @@ import club.ppmc.workflow.dto.CreateFormSubmissionRequest;
 import club.ppmc.workflow.dto.FormDefinitionResponse;
 import club.ppmc.workflow.dto.FormSubmissionResponse;
 import club.ppmc.workflow.exception.ResourceNotFoundException;
+import club.ppmc.workflow.repository.FileAttachmentRepository;
 import club.ppmc.workflow.repository.FormDefinitionRepository;
 import club.ppmc.workflow.repository.FormSubmissionRepository;
 import club.ppmc.workflow.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.CollectionUtils;
 
 import java.util.List;
 import java.util.stream.Collectors;
@@ -31,12 +34,12 @@ public class FormService {
     private final FormSubmissionRepository formSubmissionRepository;
     private final WorkflowService workflowService;
     private final UserRepository userRepository;
+    // --- 【新增】 ---
+    private final FileAttachmentRepository fileAttachmentRepository;
+    private final FileService fileService;
 
-    /**
-     * 创建一个新的表单定义
-     * @param request 包含表单名称和 schema 的 DTO
-     * @return 创建后的表单定义响应 DTO
-     */
+    // ... [createFormDefinition, getAllFormDefinitions, getFormDefinitionById methods remain unchanged] ...
+
     public FormDefinitionResponse createFormDefinition(CreateFormDefinitionRequest request) {
         FormDefinition formDefinition = new FormDefinition();
         formDefinition.setName(request.getName());
@@ -46,10 +49,6 @@ public class FormService {
         return convertToDefinitionResponse(savedForm);
     }
 
-    /**
-     * 获取所有表单定义
-     * @return 表单定义列表
-     */
     @Transactional(readOnly = true)
     public List<FormDefinitionResponse> getAllFormDefinitions() {
         return formDefinitionRepository.findAll().stream()
@@ -57,11 +56,6 @@ public class FormService {
                 .collect(Collectors.toList());
     }
 
-    /**
-     * 根据 ID 获取单个表单定义
-     * @param id 表单定义 ID
-     * @return 表单定义响应 DTO
-     */
     @Transactional(readOnly = true)
     public FormDefinitionResponse getFormDefinitionById(Long id) {
         FormDefinition formDefinition = formDefinitionRepository.findById(id)
@@ -72,7 +66,7 @@ public class FormService {
     /**
      * 为指定的表单创建一条提交记录，并可能启动工作流。
      * @param formDefinitionId 表单定义 ID
-     * @param request 包含提交数据的 DTO
+     * @param request 包含提交数据和附件ID的 DTO
      * @param submitterId 提交人 ID
      * @return 创建后的提交记录响应 DTO
      */
@@ -86,6 +80,18 @@ public class FormService {
         submission.setSubmitterId(submitterId);
 
         FormSubmission savedSubmission = formSubmissionRepository.save(submission);
+
+        // --- 【核心修改：关联附件】 ---
+        if (!CollectionUtils.isEmpty(request.getAttachmentIds())) {
+            List<FileAttachment> attachments = fileAttachmentRepository.findAllById(request.getAttachmentIds());
+            for (FileAttachment attachment : attachments) {
+                // 将附件与此次提交关联起来
+                attachment.setFormSubmission(savedSubmission);
+            }
+            // JPA 会自动处理更新
+            fileAttachmentRepository.saveAll(attachments);
+        }
+        // --- 【修改结束】 ---
 
         // 尝试启动工作流
         workflowService.startWorkflow(savedSubmission);
@@ -111,8 +117,6 @@ public class FormService {
                 .collect(Collectors.toList());
     }
 
-    // --- 公开的转换方法，以便其他服务或控制器调用 ---
-
     public FormDefinitionResponse convertToDefinitionResponse(FormDefinition entity) {
         FormDefinitionResponse dto = new FormDefinitionResponse();
         dto.setId(entity.getId());
@@ -130,6 +134,12 @@ public class FormService {
         dto.setFormName(entity.getFormDefinition().getName()); // 设置表单名称
         dto.setDataJson(entity.getDataJson());
         dto.setCreatedAt(entity.getCreatedAt());
+
+        // --- 【新增：转换附件信息】 ---
+        List<FileAttachment> attachments = fileAttachmentRepository.findByFormSubmissionId(entity.getId());
+        if (!attachments.isEmpty()) {
+            dto.setAttachments(fileService.getFilesBySubmissionId(entity.getId()));
+        }
 
         // 设置提交人姓名
         userRepository.findById(entity.getSubmitterId())

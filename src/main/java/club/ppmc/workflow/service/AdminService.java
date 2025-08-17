@@ -37,11 +37,7 @@ public class AdminService {
     private final TaskService taskService; // 新增注入
     private final PasswordEncoder passwordEncoder;
 
-    /**
-     * 获取所有正在运行的流程实例
-     * @return 流程实例DTO列表
-     */
-    @Transactional(readOnly = true)
+    // ... [getActiveProcessInstances, terminateProcessInstance, etc. methods remain unchanged] ...
     public List<ProcessInstanceDto> getActiveProcessInstances() {
         // 1. 获取所有正在运行的流程实例
         List<ProcessInstance> instances = runtimeService.createProcessInstanceQuery().active().list();
@@ -114,36 +110,18 @@ public class AdminService {
                 .collect(Collectors.toList());
     }
 
-    /**
-     * 终止一个正在运行的流程实例
-     * @param processInstanceId 流程实例ID
-     * @param reason 终止原因
-     */
     public void terminateProcessInstance(String processInstanceId, String reason) {
         runtimeService.deleteProcessInstance(processInstanceId, reason);
     }
 
-    /**
-     * 挂起流程实例
-     * @param processInstanceId 流程实例ID
-     */
     public void suspendProcessInstance(String processInstanceId) {
         runtimeService.suspendProcessInstanceById(processInstanceId);
     }
 
-    /**
-     * 激活流程实例
-     * @param processInstanceId 流程实例ID
-     */
     public void activateProcessInstance(String processInstanceId) {
         runtimeService.activateProcessInstanceById(processInstanceId);
     }
 
-    /**
-     * 改派任务
-     * @param taskId 任务ID
-     * @param newAssigneeId 新的办理人ID
-     */
     public void reassignTask(String taskId, String newAssigneeId) {
         if (!userRepository.existsById(newAssigneeId)) {
             throw new ResourceNotFoundException("新的办理人ID不存在: " + newAssigneeId);
@@ -151,7 +129,6 @@ public class AdminService {
         // Camunda API 内部会检查 task 是否存在
         taskService.setAssignee(taskId, newAssigneeId);
     }
-
 
     /**
      * 创建一个新用户
@@ -166,6 +143,8 @@ public class AdminService {
         user.setId(userDto.getId());
         user.setName(userDto.getName());
         user.setRole(userDto.getRole() != null ? userDto.getRole() : "USER");
+        // --- 【修改】 ---
+        user.setDepartment(userDto.getDepartment());
         // 默认密码为 'password'，在真实项目中应有更安全的处理方式
         user.setPassword(passwordEncoder.encode("password"));
 
@@ -191,6 +170,8 @@ public class AdminService {
                 .orElseThrow(() -> new ResourceNotFoundException("未找到用户: " + id));
         user.setName(userDto.getName());
         user.setRole(userDto.getRole());
+        // --- 【修改】 ---
+        user.setDepartment(userDto.getDepartment());
 
         // 更新上级
         if (StringUtils.hasText(userDto.getManagerId())) {
@@ -221,6 +202,8 @@ public class AdminService {
         dto.setId(user.getId());
         dto.setName(user.getName());
         dto.setRole(user.getRole());
+        // --- 【修改】 ---
+        dto.setDepartment(user.getDepartment());
         if (user.getManager() != null) {
             dto.setManagerId(user.getManager().getId());
         }

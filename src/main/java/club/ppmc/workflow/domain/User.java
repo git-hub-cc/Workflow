@@ -26,7 +26,9 @@ public class User implements UserDetails {
     @Column(nullable = false)
     private String role; // 例如: "USER", "ADMIN"
 
-    // --- 新增字段: 用户的直属上级 ---
+    // --- 【新增字段】 ---
+    private String department; // 用户所属部门
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "manager_id") // 在数据库中创建外键列 manager_id
     private User manager;

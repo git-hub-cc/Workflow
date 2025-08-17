@@ -35,7 +35,8 @@ public class SecurityConfig {
                         // 公开访问端点：登录接口和 H2 数据库控制台
                         // todo camunda为临时添加
                         .requestMatchers("/api/auth/**", "/h2-console/**",  "/camunda/**").permitAll()
-                        // 【新增】允许已认证用户访问自己的密码修改接口
+                        // 【新增】允许已认证用户访问文件上传和下载接口
+                        .requestMatchers("/api/files/**").authenticated()
                         .requestMatchers(HttpMethod.POST, "/api/users/me/change-password").authenticated()
                         // 其他所有请求都需要经过认证
                         .anyRequest().authenticated()
@@ -66,6 +67,8 @@ public class SecurityConfig {
     public AuthenticationManager authenticationManager(AuthenticationConfiguration config) throws Exception {
         return config.getAuthenticationManager();
     }
+
+
 
     @Bean
     public PasswordEncoder passwordEncoder() {

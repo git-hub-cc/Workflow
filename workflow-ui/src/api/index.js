@@ -8,7 +8,7 @@ export const login = (credentials) => service.post('/auth/login', credentials);
 // 创建 axios 实例
 const service = axios.create({
     baseURL: '/api', // Vite 代理会自动处理
-    timeout: 1200000, // 请求超时时间
+    timeout: 10000, // 请求超时时间
 });
 
 // 请求拦截器
@@ -30,6 +30,10 @@ service.interceptors.request.use(
 // 响应拦截器
 service.interceptors.response.use(
     response => {
+        // 如果是文件下载，直接返回整个响应
+        if (response.headers['content-disposition']?.includes('attachment')) {
+            return response;
+        }
         return response.data;
     },
     error => {
@@ -54,11 +58,24 @@ export const getSubmissions = (formId) => service.get(`/forms/${formId}/submissi
 export const getSubmissionById = (submissionId) => service.get(`/forms/submissions/${submissionId}`);
 export const submitForm = (formId, data) => service.post(`/forms/${formId}/submissions`, data);
 
+// --- 【新增】文件 API ---
+export const uploadFile = (file) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    return service.post('/files/upload', formData, {
+        headers: {
+            'Content-Type': 'multipart/form-data'
+        }
+    });
+};
+export const downloadFile = (fileId) => service.get(`/files/${fileId}`, { responseType: 'blob' });
+export const getFilesForSubmission = (submissionId) => service.get(`/files/submission/${submissionId}`);
+
+
 // --- 工作流 API ---
 export const deployWorkflow = (data) => service.post('/workflows/deploy', data);
 export const getWorkflowTemplate = (formId) => service.get(`/workflows/templates?formId=${formId}`);
 export const getWorkflowHistory = (submissionId) => service.get(`/workflows/history/${submissionId}`);
-// --- 【新增】 ---
 export const updateWorkflowTemplate = (formId, data) => service.put(`/workflows/templates/${formId}`, data);
 
 

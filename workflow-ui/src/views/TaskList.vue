@@ -2,7 +2,13 @@
   <div class="page-container">
     <a-page-header title="我的待办任务" />
     <div style="padding: 0 24px;">
+      <!-- 条件渲染：加载完成且列表为空时，显示 a-empty -->
+      <div v-if="!loading && tasks.length === 0" style="text-align: center; margin: 24px 0;">
+        <a-empty description="恭喜！您当前没有待办任务。" />
+      </div>
+      <!-- 条件渲染：列表有数据或正在加载时，显示 a-list -->
       <a-list
+          v-else
           :data-source="tasks"
           :loading="loading"
           item-layout="horizontal"
@@ -25,11 +31,6 @@
               <a-button type="primary" @click="goToTaskDetail(item.camundaTaskId)">去处理</a-button>
             </template>
           </a-list-item>
-        </template>
-        <template #loadMore v-if="!loading && tasks.length === 0">
-          <div style="text-align: center; margin: 24px 0;">
-            <a-empty description="恭喜！您当前没有待办任务。" />
-          </div>
         </template>
       </a-list>
     </div>

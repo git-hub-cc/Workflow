@@ -42,27 +42,31 @@ public class WorkflowApplication {
             admin.setId("admin");
             admin.setName("系统管理员");
             admin.setRole("ADMIN");
+            admin.setDepartment("IT部");
             admin.setPassword(passwordEncoder.encode("admin"));
 
             User user3 = new User(); // 财务总监-王五
             user3.setId("hr001");
             user3.setName("财务总监-王五");
             user3.setRole("USER");
+            user3.setDepartment("财务部");
             user3.setPassword(defaultPassword);
 
             User user2 = new User(); // 部门经理-李四
             user2.setId("manager001");
-            user2.setName("部门经理-李四");
+            user2.setName("研发部经理-李四");
             user2.setRole("USER");
+            user2.setDepartment("研发部");
             user2.setPassword(defaultPassword);
 
             User user1 = new User(); // 普通员工-张三
             user1.setId("user001");
-            user1.setName("普通员工-张三");
+            user1.setName("研发工程师-张三");
             user1.setRole("USER");
+            user1.setDepartment("研发部");
             user1.setPassword(defaultPassword);
 
-            // --- 【核心修改：保证保存顺序】 ---
+            // --- 【核心修改：保证保存顺序并设置部门】 ---
             // 2. 先保存没有依赖或作为依赖顶端的实体
             userRepository.save(admin);
             userRepository.save(user3); // 王五是最高级，先保存
