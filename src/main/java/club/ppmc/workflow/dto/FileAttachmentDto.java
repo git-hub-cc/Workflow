@@ -5,7 +5,7 @@ import lombok.Data;
 import java.time.LocalDateTime;
 
 /**
- * @author 你的名字
+ * @author cc
  * @description 文件附件的数据传输对象
  */
 @Data

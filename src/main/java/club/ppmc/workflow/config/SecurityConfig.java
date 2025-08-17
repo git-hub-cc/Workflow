@@ -35,11 +35,16 @@ public class SecurityConfig {
                         // 公开访问端点：登录接口和 H2 数据库控制台
                         // todo camunda为临时添加
                         .requestMatchers("/api/auth/**", "/h2-console/**",  "/camunda/**").permitAll()
-                        // 【新增】允许已认证用户访问文件上传和下载接口
+                        // 允许已认证用户访问文件上传和下载接口
                         .requestMatchers("/api/files/**").authenticated()
                         .requestMatchers(HttpMethod.POST, "/api/users/me/change-password").authenticated()
+                        // --- 【新增】为流程设计器提供用户组列表 ---
+                        .requestMatchers("/api/workflows/groups").authenticated()
+                        // --- 【新增】保护 Word 导入接口，仅限管理员 ---
+                        .requestMatchers(HttpMethod.POST, "/api/forms/import-word").hasRole("ADMIN")
                         // 【修改】明确 /api/admin/** 下的所有请求都需要 ADMIN 角色
-                        // @PreAuthorize 在 Controller 级别已经做了更细粒度的控制，这里作为一道额外的防线
+                        .requestMatchers("/api/admin/groups/**").hasRole("ADMIN")
+                        .requestMatchers("/api/admin/logs/**").hasRole("ADMIN")
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
                         // 其他所有请求都需要经过认证
                         .anyRequest().authenticated()

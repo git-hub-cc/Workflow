@@ -4,20 +4,25 @@
     <a-page-header title="表单设计器" @back="() => $router.push('/')">
       <template #extra>
         <a-space>
-          <!-- 预览按钮 -->
           <a-button @click="showPreviewModal">
             <template #icon><EyeOutlined /></template>
             预览
           </a-button>
 
-          <!-- 导入功能：隐藏的input和触发按钮 -->
-          <input type="file" ref="fileInputRef" @change="handleImport" style="display: none" accept=".json" />
-          <a-button @click="triggerImport">
-            <template #icon><UploadOutlined /></template>
-            导入
+          <!-- 新增 Word 导入功能 -->
+          <input type="file" ref="wordFileInputRef" @change="handleWordImport" style="display: none" accept=".docx" />
+          <a-button @click="triggerWordImport" :loading="importingWord">
+            <template #icon><FileWordOutlined /></template>
+            从Word导入
           </a-button>
 
-          <!-- 导出按钮 -->
+          <!-- 明确原有导入为 JSON 导入 -->
+          <input type="file" ref="jsonFileInputRef" @change="handleJsonImport" style="display: none" accept=".json" />
+          <a-button @click="triggerJsonImport">
+            <template #icon><UploadOutlined /></template>
+            导入 JSON
+          </a-button>
+
           <a-button @click="handleExport">
             <template #icon><DownloadOutlined /></template>
             导出
@@ -25,7 +30,6 @@
 
           <a-divider type="vertical" />
 
-          <!-- 取消和保存按钮 -->
           <a-button @click="$router.push('/')">取消</a-button>
           <a-button type="primary" @click="saveForm" :loading="saving">保存表单</a-button>
         </a-space>
@@ -86,11 +90,9 @@
       <!-- 中间: 画布，所有组件的拖放区域 -->
       <div class="canvas" @dragover.prevent @drop.prevent.stop="handleCanvasDrop($event)">
         <a-form layout="vertical">
-          <!-- 画布为空时的占位提示 -->
           <div v-if="formDefinition.schema.fields.length === 0" class="canvas-placeholder">
-            从左侧拖拽组件到这里
+            从左侧拖拽组件到这里，或从顶部导入Word/JSON文件
           </div>
-          <!-- 递归渲染可拖拽的表单项 -->
           <draggable-item
               v-for="(field, index) in formDefinition.schema.fields"
               :key="field.id || index"
@@ -126,13 +128,13 @@
 <script setup>
 import { ref, reactive, computed } from 'vue';
 import { useRouter } from 'vue-router';
-import { message } from 'ant-design-vue';
-import { createForm } from '@/api';
+import { message, Modal } from 'ant-design-vue';
+import { createForm, importFromWord } from '@/api';
 import { v4 as uuidv4 } from 'uuid';
 import DraggableItem from './builder-components/DraggableItem.vue';
 import PropertiesPanel from './builder-components/PropertiesPanel.vue';
 import FormPreviewModal from '@/components/FormPreviewModal.vue';
-import { EyeOutlined, UploadOutlined, DownloadOutlined } from "@ant-design/icons-vue";
+import { EyeOutlined, UploadOutlined, DownloadOutlined, FileWordOutlined } from "@ant-design/icons-vue";
 
 // --- Vue Router 和状态管理 ---
 const router = useRouter();
@@ -149,7 +151,11 @@ const formDefinition = reactive({
 // --- 设计器状态 ---
 const selectedFieldId = ref(null); // 当前选中的字段或布局的ID
 const previewModalVisible = ref(false);
-const fileInputRef = ref(null); // 用于触发文件导入
+
+// 区分不同类型的文件输入框
+const jsonFileInputRef = ref(null);
+const wordFileInputRef = ref(null);
+const importingWord = ref(false); // Word导入加载状态
 
 // --- 组件面板定义 ---
 const paletteItems = {
@@ -160,6 +166,7 @@ const paletteItems = {
     { type: 'GridRow', label: '四栏布局', options: { spans: [6, 6, 6, 6] } },
     { type: 'Collapse', label: '折叠面板' },
     { type: 'DescriptionList', label: '描述列表' },
+    { type: 'StaticText', label: '静态文本' }, // 新增静态文本组件
   ],
   // 基础输入组件
   basic: [
@@ -270,6 +277,13 @@ const createNewField = (item) => {
       baseField.props.accordion = false;
       baseField.panels = [{ id: `panel_${uuidv4().substring(0, 4)}`, type: 'CollapsePanel', props: { header: '面板1' }, fields: [] }];
       break;
+    case 'StaticText':
+      baseField.label = ''; // 静态文本自身没有 label
+      baseField.props.content = '这是一段静态文本';
+      baseField.props.tag = 'p'; // 默认为 p 标签
+      baseField.rules = []; // 静态文本没有校验规则
+      baseField.visibility = undefined; // 静态文本不支持条件显隐
+      break;
     case 'Select':
     case 'TreeSelect': // TreeSelect 与 Select 共用数据源结构
       baseField.dataSource = { type: 'static', options: [{ label: '选项1', value: '1' }, { label: '选项2', value: '2' }] };
@@ -306,13 +320,11 @@ const createNewField = (item) => {
       baseField.props.bordered = true;
       baseField.props.size = 'default';
       baseField.props.items = [{ label: '标签一', fieldId: '' }, { label: '标签二', fieldId: '' }];
-      // 【修复】将 delete 替换为设置空数组
       baseField.rules = [];
       break;
     case 'IconPicker':
       baseField.label = '图标';
       baseField.props.placeholder = '请选择一个图标';
-      // 【修复】将 delete 替换为设置空数组
       baseField.rules = [];
       break;
   }
@@ -427,9 +439,10 @@ const handleExport = () => {
   } catch (error) { message.error('导出失败！'); console.error('Export failed:', error); }
 };
 
-const triggerImport = () => { fileInputRef.value?.click(); };
+// 重命名原有 JSON 导入逻辑
+const triggerJsonImport = () => { jsonFileInputRef.value?.click(); };
 
-const handleImport = (event) => {
+const handleJsonImport = (event) => {
   const file = event.target.files[0];
   if (!file) return;
   const reader = new FileReader();
@@ -447,6 +460,46 @@ const handleImport = (event) => {
   reader.onerror = () => { message.error('读取文件失败！'); };
   reader.readAsText(file);
   event.target.value = '';
+};
+
+
+// --- 新增 Word 导入逻辑 ---
+const triggerWordImport = () => { wordFileInputRef.value?.click(); };
+
+const handleWordImport = async (event) => {
+  const file = event.target.files[0];
+  if (!file) return;
+
+  Modal.confirm({
+    title: '确认导入',
+    content: '从Word导入将会覆盖当前画布上的所有内容，确定要继续吗？',
+    okText: '确认',
+    cancelText: '取消',
+    onOk: async () => {
+      importingWord.value = true;
+      try {
+        const response = await importFromWord(file);
+        // 后端返回的 schemaJson 是字符串，需要解析
+        const schema = JSON.parse(response.schemaJson);
+
+        formDefinition.name = response.name;
+        formDefinition.schema.fields = schema.fields;
+        selectedFieldId.value = null;
+
+        message.success(`从 "${file.name}" 导入成功！请检查并调整自动生成的表单。`);
+      } catch (error) {
+        // 全局错误处理器已显示消息
+        console.error("Word import failed:", error);
+      } finally {
+        importingWord.value = false;
+        // 重置 input，以便可以再次选择同一个文件
+        event.target.value = '';
+      }
+    },
+    onCancel: () => {
+      event.target.value = '';
+    }
+  });
 };
 
 </script>

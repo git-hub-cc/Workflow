@@ -10,7 +10,7 @@ import org.springframework.web.bind.annotation.*;
 import java.security.Principal;
 
 /**
- * @author 你的名字
+ * @author cc
  * @description 处理用户个人信息相关的控制器
  */
 @RestController

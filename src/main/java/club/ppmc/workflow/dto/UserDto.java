@@ -5,7 +5,7 @@ import lombok.Data;
 import java.util.List;
 
 /**
- * @author 你的名字
+ * @author cc
  * @description 用户信息的数据传输对象
  */
 @Data

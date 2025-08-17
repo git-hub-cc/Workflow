@@ -5,7 +5,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
 /**
- * @author 你的名字
+ * @author cc
  * @description FormDefinition 实体的 JPA Repository 接口
  */
 @Repository

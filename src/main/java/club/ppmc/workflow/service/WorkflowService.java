@@ -1,5 +1,6 @@
 package club.ppmc.workflow.service;
 
+import club.ppmc.workflow.aop.LogOperation;
 import club.ppmc.workflow.domain.*;
 import club.ppmc.workflow.dto.*;
 import club.ppmc.workflow.exception.ResourceNotFoundException;
@@ -28,7 +29,7 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 /**
- * @author 你的名字
+ * @author cc
  * @description 工作流核心服务
  */
 @Service
@@ -53,7 +54,7 @@ public class WorkflowService {
 
     private final ObjectMapper objectMapper;
 
-    // ... [deployWorkflow, updateWorkflowTemplate, getOrCreateWorkflowTemplate methods remain unchanged] ...
+    @LogOperation(module = "流程管理", action = "部署流程", targetIdExpression = "#request.processDefinitionKey")
     public void deployWorkflow(DeployWorkflowRequest request) {
         FormDefinition formDef = formDefinitionRepository.findById(request.getFormDefinitionId())
                 .orElseThrow(() -> new ResourceNotFoundException("未找到表单定义 ID: " + request.getFormDefinitionId()));
@@ -74,6 +75,7 @@ public class WorkflowService {
         templateRepository.save(template);
     }
 
+    @LogOperation(module = "流程管理", action = "保存流程草稿", targetIdExpression = "#request.processDefinitionKey")
     public WorkflowTemplateResponse updateWorkflowTemplate(Long formId, UpdateWorkflowTemplateRequest request) {
         FormDefinition formDef = formDefinitionRepository.findById(formId)
                 .orElseThrow(() -> new ResourceNotFoundException("未找到表单定义 ID: " + formId));
@@ -228,6 +230,7 @@ public class WorkflowService {
         }
     }
 
+    @LogOperation(module = "任务处理", action = "完成任务", targetIdExpression = "#camundaTaskId")
     public void completeUserTask(String camundaTaskId, CompleteTaskRequest request) {
         Task task = taskService.createTaskQuery().taskId(camundaTaskId).singleResult();
         if (task == null) {

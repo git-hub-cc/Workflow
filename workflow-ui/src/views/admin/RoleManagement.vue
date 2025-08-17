@@ -22,18 +22,15 @@
           </template>
           <template v-else-if="column.key === 'actions'">
             <a-space>
-              <!--
               <a-button type="link" @click="showModal(record)">编辑</a-button>
               <a-popconfirm
                   title="确定要删除这个角色吗？"
+                  ok-text="确认删除"
+                  cancel-text="取消"
                   @confirm="handleDelete(record.id)"
               >
                 <a-button type="link" danger>删除</a-button>
               </a-popconfirm>
-              -->
-              <a-tooltip title="编辑和删除功能待后续权限模块完善">
-                <a-button type="link" disabled>编辑</a-button>
-              </a-tooltip>
             </a-space>
           </template>
         </template>
@@ -47,9 +44,10 @@
         :confirm-loading="modalConfirmLoading"
         @ok="handleOk"
         @cancel="handleCancel"
+        destroyOnClose
     >
       <a-form :model="formState" :rules="rules" ref="formRef" layout="vertical">
-        <a-form-item label="角色名称 (英文大写)" name="name" help="例如: FINANCE_APPROVER">
+        <a-form-item label="角色名称 (英文大写)" name="name" help="例如: FINANCE_APPROVER, 创建后不可修改">
           <a-input v-model:value="formState.name" :disabled="isEditing" />
         </a-form-item>
         <a-form-item label="角色描述" name="description">
@@ -63,7 +61,7 @@
 <script setup>
 import { ref, reactive, onMounted } from 'vue';
 import { useUserStore } from '@/stores/user';
-import { createRole } from '@/api';
+import { createRole, updateRole, deleteRole } from '@/api';
 import { message } from 'ant-design-vue';
 import { PlusOutlined } from '@ant-design/icons-vue';
 
@@ -71,7 +69,7 @@ const userStore = useUserStore();
 const loading = ref(false);
 
 onMounted(() => {
-  if (userStore.allRoles.length === 0) {
+  if (userStore.allRoles.length === 0 && userStore.isAdmin) {
     loading.value = true;
     userStore.fetchAllRoles().finally(() => {
       loading.value = false;
@@ -123,9 +121,9 @@ const handleOk = async () => {
     modalConfirmLoading.value = true;
 
     if (isEditing.value) {
-      // const updatedRole = await updateRole(formState.id, formState);
-      // store.updateRole(updatedRole);
-      message.warn('编辑功能暂未实现');
+      const updatedRole = await updateRole(formState.id, formState);
+      userStore.updateRole(updatedRole);
+      message.success('角色更新成功！');
     } else {
       const newRole = await createRole(formState);
       userStore.addRole(newRole);
@@ -133,6 +131,7 @@ const handleOk = async () => {
     }
     modalVisible.value = false;
   } catch (error) {
+    // API 错误已全局处理
     console.error('Form validation/submission failed:', error);
   } finally {
     modalConfirmLoading.value = false;
@@ -147,10 +146,17 @@ const resetForm = () => {
   formState.id = null;
   formState.name = '';
   formState.description = '';
-  formRef.value?.clearValidate();
 };
 
-// const handleDelete = async (roleId) => { ... }
+const handleDelete = async (roleId) => {
+  try {
+    await deleteRole(roleId);
+    userStore.removeRole(roleId);
+    message.success('角色删除成功！');
+  } catch (error) {
+    // API 错误已全局处理
+  }
+};
 </script>
 
 <style scoped>

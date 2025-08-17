@@ -1,5 +1,6 @@
 package club.ppmc.workflow.service;
 
+import club.ppmc.workflow.aop.LogOperation;
 import club.ppmc.workflow.domain.FileAttachment;
 import club.ppmc.workflow.domain.FormDefinition;
 import club.ppmc.workflow.domain.FormSubmission;
@@ -22,7 +23,7 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 /**
- * @author 你的名字
+ * @author cc
  * @description 表单相关的业务逻辑服务
  */
 @Service("appFormService")
@@ -38,8 +39,7 @@ public class FormService {
     private final FileAttachmentRepository fileAttachmentRepository;
     private final FileService fileService;
 
-    // ... [createFormDefinition, getAllFormDefinitions, getFormDefinitionById methods remain unchanged] ...
-
+    @LogOperation(module = "表单管理", action = "创建表单定义", targetIdExpression = "#result.name")
     public FormDefinitionResponse createFormDefinition(CreateFormDefinitionRequest request) {
         FormDefinition formDefinition = new FormDefinition();
         formDefinition.setName(request.getName());
@@ -70,6 +70,7 @@ public class FormService {
      * @param submitterId 提交人 ID
      * @return 创建后的提交记录响应 DTO
      */
+    @LogOperation(module = "表单提交", action = "提交申请", targetIdExpression = "#result.id")
     public FormSubmissionResponse createFormSubmission(Long formDefinitionId, CreateFormSubmissionRequest request, String submitterId) {
         FormDefinition formDefinition = formDefinitionRepository.findById(formDefinitionId)
                 .orElseThrow(() -> new ResourceNotFoundException("无法为不存在的表单 (ID: " + formDefinitionId + ") 创建提交记录"));

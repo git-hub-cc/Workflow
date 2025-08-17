@@ -1,7 +1,7 @@
 package club.ppmc.workflow.domain;
 
 /**
- * @author 你的名字
+ * @author cc
  * @description 用户状态枚举
  */
 public enum UserStatus {

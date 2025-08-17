@@ -1,5 +1,6 @@
 package club.ppmc.workflow.service;
 
+import club.ppmc.workflow.aop.LogOperation;
 import club.ppmc.workflow.domain.User;
 import club.ppmc.workflow.exception.ResourceNotFoundException;
 import club.ppmc.workflow.repository.UserRepository;
@@ -9,7 +10,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * @author 你的名字
+ * @author cc
  * @description 处理用户相关业务逻辑的服务
  */
 @Service
@@ -26,6 +27,7 @@ public class UserService {
      * @param oldPassword 旧密码
      * @param newPassword 新密码
      */
+    @LogOperation(module = "个人中心", action = "修改个人密码", targetIdExpression = "#userId")
     public void changePassword(String userId, String oldPassword, String newPassword) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("未找到用户: " + userId));
@@ -50,6 +52,7 @@ public class UserService {
      * (管理员)重置用户密码
      * @param userId 用户ID
      */
+    @LogOperation(module = "用户管理", action = "重置用户密码", targetIdExpression = "#userId")
     public void resetPassword(String userId) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("未找到用户: " + userId));

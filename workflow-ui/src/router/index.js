@@ -95,7 +95,6 @@ const router = createRouter({
                     component: () => import('../views/admin/InstanceManagement.vue'),
                     meta: { title: '实例管理', requiresAdmin: true }
                 },
-                // --- 【新增路由】 ---
                 {
                     path: 'admin/roles',
                     name: 'admin-roles',
@@ -103,10 +102,29 @@ const router = createRouter({
                     meta: { title: '角色管理', requiresAdmin: true }
                 },
                 {
+                    path: 'admin/groups',
+                    name: 'admin-groups',
+                    component: () => import('../views/admin/UserGroupManagement.vue'),
+                    meta: { title: '用户组管理', requiresAdmin: true }
+                },
+                {
                     path: 'admin/org-chart',
                     name: 'admin-org-chart',
                     component: () => import('../views/admin/OrganizationChart.vue'),
                     meta: { title: '组织架构', requiresAdmin: true }
+                },
+                // --- 【新增日志管理路由】 ---
+                {
+                    path: 'admin/logs/login',
+                    name: 'admin-login-log',
+                    component: () => import('../views/admin/LoginLog.vue'),
+                    meta: { title: '登录日志', requiresAdmin: true }
+                },
+                {
+                    path: 'admin/logs/operation',
+                    name: 'admin-operation-log',
+                    component: () => import('../views/admin/OperationLog.vue'),
+                    meta: { title: '操作日志', requiresAdmin: true }
                 }
             ]
         }

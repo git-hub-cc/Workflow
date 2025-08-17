@@ -8,7 +8,7 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * @author 你的名字
+ * @author cc
  * @description 仪表盘统计数据的 DTO
  */
 @Data

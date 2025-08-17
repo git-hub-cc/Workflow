@@ -6,11 +6,14 @@ import club.ppmc.workflow.dto.AuthRequest;
 import club.ppmc.workflow.dto.AuthResponse;
 import club.ppmc.workflow.dto.UserDto;
 import club.ppmc.workflow.repository.UserRepository;
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
 
 import java.util.stream.Collectors;
 
@@ -21,6 +24,7 @@ public class AuthService {
     private final UserRepository userRepository;
     private final JwtService jwtService;
     private final AuthenticationManager authenticationManager;
+    private final LoggingService loggingService; // 【新增】注入 LoggingService
 
     /**
      * 对用户进行认证，如果成功，则生成并返回 JWT
@@ -43,6 +47,20 @@ public class AuthService {
         User user = userRepository.findById(request.getUserId())
                 .orElseThrow(() -> new UsernameNotFoundException("认证成功但无法在数据库中找到用户，数据不一致"));
 
+        // --- 【新增】记录登录成功日志 ---
+        try {
+            ServletRequestAttributes attributes = (ServletRequestAttributes) RequestContextHolder.getRequestAttributes();
+            if (attributes != null) {
+                HttpServletRequest httpRequest = attributes.getRequest();
+                String ipAddress = getIpAddress(httpRequest);
+                String userAgent = httpRequest.getHeader("User-Agent");
+                loggingService.logLoginSuccess(user.getId(), ipAddress, userAgent);
+            }
+        } catch (Exception e) {
+            // Log the error but don't fail the login
+        }
+        // --- 【新增结束】 ---
+
         // 生成 JWT
         String jwtToken = jwtService.generateToken(user);
 
@@ -63,5 +81,19 @@ public class AuthService {
                         isAdmin ? "ADMIN" : "USER" // 为了兼容旧前端，仍然保留一个主 role
                 ))
                 .build();
+    }
+
+    private String getIpAddress(HttpServletRequest request) {
+        String ip = request.getHeader("X-Forwarded-For");
+        if (ip == null || ip.length() == 0 || "unknown".equalsIgnoreCase(ip)) {
+            ip = request.getHeader("Proxy-Client-IP");
+        }
+        if (ip == null || ip.length() == 0 || "unknown".equalsIgnoreCase(ip)) {
+            ip = request.getHeader("WL-Proxy-Client-IP");
+        }
+        if (ip == null || ip.length() == 0 || "unknown".equalsIgnoreCase(ip)) {
+            ip = request.getRemoteAddr();
+        }
+        return ip;
     }
 }

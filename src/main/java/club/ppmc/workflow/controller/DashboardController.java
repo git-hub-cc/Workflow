@@ -11,7 +11,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * @author 你的名字
+ * @author cc
  * @description 仪表盘数据相关的控制器
  */
 @RestController

@@ -8,7 +8,7 @@ import lombok.NoArgsConstructor;
 import java.time.LocalDateTime;
 
 /**
- * @author 你的名字
+ * @author cc
  * @description 工作流历史活动节点的 DTO
  */
 @Data

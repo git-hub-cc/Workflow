@@ -4,8 +4,11 @@
 
   <!-- 条件渲染：只有在满足显隐条件时才渲染组件 -->
   <div v-if="isVisible">
+    <!-- 【修改】新增 StaticText 组件的直接渲染，它不应被 a-form-item 包裹 -->
+    <StaticTextRenderer v-if="field.type === 'StaticText'" :field="field" />
+
     <!-- 1. 布局组件的统一处理 -->
-    <template v-if="['GridRow', 'Collapse'].includes(field.type)">
+    <template v-else-if="['GridRow', 'Collapse'].includes(field.type)">
       <a-row v-if="field.type === 'GridRow'" :gutter="field.props.gutter">
         <a-col v-for="(col, colIndex) in field.columns" :key="colIndex" :span="col.props.span">
           <FormItemRenderer v-for="childField in col.fields" :key="childField.id" :field="childField" :form-data="formData" :mode="mode" @update:form-data="(...args) => emit('update:form-data', ...args)" />
@@ -37,7 +40,6 @@
       <template v-if="mode === 'edit'">
         <QuillEditor v-if="field.type === 'RichText'" v-model:content="localValue" :placeholder="field.props.placeholder" content-type="html" theme="snow" />
         <a-select v-else-if="field.type === 'Select'" v-model:value="localValue" :placeholder="field.props.placeholder" :options="dynamicOptions" :loading="loadingOptions" show-search :filter-option="filterOption" />
-        <!-- 【修复】UserPicker 之前被误删，现在加回来 -->
         <template v-else-if="field.type === 'UserPicker'">
           <a-select :value="localValue" :placeholder="field.props.placeholder" :options="dynamicOptions" @click.prevent="showUserSelectorModal = true" :open="false">
             <template #suffixIcon><UserOutlined/></template>
@@ -93,6 +95,8 @@ import EditableSubform from './EditableSubform.vue';
 import UserDeptSelectorModal from '@/components/UserDeptSelectorModal.vue';
 import KeyValueEditor from './KeyValueEditor.vue';
 import IconPickerModal from '@/components/IconPickerModal.vue';
+// 【新增】导入 StaticTextRenderer
+import StaticTextRenderer from './StaticTextRenderer.vue';
 const FormItemRenderer = defineAsyncComponent(() => import('./FormItemRenderer.vue'));
 
 

@@ -11,7 +11,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.Map;
 
 /**
- * @author 你的名字
+ * @author cc
  * @description 处理用户认证的控制器
  */
 @RestController

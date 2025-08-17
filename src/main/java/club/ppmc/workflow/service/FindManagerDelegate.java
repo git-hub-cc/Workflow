@@ -12,7 +12,7 @@ import org.springframework.stereotype.Component;
 import java.util.Optional;
 
 /**
- * @author 你的名字
+ * @author cc
  * @description 一个 Camunda JavaDelegate，用于动态查找审批人。
  * 它可以在BPMN流程中作为一个服务任务被调用。
  * 支持查找N级上级。

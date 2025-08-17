@@ -1,11 +1,16 @@
 package club.ppmc.workflow.service;
 
+import club.ppmc.workflow.aop.LogOperation;
 import club.ppmc.workflow.domain.*;
 import club.ppmc.workflow.dto.*;
 import club.ppmc.workflow.exception.ResourceNotFoundException;
+import club.ppmc.workflow.repository.LoginLogRepository;
+import club.ppmc.workflow.repository.OperationLogRepository;
 import club.ppmc.workflow.repository.RoleRepository;
 import club.ppmc.workflow.repository.UserGroupRepository;
 import club.ppmc.workflow.repository.UserRepository;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.criteria.Predicate;
 import lombok.RequiredArgsConstructor;
 import org.camunda.bpm.engine.HistoryService;
 import org.camunda.bpm.engine.RuntimeService;
@@ -13,19 +18,23 @@ import org.camunda.bpm.engine.TaskService;
 import org.camunda.bpm.engine.history.HistoricProcessInstance;
 import org.camunda.bpm.engine.runtime.ActivityInstance;
 import org.camunda.bpm.engine.runtime.ProcessInstance;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.CollectionUtils;
 import org.springframework.util.StringUtils;
 
+import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.*;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /**
- * @author 你的名字
+ * @author cc
  * @description 包含管理员操作的业务逻辑服务
  */
 @Service
@@ -40,6 +49,10 @@ public class AdminService {
     private final HistoryService historyService;
     private final TaskService taskService;
     private final PasswordEncoder passwordEncoder;
+    private final EntityManager entityManager;
+    // --- 【新增】 ---
+    private final LoginLogRepository loginLogRepository;
+    private final OperationLogRepository operationLogRepository;
 
     // ... [流程实例管理相关方法保持不变] ...
     public List<ProcessInstanceDto> getActiveProcessInstances() {
@@ -114,18 +127,22 @@ public class AdminService {
                 .collect(Collectors.toList());
     }
 
+    @LogOperation(module = "实例管理", action = "终止流程实例", targetIdExpression = "#processInstanceId")
     public void terminateProcessInstance(String processInstanceId, String reason) {
         runtimeService.deleteProcessInstance(processInstanceId, reason);
     }
 
+    @LogOperation(module = "实例管理", action = "挂起流程实例", targetIdExpression = "#processInstanceId")
     public void suspendProcessInstance(String processInstanceId) {
         runtimeService.suspendProcessInstanceById(processInstanceId);
     }
 
+    @LogOperation(module = "实例管理", action = "激活流程实例", targetIdExpression = "#processInstanceId")
     public void activateProcessInstance(String processInstanceId) {
         runtimeService.activateProcessInstanceById(processInstanceId);
     }
 
+    @LogOperation(module = "实例管理", action = "转办任务", targetIdExpression = "#taskId")
     public void reassignTask(String taskId, String newAssigneeId) {
         if (!userRepository.existsById(newAssigneeId)) {
             throw new ResourceNotFoundException("新的办理人ID不存在: " + newAssigneeId);
@@ -141,6 +158,7 @@ public class AdminService {
      * @param userDto 用户数据
      * @return 创建后的用户DTO
      */
+    @LogOperation(module = "用户管理", action = "创建用户", targetIdExpression = "#userDto.id")
     public UserDto createUser(UserDto userDto) {
         if (userRepository.existsById(userDto.getId())) {
             throw new IllegalArgumentException("用户ID '" + userDto.getId() + "' 已存在");
@@ -167,6 +185,7 @@ public class AdminService {
      * @param userDto 更新数据
      * @return 更新后的用户DTO
      */
+    @LogOperation(module = "用户管理", action = "更新用户", targetIdExpression = "#id")
     public UserDto updateUser(String id, UserDto userDto) {
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("未找到用户: " + id));
@@ -205,12 +224,21 @@ public class AdminService {
         } else {
             user.getRoles().clear();
         }
+
+        // 【新增】更新用户组
+        if (!CollectionUtils.isEmpty(userDto.getGroupNames())) {
+            Set<UserGroup> groups = userGroupRepository.findByNameIn(userDto.getGroupNames());
+            user.setUserGroups(groups);
+        } else {
+            user.getUserGroups().clear();
+        }
     }
 
     /**
      * 删除用户 (逻辑删除，将状态改为 INACTIVE)
      * @param id 用户ID
      */
+    @LogOperation(module = "用户管理", action = "禁用用户", targetIdExpression = "#id")
     public void deleteUser(String id) {
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("未找到用户: " + id));
@@ -218,7 +246,8 @@ public class AdminService {
         userRepository.save(user);
     }
 
-    // --- 【新增】角色与用户组管理 ---
+    // --- 【新增与完善】角色与用户组管理 ---
+    @LogOperation(module = "角色管理", action = "创建角色", targetIdExpression = "#result.name")
     public RoleDto createRole(RoleDto roleDto) {
         if(roleRepository.findByName(roleDto.getName()).isPresent()) {
             throw new IllegalArgumentException("角色名称已存在: " + roleDto.getName());
@@ -232,7 +261,66 @@ public class AdminService {
     public List<RoleDto> getAllRoles() {
         return roleRepository.findAll().stream().map(this::toRoleDto).collect(Collectors.toList());
     }
-    // ... 可以添加更新和删除角色的方法 ...
+
+    @LogOperation(module = "角色管理", action = "更新角色", targetIdExpression = "#id")
+    public RoleDto updateRole(Long id, RoleDto roleDto) {
+        Role role = roleRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("未找到角色ID: " + id));
+        // 通常不应修改角色名称，因为它可能是硬编码的权限标识
+        role.setDescription(roleDto.getDescription());
+        return toRoleDto(roleRepository.save(role));
+    }
+
+    @LogOperation(module = "角色管理", action = "删除角色", targetIdExpression = "#id")
+    public void deleteRole(Long id) {
+        Role role = roleRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("未找到角色ID: " + id));
+
+        // 刷新实体状态以加载 users 集合
+        entityManager.refresh(role);
+
+        if (!role.getUsers().isEmpty()) {
+            throw new IllegalStateException("无法删除角色，因为仍有 " + role.getUsers().size() + " 个用户属于该角色。");
+        }
+        roleRepository.delete(role);
+    }
+
+    @LogOperation(module = "用户组管理", action = "创建用户组", targetIdExpression = "#result.name")
+    public UserGroupDto createGroup(UserGroupDto groupDto) {
+        if(userGroupRepository.findByName(groupDto.getName()).isPresent()) {
+            throw new IllegalArgumentException("用户组名称已存在: " + groupDto.getName());
+        }
+        UserGroup group = new UserGroup();
+        group.setName(groupDto.getName());
+        group.setDescription(groupDto.getDescription());
+        return toUserGroupDto(userGroupRepository.save(group));
+    }
+
+    public List<UserGroupDto> getAllGroups() {
+        return userGroupRepository.findAll().stream().map(this::toUserGroupDto).collect(Collectors.toList());
+    }
+
+    @LogOperation(module = "用户组管理", action = "更新用户组", targetIdExpression = "#id")
+    public UserGroupDto updateGroup(Long id, UserGroupDto groupDto) {
+        UserGroup group = userGroupRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("未找到用户组ID: " + id));
+        group.setName(groupDto.getName()); // 用户组名称通常可以修改
+        group.setDescription(groupDto.getDescription());
+        return toUserGroupDto(userGroupRepository.save(group));
+    }
+
+    @LogOperation(module = "用户组管理", action = "删除用户组", targetIdExpression = "#id")
+    public void deleteGroup(Long id) {
+        UserGroup group = userGroupRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("未找到用户组ID: " + id));
+
+        entityManager.refresh(group);
+
+        if (!group.getUsers().isEmpty()) {
+            throw new IllegalStateException("无法删除用户组，因为仍有 " + group.getUsers().size() + " 个用户属于该组。");
+        }
+        userGroupRepository.delete(group);
+    }
 
 
     // --- 转换器 ---
@@ -249,6 +337,10 @@ public class AdminService {
         if (user.getRoles() != null) {
             dto.setRoleNames(user.getRoles().stream().map(Role::getName).collect(Collectors.toList()));
         }
+        // 【新增】
+        if (user.getUserGroups() != null) {
+            dto.setGroupNames(user.getUserGroups().stream().map(UserGroup::getName).collect(Collectors.toList()));
+        }
         return dto;
     }
 
@@ -257,6 +349,14 @@ public class AdminService {
         dto.setId(role.getId());
         dto.setName(role.getName());
         dto.setDescription(role.getDescription());
+        return dto;
+    }
+
+    private UserGroupDto toUserGroupDto(UserGroup group) {
+        UserGroupDto dto = new UserGroupDto();
+        dto.setId(group.getId());
+        dto.setName(group.getName());
+        dto.setDescription(group.getDescription());
         return dto;
     }
 
@@ -355,5 +455,75 @@ public class AdminService {
                 })
                 .sorted(Comparator.comparing(TreeNodeDto::getTitle))
                 .collect(Collectors.toList());
+    }
+
+    // --- 【新增】日志查询逻辑 ---
+
+    @Transactional(readOnly = true)
+    public Page<LoginLogDto> getLoginLogs(String userId, String status, LocalDateTime startTime, LocalDateTime endTime, Pageable pageable) {
+        Specification<LoginLog> spec = (root, query, cb) -> {
+            List<Predicate> predicates = new ArrayList<>();
+            if (StringUtils.hasText(userId)) {
+                predicates.add(cb.like(root.get("userId"), "%" + userId + "%"));
+            }
+            if (StringUtils.hasText(status)) {
+                predicates.add(cb.equal(root.get("status"), LoginLog.LoginStatus.valueOf(status.toUpperCase())));
+            }
+            if (startTime != null) {
+                predicates.add(cb.greaterThanOrEqualTo(root.get("loginTime"), startTime));
+            }
+            if (endTime != null) {
+                predicates.add(cb.lessThanOrEqualTo(root.get("loginTime"), endTime));
+            }
+            return cb.and(predicates.toArray(new Predicate[0]));
+        };
+        return loginLogRepository.findAll(spec, pageable).map(this::toLoginLogDto);
+    }
+
+    @Transactional(readOnly = true)
+    public Page<OperationLogDto> getOperationLogs(String operatorId, String module, LocalDateTime startTime, LocalDateTime endTime, Pageable pageable) {
+        Specification<OperationLog> spec = (root, query, cb) -> {
+            List<Predicate> predicates = new ArrayList<>();
+            if (StringUtils.hasText(operatorId)) {
+                predicates.add(cb.like(root.get("operatorId"), "%" + operatorId + "%"));
+            }
+            if (StringUtils.hasText(module)) {
+                predicates.add(cb.equal(root.get("module"), module));
+            }
+            if (startTime != null) {
+                predicates.add(cb.greaterThanOrEqualTo(root.get("operationTime"), startTime));
+            }
+            if (endTime != null) {
+                predicates.add(cb.lessThanOrEqualTo(root.get("operationTime"), endTime));
+            }
+            return cb.and(predicates.toArray(new Predicate[0]));
+        };
+        return operationLogRepository.findAll(spec, pageable).map(this::toOperationLogDto);
+    }
+
+    private LoginLogDto toLoginLogDto(LoginLog log) {
+        LoginLogDto dto = new LoginLogDto();
+        dto.setId(log.getId());
+        dto.setUserId(log.getUserId());
+        dto.setLoginTime(log.getLoginTime());
+        dto.setIpAddress(log.getIpAddress());
+        dto.setUserAgent(log.getUserAgent());
+        dto.setStatus(log.getStatus().name());
+        dto.setFailureReason(log.getFailureReason());
+        return dto;
+    }
+
+    private OperationLogDto toOperationLogDto(OperationLog log) {
+        OperationLogDto dto = new OperationLogDto();
+        dto.setId(log.getId());
+        dto.setOperatorId(log.getOperatorId());
+        dto.setOperatorName(log.getOperatorName());
+        dto.setOperationTime(log.getOperationTime());
+        dto.setModule(log.getModule());
+        dto.setAction(log.getAction());
+        dto.setTargetId(log.getTargetId());
+        dto.setDetails(log.getDetails());
+        dto.setIpAddress(log.getIpAddress());
+        return dto;
     }
 }

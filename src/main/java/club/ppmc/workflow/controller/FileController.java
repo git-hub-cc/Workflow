@@ -16,7 +16,7 @@ import java.security.Principal;
 import java.util.List;
 
 /**
- * @author 你的名字
+ * @author cc
  * @description 处理文件上传和下载的控制器
  */
 @RestController

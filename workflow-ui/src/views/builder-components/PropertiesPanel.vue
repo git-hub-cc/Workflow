@@ -40,7 +40,6 @@ watch(localField, (newVal) => {
   }
 }, { deep: true });
 
-// 【修改】: 增加对新组件的映射
 const propertiesComponent = computed(() => {
   if (!localField.value || !localField.value.type) return null;
 
@@ -60,18 +59,19 @@ const propertiesComponent = computed(() => {
       return defineAsyncComponent(() => import('./props/FileUploadProps.vue'));
     case 'Subform':
       return defineAsyncComponent(() => import('./props/SubformProps.vue'));
-      // --- 【新增映射】 ---
     case 'DescriptionList':
       return defineAsyncComponent(() => import('./props/DescriptionListProps.vue'));
     case 'KeyValue':
       return defineAsyncComponent(() => import('./props/KeyValueProps.vue'));
     case 'IconPicker':
       return defineAsyncComponent(() => import('./props/IconPickerProps.vue'));
-    case 'TreeSelect': // 树形选择器复用通用配置面板
+    case 'TreeSelect':
       return defineAsyncComponent(() => import('./props/GenericProps.vue'));
+      // --- 【新增】 ---
+    case 'StaticText':
+      return defineAsyncComponent(() => import('./props/StaticTextProps.vue'));
       // --- 【新增结束】 ---
     default:
-      // 为所有其他标准字段创建一个通用属性组件
       return defineAsyncComponent(() => import('./props/GenericProps.vue'));
   }
 });

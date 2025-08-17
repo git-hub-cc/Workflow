@@ -8,7 +8,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * @author 你的名字
+ * @author cc
  * @description 用于前端组织架构树的数据传输对象
  */
 @Data

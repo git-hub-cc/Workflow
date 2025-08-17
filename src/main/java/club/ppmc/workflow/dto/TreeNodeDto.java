@@ -7,7 +7,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * @author 你的名字
+ * @author cc
  * @description 通用的树形节点数据传输对象, 用于前端 a-tree-select 组件
  */
 @Data

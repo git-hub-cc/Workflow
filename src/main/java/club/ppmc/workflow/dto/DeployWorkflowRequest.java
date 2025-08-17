@@ -3,7 +3,7 @@ package club.ppmc.workflow.dto;
 import lombok.Data;
 
 /**
- * @author 你的名字
+ * @author cc
  * @description 部署工作流的请求 DTO
  */
 @Data

@@ -4,16 +4,20 @@ import club.ppmc.workflow.dto.*;
 import club.ppmc.workflow.service.AdminService;
 import club.ppmc.workflow.service.UserService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 
 /**
- * @author 你的名字
+ * @author cc
  * @description 管理员相关的 RESTful API 控制器
  */
 @RestController
@@ -95,7 +99,7 @@ public class AdminController {
         return ResponseEntity.ok().build();
     }
 
-    // --- 角色管理 (新增) ---
+    // --- 角色管理 (新增与完善) ---
 
     /**
      * API: 创建一个新角色
@@ -113,7 +117,48 @@ public class AdminController {
     public ResponseEntity<List<RoleDto>> getAllRoles() {
         return ResponseEntity.ok(adminService.getAllRoles());
     }
-    // ... 可以添加更新和删除角色的端点 ...
+
+    /**
+     * API: 更新角色信息
+     */
+    @PutMapping("/roles/{id}")
+    public ResponseEntity<RoleDto> updateRole(@PathVariable Long id, @RequestBody RoleDto roleDto) {
+        return ResponseEntity.ok(adminService.updateRole(id, roleDto));
+    }
+
+    /**
+     * API: 删除角色
+     */
+    @DeleteMapping("/roles/{id}")
+    public ResponseEntity<Void> deleteRole(@PathVariable Long id) {
+        adminService.deleteRole(id);
+        return ResponseEntity.noContent().build();
+    }
+
+
+    // --- 【新增】用户组管理 ---
+
+    @PostMapping("/groups")
+    public ResponseEntity<UserGroupDto> createGroup(@RequestBody UserGroupDto groupDto) {
+        UserGroupDto createdGroup = adminService.createGroup(groupDto);
+        return new ResponseEntity<>(createdGroup, HttpStatus.CREATED);
+    }
+
+    @GetMapping("/groups")
+    public ResponseEntity<List<UserGroupDto>> getAllGroups() {
+        return ResponseEntity.ok(adminService.getAllGroups());
+    }
+
+    @PutMapping("/groups/{id}")
+    public ResponseEntity<UserGroupDto> updateGroup(@PathVariable Long id, @RequestBody UserGroupDto groupDto) {
+        return ResponseEntity.ok(adminService.updateGroup(id, groupDto));
+    }
+
+    @DeleteMapping("/groups/{id}")
+    public ResponseEntity<Void> deleteGroup(@PathVariable Long id) {
+        adminService.deleteGroup(id);
+        return ResponseEntity.noContent().build();
+    }
 
 
     // --- 组织架构与数据源 (保持不变) ---
@@ -131,5 +176,33 @@ public class AdminController {
             return ResponseEntity.ok(adminService.getDepartmentTree());
         }
         return ResponseEntity.badRequest().build();
+    }
+
+    // --- 【新增】日志管理 ---
+
+    /**
+     * API: 分页查询登录日志
+     */
+    @GetMapping("/logs/login")
+    public ResponseEntity<Page<LoginLogDto>> getLoginLogs(
+            @RequestParam(required = false) String userId,
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime startTime,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime endTime,
+            Pageable pageable) {
+        return ResponseEntity.ok(adminService.getLoginLogs(userId, status, startTime, endTime, pageable));
+    }
+
+    /**
+     * API: 分页查询操作日志
+     */
+    @GetMapping("/logs/operation")
+    public ResponseEntity<Page<OperationLogDto>> getOperationLogs(
+            @RequestParam(required = false) String operatorId,
+            @RequestParam(required = false) String module,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime startTime,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime endTime,
+            Pageable pageable) {
+        return ResponseEntity.ok(adminService.getOperationLogs(operatorId, module, startTime, endTime, pageable));
     }
 }

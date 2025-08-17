@@ -8,7 +8,7 @@ import java.util.HashSet;
 import java.util.Set;
 
 /**
- * @author 你的名字
+ * @author cc
  * @description 角色实体
  */
 @Entity

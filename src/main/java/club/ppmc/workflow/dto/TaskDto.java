@@ -4,7 +4,7 @@ import lombok.Data;
 import java.util.Date; // Camunda 的时间是 java.util.Date
 
 /**
- * @author 你的名字
+ * @author cc
  * @description 任务的数据传输对象
  */
 @Data

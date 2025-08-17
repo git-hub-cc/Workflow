@@ -7,7 +7,7 @@ import org.springframework.stereotype.Repository;
 import java.util.List;
 
 /**
- * @author 你的名字
+ * @author cc
  * @description FileAttachment 实体的 JPA Repository 接口
  */
 @Repository

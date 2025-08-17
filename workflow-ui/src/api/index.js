@@ -86,6 +86,7 @@ export const deployWorkflow = (data) => service.post('/workflows/deploy', data);
 export const getWorkflowTemplate = (formId) => service.get(`/workflows/templates?formId=${formId}`);
 export const getWorkflowHistory = (submissionId) => service.get(`/workflows/history/${submissionId}`);
 export const updateWorkflowTemplate = (formId, data) => service.put(`/workflows/templates/${formId}`, data);
+export const getGroupsForWorkflow = () => service.get('/workflows/groups');
 
 
 // --- 任务 API ---
@@ -98,17 +99,24 @@ export const getAllUsers = () => service.get('/workflows/users');
 export const changePassword = (data) => service.post('/users/me/change-password', data);
 export const getOrganizationTree = () => service.get('/admin/organization-tree');
 
-// Admin User Management (已更新)
+// Admin User Management
 export const createUser = (data) => service.post('/admin/users', data);
 export const updateUser = (id, data) => service.put(`/admin/users/${id}`, data);
-export const deleteUser = (id) => service.delete(`/admin/users/${id}`); // 后端已改为逻辑删除
+export const deleteUser = (id) => service.delete(`/admin/users/${id}`);
 export const resetPassword = (id) => service.post(`/admin/users/${id}/reset-password`);
 
-// --- 【新增】角色管理 API ---
+// --- 角色管理 API ---
 export const getRoles = () => service.get('/admin/roles');
 export const createRole = (data) => service.post('/admin/roles', data);
-// export const updateRole = (id, data) => service.put(`/admin/roles/${id}`, data);
-// export const deleteRole = (id) => service.delete(`/admin/roles/${id}`);
+export const updateRole = (id, data) => service.put(`/admin/roles/${id}`, data);
+export const deleteRole = (id) => service.delete(`/admin/roles/${id}`);
+
+
+// --- 用户组管理 API ---
+export const getGroups = () => service.get('/admin/groups');
+export const createGroup = (data) => service.post('/admin/groups', data);
+export const updateGroup = (id, data) => service.put(`/admin/groups/${id}`, data);
+export const deleteGroup = (id) => service.delete(`/admin/groups/${id}`);
 
 
 // Admin Instance Management
@@ -120,6 +128,24 @@ export const reassignTask = (taskId, newAssigneeId) => service.post(`/admin/task
 
 // Admin Dashboard
 export const getDashboardStats = () => service.get('/dashboard/stats');
+
+
+// --- 日志管理 API ---
+export const getLoginLogs = (params) => service.get('/admin/logs/login', { params });
+export const getOperationLogs = (params) => service.get('/admin/logs/operation', { params });
+
+// --- 【新增】表单导入 API ---
+export const importFromWord = (file) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    // 增加超时时间，因为后端解析可能需要一些时间
+    return service.post('/forms/import-word', formData, {
+        headers: {
+            'Content-Type': 'multipart/form-data'
+        },
+        timeout: 30000 // 30秒
+    });
+};
 
 
 export default service;

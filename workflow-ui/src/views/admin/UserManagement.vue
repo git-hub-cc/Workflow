@@ -1,6 +1,6 @@
 <template>
   <div class="page-container">
-    <a-page-header title="用户管理" sub-title="管理系统中的所有用户及其角色">
+    <a-page-header title="用户管理" sub-title="管理系统中的所有用户及其角色和用户组">
       <template #extra>
         <a-button type="primary" @click="showModal(null)">
           <template #icon><PlusOutlined /></template>
@@ -20,6 +20,11 @@
           <template v-if="column.key === 'roleNames'">
             <a-tag v-for="role in record.roleNames" :key="role" :color="getRoleColor(role)">
               {{ role }}
+            </a-tag>
+          </template>
+          <template v-else-if="column.key === 'groupNames'">
+            <a-tag v-for="group in record.groupNames" :key="group" color="blue">
+              {{ group }}
             </a-tag>
           </template>
           <template v-else-if="column.key === 'status'">
@@ -63,6 +68,7 @@
         @ok="handleOk"
         @cancel="handleCancel"
         width="600px"
+        destroyOnClose
     >
       <a-form :model="formState" :rules="rules" ref="formRef" layout="vertical">
         <a-row :gutter="16">
@@ -98,13 +104,23 @@
               />
             </a-form-item>
           </a-col>
-          <a-col :span="24">
+          <a-col :span="12">
             <a-form-item label="角色" name="roleNames">
               <a-select
                   v-model:value="formState.roleNames"
                   mode="multiple"
                   placeholder="请分配角色"
                   :options="userStore.allRoles.map(r => ({ label: `${r.name} (${r.description})`, value: r.name }))"
+              />
+            </a-form-item>
+          </a-col>
+          <a-col :span="12">
+            <a-form-item label="用户组" name="groupNames">
+              <a-select
+                  v-model:value="formState.groupNames"
+                  mode="multiple"
+                  placeholder="请分配用户组"
+                  :options="userStore.allGroups.map(g => ({ label: `${g.name} (${g.description})`, value: g.name }))"
               />
             </a-form-item>
           </a-col>
@@ -130,13 +146,13 @@ const orgTreeData = ref([]);
 const fetchInitialData = async () => {
   loading.value = true;
   try {
-    await Promise.all([
+    const promises = [
       userStore.allUsers.length === 0 ? userStore.fetchAllUsers() : Promise.resolve(),
       userStore.allRoles.length === 0 ? userStore.fetchAllRoles() : Promise.resolve(),
-      getOrganizationTree().then(data => {
-        orgTreeData.value = data;
-      })
-    ]);
+      userStore.allGroups.length === 0 ? userStore.fetchAllGroups() : Promise.resolve(),
+      getOrganizationTree().then(data => { orgTreeData.value = data; })
+    ];
+    await Promise.all(promises);
   } catch (error) {
     message.error("初始化页面数据失败");
   } finally {
@@ -174,12 +190,13 @@ const columns = [
   { title: '用户ID', dataIndex: 'id', key: 'id' },
   { title: '姓名', dataIndex: 'name', key: 'name' },
   { title: '角色', dataIndex: 'roleNames', key: 'roleNames' },
+  { title: '用户组', dataIndex: 'groupNames', key: 'groupNames' },
   { title: '状态', dataIndex: 'status', key: 'status', align: 'center' },
   { title: '直属上级', dataIndex: 'managerId', key: 'managerName', align: 'center' },
   { title: '操作', key: 'actions', align: 'center' },
 ];
 
-const getRoleColor = (role) => (role === 'ADMIN' ? 'gold' : 'blue');
+const getRoleColor = (role) => (role === 'ADMIN' ? 'gold' : 'purple');
 const getStatusColor = (status) => {
   if (status === 'ACTIVE') return 'success';
   if (status === 'INACTIVE') return 'default';
@@ -198,7 +215,12 @@ const modalConfirmLoading = ref(false);
 const isEditing = ref(false);
 const formRef = ref();
 const formState = reactive({
-  id: '', name: '', department: '', managerId: null, roleNames: [],
+  id: '',
+  name: '',
+  department: '',
+  managerId: null,
+  roleNames: [],
+  groupNames: [],
 });
 
 const rules = {
@@ -210,8 +232,6 @@ const rules = {
 const showModal = (user) => {
   if (user) {
     isEditing.value = true;
-    // The TreeSelect now uses the 'key' (e.g., 'user_jsmith') as its value.
-    // We need to construct this key from the raw managerId ('jsmith').
     const managerKey = user.managerId ? `user_${user.managerId}` : null;
     Object.assign(formState, { ...user, managerId: managerKey });
   } else {
@@ -221,10 +241,7 @@ const showModal = (user) => {
   modalVisible.value = true;
 };
 
-// --- 【FIX】: Refactored to remove dependency on deprecated `triggerNode` ---
 const handleManagerChange = (value) => {
-  // Only auto-fill department if a user is selected and the department is currently empty.
-  // We check the prefix of the `value` (which is the node's `key`) to determine its type.
   if (value && value.startsWith('user_') && !formState.department) {
     const findParent = (tree, childKey) => {
       for (const node of tree) {
@@ -246,8 +263,6 @@ const handleOk = async () => {
     await formRef.value.validate();
     modalConfirmLoading.value = true;
 
-    // The TreeSelect v-model now holds the 'key' (e.g., 'user_jsmith').
-    // We need to extract the raw ID ('jsmith') for the API.
     const rawManagerId = formState.managerId && formState.managerId.startsWith('user_')
         ? formState.managerId.substring(5)
         : null;
@@ -263,7 +278,6 @@ const handleOk = async () => {
       message.success('用户创建成功！');
     }
     modalVisible.value = false;
-    await fetchInitialData();
   } catch (error) {
     console.error('Form validation/submission failed:', error);
   } finally {
@@ -271,8 +285,20 @@ const handleOk = async () => {
   }
 };
 
-const handleCancel = () => modalVisible.value = false;
-const resetForm = () => { Object.assign(formState, { id: '', name: '', department: '', managerId: null, roleNames: [] }); formRef.value?.clearValidate(); };
+const handleCancel = () => {
+  modalVisible.value = false;
+};
+
+const resetForm = () => {
+  Object.assign(formState, {
+    id: '',
+    name: '',
+    department: '',
+    managerId: null,
+    roleNames: [],
+    groupNames: []
+  });
+};
 
 const handleDelete = (userId) => {
   Modal.confirm({

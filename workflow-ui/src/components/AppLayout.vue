@@ -30,9 +30,11 @@
                   <a-menu-item v-if="userStore.isAdmin" key="admin-users" @click="$router.push({ name: 'admin-users' })">
                     <TeamOutlined /> 用户管理
                   </a-menu-item>
-                  <!-- 【新增菜单项】 -->
                   <a-menu-item v-if="userStore.isAdmin" key="admin-roles" @click="$router.push({ name: 'admin-roles' })">
                     <SafetyCertificateOutlined /> 角色管理
+                  </a-menu-item>
+                  <a-menu-item v-if="userStore.isAdmin" key="admin-groups" @click="$router.push({ name: 'admin-groups' })">
+                    <UsergroupAddOutlined /> 用户组管理
                   </a-menu-item>
                   <a-menu-item v-if="userStore.isAdmin" key="admin-org-chart" @click="$router.push({ name: 'admin-org-chart' })">
                     <ApartmentOutlined /> 组织架构
@@ -40,6 +42,18 @@
                   <a-menu-item v-if="userStore.isAdmin" key="admin-instances" @click="$router.push({ name: 'admin-instances' })">
                     <NodeIndexOutlined /> 实例管理
                   </a-menu-item>
+                  <!-- 【新增日志管理菜单】 -->
+                  <a-sub-menu v-if="userStore.isAdmin" key="admin-logs">
+                    <template #title>
+                      <span>
+                        <FileSearchOutlined />
+                        <span>日志管理</span>
+                      </span>
+                    </template>
+                    <a-menu-item key="admin-login-log" @click="$router.push({ name: 'admin-login-log' })">登录日志</a-menu-item>
+                    <a-menu-item key="admin-operation-log" @click="$router.push({ name: 'admin-operation-log' })">操作日志</a-menu-item>
+                  </a-sub-menu>
+
                   <a-menu-divider />
                   <a-menu-item key="profile" @click="$router.push({ name: 'profile' })">
                     <UserOutlined /> 个人中心
@@ -75,8 +89,10 @@ import {
   DashboardOutlined,
   TeamOutlined,
   SafetyCertificateOutlined,
+  UsergroupAddOutlined,
   ApartmentOutlined,
   NodeIndexOutlined,
+  FileSearchOutlined, // 【新增图标】
   UserOutlined,
   LogoutOutlined
 } from '@ant-design/icons-vue';
@@ -98,7 +114,11 @@ const checkTasks = async () => {
 onMounted(() => {
   if (userStore.isAuthenticated) {
     userStore.fetchAllUsers();
-    if(userStore.isAdmin) userStore.fetchAllRoles();
+    // 【修改】为管理员预加载所有基础数据
+    if(userStore.isAdmin) {
+      userStore.fetchAllRoles();
+      userStore.fetchAllGroups();
+    }
     checkTasks();
   }
 });
@@ -143,7 +163,7 @@ const handleLogout = () => {
 .fade-leave-to {
   opacity: 0;
 }
-.ant-menu-item .anticon {
+.ant-menu-item .anticon, .ant-sub-menu-title .anticon {
   margin-right: 8px;
 }
 </style>
