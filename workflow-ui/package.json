@@ -9,6 +9,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@ant-design/icons-vue": "^7.0.1",
     "@bpmn-io/cm-theme": "^0.1.0-alpha.2",
     "@bpmn-io/properties-panel": "^3.32.0",
     "@vueup/vue-quill": "^1.2.0",

@@ -1,7 +1,9 @@
 package club.ppmc.workflow.service;
 
 import club.ppmc.workflow.domain.User;
+import club.ppmc.workflow.dto.DepartmentTreeNode;
 import club.ppmc.workflow.dto.ProcessInstanceDto;
+import club.ppmc.workflow.dto.TreeNodeDto; // 【新增】导入
 import club.ppmc.workflow.dto.UserDto;
 import club.ppmc.workflow.exception.ResourceNotFoundException;
 import club.ppmc.workflow.repository.UserRepository;
@@ -208,5 +210,101 @@ public class AdminService {
             dto.setManagerId(user.getManager().getId());
         }
         return dto;
+    }
+
+    /**
+     * 获取组织架构树 (用于Ant Design Tree)
+     * @return 部门和用户的树形结构列表
+     */
+    @Transactional(readOnly = true)
+    public List<DepartmentTreeNode> getOrganizationTree() {
+        List<User> allUsers = userRepository.findAll();
+
+        // 1. 按部门对所有用户进行分组
+        Map<String, List<User>> usersByDepartment = allUsers.stream()
+                .filter(user -> user.getDepartment() != null)
+                .collect(Collectors.groupingBy(User::getDepartment));
+
+        // 2. 提取所有唯一的部门名称，并为每个部门创建一个树节点
+        Map<String, DepartmentTreeNode> departmentNodeMap = usersByDepartment.keySet().stream()
+                .distinct()
+                .map(deptName -> {
+                    DepartmentTreeNode node = new DepartmentTreeNode();
+                    node.setTitle(deptName);
+                    node.setKey("dept_" + deptName); // 构造唯一的 key
+                    node.setValue(deptName);
+                    node.setType("department");
+                    node.setLeaf(false);
+                    return node;
+                })
+                .collect(Collectors.toMap(DepartmentTreeNode::getValue, Function.identity()));
+
+        // 3. 将用户作为叶子节点添加到对应的部门节点下
+        usersByDepartment.forEach((deptName, users) -> {
+            DepartmentTreeNode parentNode = departmentNodeMap.get(deptName);
+            if (parentNode != null) {
+                List<DepartmentTreeNode> userNodes = users.stream()
+                        .map(user -> {
+                            DepartmentTreeNode userNode = new DepartmentTreeNode();
+                            userNode.setTitle(user.getName() + " (" + user.getId() + ")");
+                            userNode.setKey("user_" + user.getId());
+                            userNode.setValue(user.getId());
+                            userNode.setType("user");
+                            userNode.setLeaf(true);
+                            return userNode;
+                        })
+                        .sorted(Comparator.comparing(DepartmentTreeNode::getTitle)) // 按姓名排序
+                        .collect(Collectors.toList());
+                parentNode.getChildren().addAll(userNodes);
+            }
+        });
+
+        // 4. 返回所有部门节点，并按部门名称排序
+        return departmentNodeMap.values().stream()
+                .sorted(Comparator.comparing(DepartmentTreeNode::getTitle))
+                .collect(Collectors.toList());
+    }
+
+    // --- 【新增方法】 ---
+    /**
+     * 获取部门-用户树形结构 (用于 a-tree-select)
+     * @return 符合 TreeNodeDto 结构的列表
+     */
+    @Transactional(readOnly = true)
+    public List<TreeNodeDto> getDepartmentTree() {
+        List<User> allUsers = userRepository.findAll();
+
+        Map<String, List<User>> usersByDepartment = allUsers.stream()
+                .filter(user -> user.getDepartment() != null)
+                .collect(Collectors.groupingBy(User::getDepartment));
+
+        return usersByDepartment.entrySet().stream()
+                .map(entry -> {
+                    String deptName = entry.getKey();
+                    List<User> usersInDept = entry.getValue();
+
+                    // 创建部门节点 (父节点)
+                    TreeNodeDto deptNode = new TreeNodeDto();
+                    deptNode.setTitle(deptName);
+                    deptNode.setValue("dept_" + deptName); // 部门节点的值是唯一的，但通常不可选
+                    deptNode.setKey("dept_" + deptName);
+
+                    // 创建用户节点 (子节点)
+                    List<TreeNodeDto> userNodes = usersInDept.stream()
+                            .map(user -> {
+                                TreeNodeDto userNode = new TreeNodeDto();
+                                userNode.setTitle(user.getName());
+                                userNode.setValue(user.getId()); // 用户节点的值是用户的ID
+                                userNode.setKey(user.getId());
+                                return userNode;
+                            })
+                            .sorted(Comparator.comparing(TreeNodeDto::getTitle))
+                            .collect(Collectors.toList());
+
+                    deptNode.setChildren(userNodes);
+                    return deptNode;
+                })
+                .sorted(Comparator.comparing(TreeNodeDto::getTitle))
+                .collect(Collectors.toList());
     }
 }

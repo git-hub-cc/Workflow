@@ -1,6 +1,8 @@
 package club.ppmc.workflow.controller;
 
+import club.ppmc.workflow.dto.DepartmentTreeNode;
 import club.ppmc.workflow.dto.ProcessInstanceDto;
+import club.ppmc.workflow.dto.TreeNodeDto; // 【新增】导入
 import club.ppmc.workflow.dto.UserDto;
 import club.ppmc.workflow.service.AdminService;
 import lombok.RequiredArgsConstructor;
@@ -104,5 +106,33 @@ public class AdminController {
     public ResponseEntity<Void> deleteUser(@PathVariable String id) {
         adminService.deleteUser(id);
         return ResponseEntity.noContent().build();
+    }
+
+    // --- 组织架构与数据源 ---
+    /**
+     * API: 获取组织架构树 (部门+用户, Ant Design Tree 使用)
+     * 权限: 已认证用户 (因为用户选择器所有人都可能用到)
+     */
+    @GetMapping("/organization-tree")
+    @PreAuthorize("isAuthenticated()") // 覆盖类级别的 'ADMIN' 限制
+    public ResponseEntity<List<DepartmentTreeNode>> getOrganizationTree() {
+        return ResponseEntity.ok(adminService.getOrganizationTree());
+    }
+
+    // --- 【新增API：用于树形选择器】 ---
+    /**
+     * API: 获取指定类型的树形结构数据
+     * @param source 数据源标识, 例如 "departments"
+     * @return 树形节点列表
+     */
+    @GetMapping("/tree-data-source")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<List<TreeNodeDto>> getTreeDataSource(@RequestParam String source) {
+        if ("departments".equalsIgnoreCase(source)) {
+            return ResponseEntity.ok(adminService.getDepartmentTree());
+        }
+        // 未来可以扩展其他数据源, 如商品分类等
+        // else if ("categories".equalsIgnoreCase(source)) { ... }
+        return ResponseEntity.badRequest().build();
     }
 }

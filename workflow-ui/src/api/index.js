@@ -57,8 +57,12 @@ export const createForm = (data) => service.post('/forms', data);
 export const getSubmissions = (formId) => service.get(`/forms/${formId}/submissions`);
 export const getSubmissionById = (submissionId) => service.get(`/forms/submissions/${submissionId}`);
 export const submitForm = (formId, data) => service.post(`/forms/${formId}/submissions`, data);
+export const fetchTableData = (url, params) => service.get(url, { params });
+// 【新增】获取树形数据
+export const fetchTreeData = (source) => service.get('/admin/tree-data-source', { params: { source } });
 
-// --- 【新增】文件 API ---
+
+// --- 文件 API ---
 export const uploadFile = (file) => {
     const formData = new FormData();
     formData.append('file', file);
@@ -87,6 +91,7 @@ export const completeTask = (taskId, data) => service.post(`/tasks/${taskId}/com
 // --- 用户和管理 API ---
 export const getAllUsers = () => service.get('/workflows/users');
 export const changePassword = (data) => service.post('/users/me/change-password', data);
+export const getOrganizationTree = () => service.get('/admin/organization-tree');
 
 // Admin User Management
 export const createUser = (data) => service.post('/admin/users', data);

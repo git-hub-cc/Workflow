@@ -33,10 +33,11 @@ const { modelValue } = toRefs(props);
 const fileList = ref([]);
 
 // 将 modelValue (父组件的附件列表) 同步到内部的 fileList
-watch(modelValue, (newVal) => {
-  if (newVal) {
-    fileList.value = newVal.map(file => ({
-      uid: file.id.toString(),
+watch(modelValue, (newVal, oldVal) => {
+  // 【修改】增加深度比较，防止不必要的重复渲染，特别是在表单数据频繁更新时
+  if (JSON.stringify(newVal) !== JSON.stringify(fileList.value.map(f => f.response))) {
+    fileList.value = (newVal || []).map(file => ({
+      uid: file.id.toString(), // uid 必须是 string
       name: file.originalFilename,
       status: 'done',
       response: file, // 存储完整的文件信息
@@ -57,11 +58,12 @@ const beforeUpload = (file) => {
 const handleUpload = async ({ file, onSuccess, onError }) => {
   try {
     const res = await uploadFile(file);
+    // 【修改】Ant Design Vue 4.x onSuccess 的第二个参数是文件对象
     onSuccess(res, file);
     message.success(`${file.name} 上传成功`);
 
     // 更新父组件的值
-    const newAttachments = [...modelValue.value, res];
+    const newAttachments = [...(modelValue.value || []), res];
     emit('update:modelValue', newAttachments);
 
   } catch (error) {
@@ -73,7 +75,8 @@ const handleUpload = async ({ file, onSuccess, onError }) => {
 const handleRemove = (file) => {
   const fileIdToRemove = file.response?.id;
   if (fileIdToRemove) {
-    const newAttachments = modelValue.value.filter(att => att.id !== fileIdToRemove);
+    const currentAttachments = modelValue.value || [];
+    const newAttachments = currentAttachments.filter(att => att.id !== fileIdToRemove);
     emit('update:modelValue', newAttachments);
   }
   return true; // 允许移除
