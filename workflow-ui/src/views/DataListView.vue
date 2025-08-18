@@ -51,7 +51,8 @@
             <a-button type="link" @click="goToDetail(record.id)">查看详情</a-button>
           </template>
           <template v-else>
-            {{ getRecordValue(record, column.dataIndex) }}
+            <!-- 【核心修改】从 record 中直接取值，因为后端返回的数据已包含 dataJson 的内容 -->
+            {{ record[column.dataIndex] }}
           </template>
         </template>
       </a-table>
@@ -66,7 +67,6 @@ import { getFormById, getSubmissions } from '@/api';
 import { message } from 'ant-design-vue';
 import { SearchOutlined, ReloadOutlined } from '@ant-design/icons-vue';
 import { flattenFields } from '@/utils/formUtils.js';
-// --- 【核心修改】引入 usePaginatedFetch hook ---
 import { usePaginatedFetch } from '@/composables/usePaginatedFetch.js';
 
 const route = useRoute();
@@ -74,10 +74,13 @@ const router = useRouter();
 
 const pageTitle = ref(route.meta.title || '数据列表');
 const formId = ref(route.meta.formId);
+const menuId = ref(route.meta.menuId); // 【新增】获取 menuId
 const formDefinition = ref(null);
 const filterConfig = ref([]);
 
-// --- 【核心修改】使用 hook 管理表格数据和状态 ---
+// 【核心修改】更新 API 调用函数，传递 menuId
+const apiFunction = (params) => getSubmissions(formId.value, { ...params, menuId: menuId.value });
+
 const {
   loading,
   dataSource,
@@ -88,21 +91,32 @@ const {
   handleReset,
   fetchData,
 } = usePaginatedFetch(
-    (params) => getSubmissions(formId.value, params),
-    {}, // 初始筛选条件为空，将在 initialize 中动态设置
+    apiFunction,
+    {},
     { defaultSort: 'createdAt,desc' }
 );
 
 // 动态生成表格列
 const columns = computed(() => {
+  if (!formDefinition.value) return [];
+  const allFields = flattenFields(formDefinition.value.schema.fields);
+
   const baseColumns = [
     { title: '提交人', dataIndex: 'submitterName', key: 'submitterName', width: 120 },
     { title: '流程状态', dataIndex: 'workflowStatus', key: 'workflowStatus', width: 120, align: 'center' },
   ];
-  const dynamicColumns = (formDefinition.value?.schema.fields || []).slice(0, 4)
+
+  // 动态列现在从 dataJson 中提取
+  const dynamicColumns = allFields
+      .filter(f => !['GridRow', 'GridCol', 'Collapse', 'StaticText', 'RichText', 'Subform'].includes(f.type)) // 过滤掉不适合在表格中展示的组件
+      .slice(0, 4) // 最多显示4个动态列
       .map(field => ({
-        title: field.label, dataIndex: field.id, key: field.id, ellipsis: true,
+        title: field.label,
+        dataIndex: field.id, // dataIndex 直接使用字段 ID
+        key: field.id,
+        ellipsis: true,
       }));
+
   const finalColumns = [
     { title: '提交时间', dataIndex: 'createdAt', key: 'createdAt', width: 180, sorter: true },
     { title: '操作', key: 'actions', width: 120, align: 'center' },
@@ -121,44 +135,44 @@ const initialize = async () => {
     res.schema = JSON.parse(res.schemaJson);
     formDefinition.value = res;
 
+    // 动态设置筛选条件
     const allFields = flattenFields(res.schema.fields);
     filterConfig.value = allFields.filter(f => ['Input', 'Select', 'DatePicker'].includes(f.type)).slice(0, 2);
-    // 动态设置 hook 的筛选条件
     filterConfig.value.forEach(f => {
       if (!(f.id in filterState)) {
         filterState[f.id] = undefined;
       }
     });
 
-    // 解析后的数据源包含 dataJson 的内容
-    dataSource.value.forEach(s => Object.assign(s, JSON.parse(s.dataJson)));
-
     await fetchData();
+
   } catch (error) {
     message.error("初始化页面失败");
   }
 };
 
-// 监听路由变化，以便在同一个组件实例中切换不同菜单
+// 监听路由元信息变化，支持在同一组件实例中切换不同菜单
 watch(() => route.meta, (newMeta) => {
-  if (newMeta && newMeta.formId && newMeta.formId !== formId.value) {
+  if (newMeta && newMeta.menuId && newMeta.menuId !== menuId.value) {
     pageTitle.value = newMeta.title;
     formId.value = newMeta.formId;
-    handleReset();
-    initialize();
+    menuId.value = newMeta.menuId;
+    handleReset(); // 重置筛选条件
+    initialize();   // 重新初始化页面
   }
 }, { immediate: true });
 
-onMounted(initialize);
+onMounted(() => {
+  // watch 的 immediate: true 已经会调用一次 initialize
+});
 
 const goToDetail = (submissionId) => {
   router.push({ name: 'submission-detail', params: { submissionId } });
 };
 
-// --- Helper Functions ---
+// Helper Functions
 const getComponentByType = (type) => ({ 'Input': 'a-input', 'DatePicker': 'a-date-picker' }[type] || 'a-input');
 const getStatusColor = (status) => ({ '审批中': 'processing', '已通过': 'success', '已拒绝': 'error' }[status] || 'default');
-const getRecordValue = (record, dataIndex) => record[dataIndex];
 </script>
 
 <style scoped>

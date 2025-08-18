@@ -13,10 +13,13 @@ public class UserDto {
     private String id;
     private String name;
     private String managerId;
-    private String department;
 
-    // --- 【新增与修改】 ---
+    // --- 【核心修改】将 department 字符串改为 departmentId 和 departmentName ---
+    private Long departmentId;
+    private String departmentName;
+    // --- 【修改结束】 ---
+
     private String status;
-    private List<String> roleNames; // 角色名称列表
-    private List<String> groupNames; // 用户组名称列表
+    private List<String> roleNames;
+    private List<String> groupNames;
 }

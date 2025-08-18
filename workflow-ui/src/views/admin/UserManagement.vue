@@ -82,11 +82,19 @@
               <a-input v-model:value="formState.name" />
             </a-form-item>
           </a-col>
+
           <a-col :span="12">
-            <a-form-item label="部门" name="department">
-              <a-input v-model:value="formState.department" />
+            <a-form-item label="部门" name="departmentId">
+              <a-tree-select
+                  v-model:value="formState.departmentId"
+                  :tree-data="departmentTree"
+                  placeholder="请选择所属部门"
+                  tree-default-expand-all
+                  allow-clear
+              />
             </a-form-item>
           </a-col>
+
           <a-col :span="12">
             <a-form-item label="直属上级" name="managerId">
               <a-tree-select
@@ -100,7 +108,6 @@
                   :tree-data="orgTreeDataForSelector"
                   :field-names="{ children: 'children', label: 'title', value: 'key' }"
                   :tree-node-filter-prop="'title'"
-                  @change="handleManagerChange"
               />
             </a-form-item>
           </a-col>
@@ -134,13 +141,15 @@
 <script setup>
 import { ref, reactive, onMounted, computed } from 'vue';
 import { useUserStore } from '@/stores/user';
-import { createUser, updateUser, deleteUser, resetPassword, getOrganizationTree } from '@/api';
+import { createUser, updateUser, deleteUser, resetPassword, getOrganizationTree, getDepartmentTree } from '@/api';
 import { message, Modal } from 'ant-design-vue';
 import { PlusOutlined, DownOutlined, EditOutlined, ReloadOutlined, UserDeleteOutlined } from '@ant-design/icons-vue';
 
 const userStore = useUserStore();
 const loading = ref(false);
 const orgTreeData = ref([]);
+const departmentTree = ref([]);
+
 
 const fetchInitialData = async () => {
   loading.value = true;
@@ -149,7 +158,8 @@ const fetchInitialData = async () => {
       userStore.usersForManagement.length === 0 ? userStore.fetchUsersForManagement() : Promise.resolve(),
       userStore.allRoles.length === 0 ? userStore.fetchAllRoles() : Promise.resolve(),
       userStore.allGroups.length === 0 ? userStore.fetchAllGroups() : Promise.resolve(),
-      getOrganizationTree().then(data => { orgTreeData.value = data; })
+      getOrganizationTree().then(data => { orgTreeData.value = data; }),
+      getDepartmentTree().then(data => { departmentTree.value = transformDeptTree(data); })
     ];
     await Promise.all(promises);
   } catch (error) {
@@ -160,6 +170,15 @@ const fetchInitialData = async () => {
 };
 
 onMounted(fetchInitialData);
+
+const transformDeptTree = (nodes) => {
+  return nodes.map(node => ({
+    title: node.name,
+    value: node.id,
+    key: node.id,
+    children: node.children ? transformDeptTree(node.children) : []
+  }));
+};
 
 const orgTreeDataForSelector = computed(() => {
   const currentUserId = isEditing.value ? formState.id : null;
@@ -186,6 +205,7 @@ const orgTreeDataForSelector = computed(() => {
 const columns = [
   { title: '用户ID', dataIndex: 'id', key: 'id' },
   { title: '姓名', dataIndex: 'name', key: 'name' },
+  { title: '部门', dataIndex: 'departmentName', key: 'departmentName' },
   { title: '角色', dataIndex: 'roleNames', key: 'roleNames' },
   { title: '用户组', dataIndex: 'groupNames', key: 'groupNames' },
   { title: '状态', dataIndex: 'status', key: 'status', align: 'center' },
@@ -203,8 +223,7 @@ const getStatusColor = (status) => {
 const getStatusText = (status) => ({ ACTIVE: '正常', INACTIVE: '禁用', LOCKED: '锁定' }[status] || '未知');
 const getManagerName = (managerId) => {
   if (!managerId) return '-';
-  // 【状态管理修复】从 picker 列表（轻量级）中查找，提高效率
-  const manager = userStore.usersForPicker.find(u => u.id === managerId);
+  const manager = userStore.usersForManagement.find(u => u.id === managerId);
   return manager ? manager.name : managerId;
 };
 
@@ -215,7 +234,7 @@ const formRef = ref();
 const formState = reactive({
   id: '',
   name: '',
-  department: '',
+  departmentId: null,
   managerId: null,
   roleNames: [],
   groupNames: [],
@@ -239,23 +258,6 @@ const showModal = (user) => {
   modalVisible.value = true;
 };
 
-const handleManagerChange = (value) => {
-  if (value && value.startsWith('user_') && !formState.department) {
-    const findParent = (tree, childKey) => {
-      for (const node of tree) {
-        if (node.children?.some(child => child.key === childKey)) {
-          return node;
-        }
-      }
-      return null;
-    };
-    const deptNode = findParent(orgTreeData.value, value);
-    if (deptNode) {
-      formState.department = deptNode.title;
-    }
-  }
-};
-
 const handleOk = async () => {
   try {
     await formRef.value.validate();
@@ -274,9 +276,8 @@ const handleOk = async () => {
       message.success('用户创建成功！');
     }
     modalVisible.value = false;
-    // --- 【状态管理修复】统一调用Store的Action来刷新数据 ---
     await userStore.fetchUsersForManagement();
-    await userStore.fetchUsersForPicker(); // 同样刷新选择器列表
+    await userStore.fetchUsersForPicker();
   } catch (error) {
     console.error('Form validation/submission failed:', error);
   } finally {
@@ -290,7 +291,7 @@ const handleCancel = () => {
 
 const resetForm = () => {
   Object.assign(formState, {
-    id: '', name: '', department: '', managerId: null, roleNames: [], groupNames: []
+    id: '', name: '', departmentId: null, managerId: null, roleNames: [], groupNames: []
   });
 };
 
@@ -305,7 +306,6 @@ const handleDelete = (userId) => {
       try {
         await deleteUser(userId);
         message.success('用户禁用成功！');
-        // --- 【状态管理修复】统一调用Store的Action来刷新数据 ---
         await userStore.fetchUsersForManagement();
       } catch (error) {}
     },

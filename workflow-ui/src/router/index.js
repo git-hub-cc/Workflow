@@ -3,7 +3,7 @@ import AppLayout from '@/components/AppLayout.vue';
 import { useUserStore } from '@/stores/user';
 import { message } from "ant-design-vue";
 
-// --- 1. 静态路由定义 (保持不变) ---
+// --- 1. 静态路由定义 ---
 const staticRoutes = [
     {
         path: '/login',
@@ -19,7 +19,7 @@ const staticRoutes = [
         children: [
             // 基础页面
             { path: '', name: 'home', component: () => import('../views/Home.vue'), meta: { title: '首页' } },
-            { path: 'profile', name: 'profile', component: () => import('../views/Profile.vue'), meta: { title: '个人中心' } },
+            { path: 'profile', name: 'profile', component: () => import('../views/Profile.vue'), meta: { title: '个人设置' } },
             // 管理员专属的静态页面
             { path: 'admin/dashboard', name: 'admin-dashboard', component: () => import('../views/admin/Dashboard.vue'), meta: { title: '仪表盘', requiresAdmin: true } },
             { path: 'admin/forms', name: 'admin-forms', component: () => import('../views/admin/FormManagement.vue'), meta: { title: '表单管理', requiresAdmin: true } },
@@ -28,7 +28,10 @@ const staticRoutes = [
             { path: 'admin/groups', name: 'admin-groups', component: () => import('../views/admin/UserGroupManagement.vue'), meta: { title: '用户组管理', requiresAdmin: true } },
             { path: 'admin/menus', name: 'admin-menus', component: () => import('../views/admin/MenuManagement.vue'), meta: { title: '菜单管理', requiresAdmin: true } },
             { path: 'admin/instances', name: 'admin-instances', component: () => import('../views/admin/InstanceManagement.vue'), meta: { title: '实例管理', requiresAdmin: true } },
-            { path: 'admin/org-chart', name: 'admin-org-chart', component: () => import('../views/admin/OrganizationChart.vue'), meta: { title: '组织架构', requiresAdmin: true } },
+            // 【核心修改】组织架构路由现在指向可视化图表页
+            { path: 'admin/org-chart', name: 'admin-org-chart', component: () => import('../views/admin/OrganizationChart.vue'), meta: { title: '组织架构图', requiresAdmin: true } },
+            // 【核心新增】新增组织架构管理页面的路由
+            { path: 'admin/org-management', name: 'admin-org-management', component: () => import('../views/admin/OrganizationManagement.vue'), meta: { title: '组织架构管理', requiresAdmin: true } },
             { path: 'admin/logs/login', name: 'admin-login-log', component: () => import('../views/admin/LoginLog.vue'), meta: { title: '登录日志', requiresAdmin: true } },
             { path: 'admin/logs/operation', name: 'admin-operation-log', component: () => import('../views/admin/OperationLog.vue'), meta: { title: '操作日志', requiresAdmin: true } },
             // 固定的表单/流程/任务相关页面
@@ -38,6 +41,7 @@ const staticRoutes = [
             { path: 'workflow/designer/:formId', name: 'workflow-designer', component: () => import('../views/WorkflowDesigner.vue'), props: true, meta: { title: '流程设计器', requiresAdmin: true } },
             { path: 'tasks', name: 'task-list', component: () => import('../views/TaskList.vue'), meta: { title: '我的待办' } },
             { path: 'tasks/:taskId', name: 'task-detail', component: () => import('../views/TaskDetail.vue'), props: true, meta: { title: '任务处理' } },
+            { path: 'my-submissions', name: 'my-submissions', component: () => import('../views/MySubmissions.vue'), meta: { title: '我的申请' } },
         ]
     }
 ];
@@ -94,30 +98,25 @@ export function resetRouter() {
     router.matcher = newRouter.matcher;
 }
 
-// --- 5. 全局导航守卫 (核心修改) ---
+// --- 5. 全局导航守卫 (保持不变) ---
 router.beforeEach(async (to, from, next) => {
     document.title = to.meta.title || '表单工作流引擎';
     const userStore = useUserStore();
 
-    // 检查1: 未登录用户访问需要认证的页面 -> 跳转登录页
     if (to.meta.requiresAuth && !userStore.isAuthenticated) {
         next({ name: 'login' });
     }
-    // 检查2: 已登录用户访问登录页 -> 跳转首页
     else if (to.name === 'login' && userStore.isAuthenticated) {
         next({ name: 'home' });
     }
-    // 检查3: 非管理员访问管理员页面 -> 提示并跳转首页
     else if (to.meta.requiresAdmin && !userStore.isAdmin) {
         message.warn('您没有权限访问此页面');
         next({ name: 'home' });
     }
-    // 检查4: 需要强制修改密码的用户访问非个人中心页面 -> 提示并跳转个人中心
     else if (userStore.isAuthenticated && userStore.passwordChangeRequired && to.name !== 'profile') {
         message.warn('为了您的账户安全，请先修改初始密码。');
         next({ name: 'profile' });
     }
-    // 所有检查通过
     else {
         next();
     }

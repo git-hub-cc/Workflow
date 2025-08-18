@@ -4,12 +4,13 @@ import club.ppmc.workflow.dto.CompleteTaskRequest;
 import club.ppmc.workflow.dto.TaskDto;
 import club.ppmc.workflow.service.WorkflowService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.security.Principal;
-import java.util.List;
 
 /**
  * @author cc
@@ -24,13 +25,16 @@ public class TaskController {
     private final WorkflowService workflowService;
 
     /**
-     * API: 获取当前登录用户的待办任务列表
+     * 【核心修改】API: 获取当前登录用户的待办任务列表，支持分页和搜索
      * 权限: 已认证用户
      */
     @GetMapping("/pending")
-    public ResponseEntity<List<TaskDto>> getPendingTasks(Principal principal) {
+    public ResponseEntity<Page<TaskDto>> getPendingTasks(
+            Principal principal,
+            @RequestParam(required = false) String keyword,
+            Pageable pageable) {
         String assigneeId = principal.getName();
-        List<TaskDto> tasks = workflowService.getPendingTasksForUser(assigneeId);
+        Page<TaskDto> tasks = workflowService.getPendingTasksForUser(assigneeId, keyword, pageable);
         return ResponseEntity.ok(tasks);
     }
 

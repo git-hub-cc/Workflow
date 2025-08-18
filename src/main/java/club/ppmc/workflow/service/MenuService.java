@@ -1,9 +1,6 @@
 package club.ppmc.workflow.service;
 
-import club.ppmc.workflow.domain.FormDefinition;
-import club.ppmc.workflow.domain.Menu;
-import club.ppmc.workflow.domain.Role;
-import club.ppmc.workflow.domain.User;
+import club.ppmc.workflow.domain.*;
 import club.ppmc.workflow.dto.MenuDto;
 import club.ppmc.workflow.exception.ResourceNotFoundException;
 import club.ppmc.workflow.repository.FormDefinitionRepository;
@@ -14,6 +11,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.CollectionUtils;
+import org.springframework.util.StringUtils;
 
 import java.util.*;
 import java.util.function.Function;
@@ -95,6 +93,12 @@ public class MenuService {
         existingMenu.setOrderNum(menuDto.getOrderNum());
         existingMenu.setVisible(menuDto.isVisible());
         existingMenu.setParentId(menuDto.getParentId());
+        // --- 【核心修改】更新数据范围 ---
+        if (StringUtils.hasText(menuDto.getDataScope())) {
+            existingMenu.setDataScope(DataScope.valueOf(menuDto.getDataScope()));
+        } else {
+            existingMenu.setDataScope(null);
+        }
 
         // 更新关联的表单
         if (menuDto.getFormDefinitionId() != null) {
@@ -174,6 +178,11 @@ public class MenuService {
         entity.setOrderNum(dto.getOrderNum());
         entity.setVisible(dto.isVisible());
 
+        // --- 【核心修改】处理数据范围 ---
+        if (StringUtils.hasText(dto.getDataScope())) {
+            entity.setDataScope(DataScope.valueOf(dto.getDataScope()));
+        }
+
         if (dto.getFormDefinitionId() != null) {
             FormDefinition formDef = formDefinitionRepository.findById(dto.getFormDefinitionId())
                     .orElseThrow(() -> new ResourceNotFoundException("未找到关联的表单定义ID: " + dto.getFormDefinitionId()));
@@ -199,6 +208,11 @@ public class MenuService {
         dto.setComponentPath(entity.getComponentPath());
         dto.setOrderNum(entity.getOrderNum());
         dto.setVisible(entity.isVisible());
+
+        // --- 【核心修改】处理数据范围 ---
+        if (entity.getDataScope() != null) {
+            dto.setDataScope(entity.getDataScope().name());
+        }
 
         if (entity.getFormDefinition() != null) {
             dto.setFormDefinitionId(entity.getFormDefinition().getId());

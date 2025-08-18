@@ -1,63 +1,93 @@
 <template>
   <div class="page-container">
     <a-page-header title="我的待办任务" />
-    <div style="padding: 0 24px;">
-      <!-- 条件渲染：加载完成且列表为空时，显示 a-empty -->
-      <div v-if="!loading && tasks.length === 0" style="text-align: center; margin: 24px 0;">
-        <a-empty description="恭喜！您当前没有待办任务。" />
-      </div>
-      <!-- 条件渲染：列表有数据或正在加载时，显示 a-list -->
-      <a-list
-          v-else
-          :data-source="tasks"
+    <div style="padding: 24px;">
+      <!-- 【核心新增】搜索区域 -->
+      <a-card :bordered="false" style="margin-bottom: 24px;">
+        <a-form :model="filterState" layout="inline">
+          <a-form-item label="关键字">
+            <a-input v-model:value="filterState.keyword" placeholder="按表单名称或提交人搜索" allow-clear />
+          </a-form-item>
+          <a-form-item>
+            <a-space>
+              <a-button type="primary" @click="handleSearch">
+                <template #icon><SearchOutlined /></template>
+                查询
+              </a-button>
+              <a-button @click="handleReset">
+                <template #icon><ReloadOutlined /></template>
+                重置
+              </a-button>
+            </a-space>
+          </a-form-item>
+        </a-form>
+      </a-card>
+
+      <!-- 【核心修改】将 a-list 替换为 a-table -->
+      <a-table
+          :columns="columns"
+          :data-source="dataSource"
           :loading="loading"
-          item-layout="horizontal"
+          :pagination="pagination"
+          row-key="camundaTaskId"
+          @change="handleTableChange"
       >
-        <template #renderItem="{ item }">
-          <a-list-item>
-            <a-list-item-meta>
-              <template #title>
-                <a @click="goToTaskDetail(item.camundaTaskId)">{{ item.formName }} - {{ item.stepName }}</a>
-              </template>
-              <template #description>
-                <span>提交人: {{ item.submitterName || '未知' }} | 到达时间: {{ new Date(item.createdAt).toLocaleString() }}</span>
-              </template>
-              <template #avatar>
-                <a-tag v-if="isRejectedTask(item)" color="error">待修改</a-tag>
-                <a-tag v-else color="processing">待处理</a-tag>
-              </template>
-            </a-list-item-meta>
-            <template #actions>
-              <a-button type="primary" @click="goToTaskDetail(item.camundaTaskId)">去处理</a-button>
-            </template>
-          </a-list-item>
+        <template #bodyCell="{ column, record }">
+          <template v-if="column.key === 'taskName'">
+            <a @click="goToTaskDetail(record.camundaTaskId)">{{ record.formName }} - {{ record.stepName }}</a>
+          </template>
+          <template v-else-if="column.key === 'createdAt'">
+            {{ new Date(record.createdAt).toLocaleString() }}
+          </template>
+          <template v-else-if="column.key === 'statusTag'">
+            <a-tag v-if="isRejectedTask(record)" color="error">待修改</a-tag>
+            <a-tag v-else color="processing">待处理</a-tag>
+          </template>
+          <template v-else-if="column.key === 'actions'">
+            <a-button type="primary" @click="goToTaskDetail(record.camundaTaskId)">去处理</a-button>
+          </template>
         </template>
-      </a-list>
+      </a-table>
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue';
+import { onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { getPendingTasks } from '@/api';
+import { usePaginatedFetch } from '@/composables/usePaginatedFetch.js';
+import { SearchOutlined, ReloadOutlined } from '@ant-design/icons-vue';
 
 const router = useRouter();
-const loading = ref(true);
-const tasks = ref([]);
 
-onMounted(async () => {
-  try {
-    tasks.value = await getPendingTasks();
-  } catch (error) {
-    // 错误已全局处理
-  } finally {
-    loading.value = false;
-  }
-});
+// 【核心修改】使用 usePaginatedFetch hook
+const {
+  loading,
+  dataSource,
+  pagination,
+  filterState,
+  handleTableChange,
+  handleSearch,
+  handleReset,
+  fetchData,
+} = usePaginatedFetch(
+    getPendingTasks,
+    { keyword: '' },
+    // Camunda Task Query 不直接支持按 createTime 排序，故不设置默认排序
+);
+
+const columns = [
+  { title: '任务名称', key: 'taskName' },
+  { title: '提交人', dataIndex: 'submitterName', key: 'submitterName', width: 150 },
+  { title: '到达时间', dataIndex: 'createdAt', key: 'createdAt', width: 200 },
+  { title: '状态', key: 'statusTag', align: 'center', width: 100 },
+  { title: '操作', key: 'actions', align: 'center', width: 120 },
+];
+
+onMounted(fetchData);
 
 const isRejectedTask = (task) => {
-  // 简单约定：如果任务名包含“修改”或“调整”，则认为是驳回任务
   return task.stepName.includes('修改') || task.stepName.includes('调整');
 };
 

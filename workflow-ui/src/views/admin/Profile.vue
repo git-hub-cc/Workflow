@@ -1,7 +1,7 @@
 
 <template>
   <div class="page-container">
-    <a-page-header title="个人中心" />
+    <a-page-header title="个人设置" />
     <div style="padding: 24px; max-width: 600px; margin: auto;">
       <a-card title="修改密码">
         <a-form

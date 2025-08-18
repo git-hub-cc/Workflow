@@ -1,7 +1,9 @@
 package club.ppmc.workflow;
 
+import club.ppmc.workflow.domain.Department;
 import club.ppmc.workflow.domain.Role;
 import club.ppmc.workflow.domain.User;
+import club.ppmc.workflow.repository.DepartmentRepository;
 import club.ppmc.workflow.repository.RoleRepository;
 import club.ppmc.workflow.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -13,9 +15,12 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.scheduling.annotation.EnableAsync;
 import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * @author cc
@@ -25,7 +30,6 @@ import java.util.Set;
 @RequiredArgsConstructor
 @EnableProcessApplication
 @EnableAsync
-// --- 【数据不一致修复】启用定时任务功能，用于文件清理服务 ---
 @EnableScheduling
 public class WorkflowApplication {
 
@@ -36,11 +40,11 @@ public class WorkflowApplication {
     }
 
     @Bean
-    public CommandLineRunner initData(UserRepository userRepository, RoleRepository roleRepository) {
+    @Transactional
+    public CommandLineRunner initData(UserRepository userRepository, RoleRepository roleRepository, DepartmentRepository departmentRepository) {
         return args -> {
             System.out.println("正在初始化演示用户及角色数据...");
 
-            // --- 【核心修改：先初始化角色】 ---
             // 1. 创建并保存角色
             Role adminRole = new Role();
             adminRole.setName("ADMIN");
@@ -57,29 +61,43 @@ public class WorkflowApplication {
             financeRole.setDescription("财务审批员");
             roleRepository.save(financeRole);
 
-            // 2. 创建用户并分配角色
+            // --- 【核心新增：创建部门】 ---
+            Department itDept = new Department();
+            itDept.setName("IT部");
+            departmentRepository.save(itDept);
+
+            Department financeDept = new Department();
+            financeDept.setName("财务部");
+            departmentRepository.save(financeDept);
+
+            Department rdDept = new Department();
+            rdDept.setName("研发部");
+            departmentRepository.save(rdDept);
+
+
+            // 2. 创建用户并分配角色和部门
             String defaultPassword = passwordEncoder.encode("password");
 
             User admin = new User();
             admin.setId("admin");
             admin.setName("系统管理员");
-            admin.setDepartment("IT部");
+            admin.setDepartment(itDept); // 关联部门实体
             admin.setPassword(passwordEncoder.encode("admin"));
-            admin.setRoles(Set.of(adminRole, userRole)); // 管理员同时也是一个用户
+            admin.setRoles(Set.of(adminRole, userRole));
             userRepository.save(admin);
 
             User user3 = new User(); // 财务总监-王五
             user3.setId("hr001");
             user3.setName("财务总监-王五");
-            user3.setDepartment("财务部");
+            user3.setDepartment(financeDept); // 关联部门实体
             user3.setPassword(defaultPassword);
-            user3.setRoles(Set.of(userRole, financeRole)); // 王五是普通用户，也是财务审批员
+            user3.setRoles(Set.of(userRole, financeRole));
             userRepository.save(user3);
 
             User user2 = new User(); // 部门经理-李四
             user2.setId("manager001");
             user2.setName("研发部经理-李四");
-            user2.setDepartment("研发部");
+            user2.setDepartment(rdDept); // 关联部门实体
             user2.setPassword(defaultPassword);
             user2.setRoles(Set.of(userRole));
             user2.setManager(user3); // 李四的上级是王五
@@ -88,17 +106,56 @@ public class WorkflowApplication {
             User user1 = new User(); // 普通员工-张三
             user1.setId("user001");
             user1.setName("研发工程师-张三");
-            user1.setDepartment("研发部");
+            user1.setDepartment(rdDept); // 关联部门实体
             user1.setPassword(defaultPassword);
             user1.setRoles(Set.of(userRole));
             user1.setManager(user2); // 张三的上级是李四
             userRepository.save(user1);
-            // --- 【修改结束】 ---
 
-            System.out.println("演示用户和角色数据初始化完成！");
-            System.out.println("已创建角色: ADMIN, USER, FINANCE_APPROVER");
-            System.out.println("已设置 'user001' 的上级为 'manager001'");
-            System.out.println("已设置 'manager001' 的上级为 'hr001'");
+            System.out.println("演示用户、角色和部门数据初始化完成！");
+        };
+    }
+
+    /**
+     * 【重要】这是一个数据迁移的示例。
+     * 如果您是从旧版本（使用 department 字符串）升级，可以临时启用此 Bean 来迁移数据。
+     * 迁移完成后应将其注释或删除。
+     */
+    // @Bean
+    @Transactional
+    public CommandLineRunner migrateDepartmentData(UserRepository userRepository, DepartmentRepository departmentRepository) {
+        return args -> {
+            System.out.println("【数据迁移】开始将用户的 department 字符串迁移到 Department 实体...");
+
+            List<User> allUsers = userRepository.findAll();
+            // 1. 找出所有唯一的部门名称
+            Set<String> departmentNames = allUsers.stream()
+                    .map(User::getDepartmentName) // 假设您临时在User实体中添加一个getDepartmentName()来获取旧的字符串值
+                    .filter(name -> name != null && !name.isEmpty())
+                    .collect(Collectors.toSet());
+
+            // 2. 为每个部门名称创建 Department 实体
+            Map<String, Department> departmentMap = departmentNames.stream()
+                    .map(name -> {
+                        Department dept = new Department();
+                        dept.setName(name);
+                        return departmentRepository.save(dept);
+                    })
+                    .collect(Collectors.toMap(Department::getName, dept -> dept));
+
+            System.out.println("【数据迁移】创建了 " + departmentMap.size() + " 个部门实体。");
+
+            // 3. 更新所有用户的 department 关联
+            for (User user : allUsers) {
+                String deptName = user.getDepartmentName();
+                if (deptName != null && departmentMap.containsKey(deptName)) {
+                    user.setDepartment(departmentMap.get(deptName));
+                }
+            }
+            userRepository.saveAll(allUsers);
+
+            System.out.println("【数据迁移】所有用户已成功关联到新的 Department 实体。迁移完成！");
+            System.out.println("【注意】现在可以安全地从 User 实体中移除旧的 department 字符串字段，并删除此迁移 Bean。");
         };
     }
 }

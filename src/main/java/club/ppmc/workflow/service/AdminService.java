@@ -49,8 +49,10 @@ public class AdminService {
     private final LoginLogRepository loginLogRepository;
     private final OperationLogRepository operationLogRepository;
     private final MenuService menuService;
-    // --- 【新增依赖】 ---
     private final WorkflowTemplateRepository workflowTemplateRepository;
+    // --- 【核心新增】 ---
+    private final DepartmentRepository departmentRepository;
+    private final DepartmentService departmentService;
 
     // --- 流程实例管理 ---
     public List<ProcessInstanceDto> getActiveProcessInstances() {
@@ -139,11 +141,6 @@ public class AdminService {
 
 
     // --- 用户管理 ---
-
-    /**
-     * 获取所有用户列表，用于管理页面
-     * @return 包含完整信息的用户DTO列表
-     */
     @Transactional(readOnly = true)
     public List<UserDto> getAllUsers() {
         return userRepository.findAll().stream()
@@ -159,7 +156,6 @@ public class AdminService {
         User user = new User();
         user.setId(userDto.getId());
         user.setName(userDto.getName());
-        user.setDepartment(userDto.getDepartment());
         user.setStatus(UserStatus.ACTIVE);
 
         user.setPassword(passwordEncoder.encode("password"));
@@ -175,7 +171,6 @@ public class AdminService {
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("未找到用户: " + id));
         user.setName(userDto.getName());
-        user.setDepartment(userDto.getDepartment());
         if (StringUtils.hasText(userDto.getStatus())) {
             user.setStatus(UserStatus.valueOf(userDto.getStatus().toUpperCase()));
         }
@@ -186,6 +181,17 @@ public class AdminService {
     }
 
     private void updateUserRelations(User user, UserDto userDto) {
+        // --- 【核心修改】更新部门关联 ---
+        if (userDto.getDepartmentId() != null) {
+            Department department = departmentRepository.findById(userDto.getDepartmentId())
+                    .orElseThrow(() -> new ResourceNotFoundException("未找到部门 ID: " + userDto.getDepartmentId()));
+            user.setDepartment(department);
+        } else {
+            user.setDepartment(null);
+        }
+        // --- 【修改结束】 ---
+
+
         if (StringUtils.hasText(userDto.getManagerId())) {
             if (user.getId() != null && user.getId().equals(userDto.getManagerId())) {
                 throw new IllegalArgumentException("用户不能将自己设置为上级");
@@ -253,14 +259,11 @@ public class AdminService {
             throw new IllegalStateException("无法删除角色，因为仍有 " + role.getUsers().size() + " 个用户属于该角色。");
         }
 
-        // --- 【核心修改：检查工作流模板中的使用情况】 ---
-        // 检查角色名是否被用作camunda:candidateGroups
         String roleSearchPattern = "camunda:candidateGroups=\"" + role.getName() + "\"";
         long workflowUsageCount = workflowTemplateRepository.countByBpmnXmlContaining(roleSearchPattern);
         if (workflowUsageCount > 0) {
             throw new IllegalStateException("无法删除角色 '" + role.getName() + "'，因为它正被 " + workflowUsageCount + " 个工作流模板用作候选组。");
         }
-        // --- 【修改结束】 ---
 
         roleRepository.delete(role);
     }
@@ -302,14 +305,11 @@ public class AdminService {
             throw new IllegalStateException("无法删除用户组，因为仍有 " + group.getUsers().size() + " 个用户属于该组。");
         }
 
-        // --- 【核心修改：检查工作流模板中的使用情况】 ---
-        // 检查用户组名是否被用作camunda:candidateGroups
         String groupSearchPattern = "camunda:candidateGroups=\"" + group.getName() + "\"";
         long workflowUsageCount = workflowTemplateRepository.countByBpmnXmlContaining(groupSearchPattern);
         if (workflowUsageCount > 0) {
             throw new IllegalStateException("无法删除用户组 '" + group.getName() + "'，因为它正被 " + workflowUsageCount + " 个工作流模板用作候选组。");
         }
-        // --- 【修改结束】 ---
 
         userGroupRepository.delete(group);
     }
@@ -320,11 +320,16 @@ public class AdminService {
         UserDto dto = new UserDto();
         dto.setId(user.getId());
         dto.setName(user.getName());
-        dto.setDepartment(user.getDepartment());
         dto.setStatus(user.getStatus().name());
         if (user.getManager() != null) {
             dto.setManagerId(user.getManager().getId());
         }
+        // --- 【核心修改】填充部门ID和名称 ---
+        if (user.getDepartment() != null) {
+            dto.setDepartmentId(user.getDepartment().getId());
+            dto.setDepartmentName(user.getDepartment().getName());
+        }
+        // --- 【修改结束】 ---
         if (user.getRoles() != null) {
             dto.setRoleNames(user.getRoles().stream().map(Role::getName).collect(Collectors.toList()));
         }
@@ -352,58 +357,74 @@ public class AdminService {
 
 
     // --- 组织架构与日志 ---
+
+    /**
+     * 【核心重构】重写组织架构树的生成逻辑，以新的 Department 实体为基础
+     */
     @Transactional(readOnly = true)
     public List<DepartmentTreeNode> getOrganizationTree() {
+        // 1. 获取所有部门的树形结构
+        List<DepartmentDto> departmentTree = departmentService.getDepartmentTree();
+        // 2. 获取所有用户并按部门ID分组
         List<User> allUsers = userRepository.findAll();
+        Map<Long, List<User>> usersByDeptId = allUsers.stream()
+                .filter(u -> u.getDepartment() != null)
+                .collect(Collectors.groupingBy(u -> u.getDepartment().getId()));
 
-        Map<String, List<User>> usersByDepartment = allUsers.stream()
-                .filter(user -> user.getDepartment() != null)
-                .collect(Collectors.groupingBy(User::getDepartment));
-
-        Map<String, DepartmentTreeNode> departmentNodeMap = usersByDepartment.keySet().stream()
-                .distinct()
-                .map(deptName -> {
-                    DepartmentTreeNode node = new DepartmentTreeNode();
-                    node.setTitle(deptName);
-                    node.setKey("dept_" + deptName);
-                    node.setValue(deptName);
-                    node.setType("department");
-                    node.setLeaf(false);
-                    return node;
-                })
-                .collect(Collectors.toMap(DepartmentTreeNode::getValue, Function.identity()));
-
-        usersByDepartment.forEach((deptName, users) -> {
-            DepartmentTreeNode parentNode = departmentNodeMap.get(deptName);
-            if (parentNode != null) {
-                List<DepartmentTreeNode> userNodes = users.stream()
-                        .map(user -> {
-                            DepartmentTreeNode userNode = new DepartmentTreeNode();
-                            userNode.setTitle(user.getName() + " (" + user.getId() + ")");
-                            userNode.setKey("user_" + user.getId());
-                            userNode.setValue(user.getId());
-                            userNode.setType("user");
-                            userNode.setLeaf(true);
-                            return userNode;
-                        })
-                        .sorted(Comparator.comparing(DepartmentTreeNode::getTitle))
-                        .collect(Collectors.toList());
-                parentNode.getChildren().addAll(userNodes);
-            }
-        });
-
-        return departmentNodeMap.values().stream()
-                .sorted(Comparator.comparing(DepartmentTreeNode::getTitle))
+        // 3. 将用户节点挂载到部门树上
+        return departmentTree.stream()
+                .map(deptDto -> convertDeptDtoToTreeNode(deptDto, usersByDeptId))
                 .collect(Collectors.toList());
     }
+
+    /**
+     * 递归辅助方法，将 DepartmentDto 树转换为 DepartmentTreeNode 树，并挂载用户
+     */
+    private DepartmentTreeNode convertDeptDtoToTreeNode(DepartmentDto deptDto, Map<Long, List<User>> usersByDeptId) {
+        DepartmentTreeNode deptNode = new DepartmentTreeNode();
+        deptNode.setTitle(deptDto.getName());
+        deptNode.setKey("dept_" + deptDto.getId());
+        deptNode.setValue(String.valueOf(deptDto.getId()));
+        deptNode.setType("department");
+        deptNode.setLeaf(false);
+
+        // 挂载子部门
+        if (!CollectionUtils.isEmpty(deptDto.getChildren())) {
+            List<DepartmentTreeNode> childDeptNodes = deptDto.getChildren().stream()
+                    .map(childDto -> convertDeptDtoToTreeNode(childDto, usersByDeptId))
+                    .collect(Collectors.toList());
+            deptNode.getChildren().addAll(childDeptNodes);
+        }
+
+        // 挂载当前部门下的用户
+        List<User> usersInDept = usersByDeptId.get(deptDto.getId());
+        if (!CollectionUtils.isEmpty(usersInDept)) {
+            List<DepartmentTreeNode> userNodes = usersInDept.stream()
+                    .map(user -> {
+                        DepartmentTreeNode userNode = new DepartmentTreeNode();
+                        userNode.setTitle(user.getName() + " (" + user.getId() + ")");
+                        userNode.setKey("user_" + user.getId());
+                        userNode.setValue(user.getId());
+                        userNode.setType("user");
+                        userNode.setLeaf(true);
+                        return userNode;
+                    })
+                    .sorted(Comparator.comparing(DepartmentTreeNode::getTitle))
+                    .collect(Collectors.toList());
+            deptNode.getChildren().addAll(userNodes);
+        }
+
+        return deptNode;
+    }
+    // --- 【重构结束】 ---
 
     @Transactional(readOnly = true)
     public List<TreeNodeDto> getDepartmentTree() {
         List<User> allUsers = userRepository.findAll();
 
         Map<String, List<User>> usersByDepartment = allUsers.stream()
-                .filter(user -> user.getDepartment() != null)
-                .collect(Collectors.groupingBy(User::getDepartment));
+                .filter(user -> user.getDepartment() != null && StringUtils.hasText(user.getDepartment().getName()))
+                .collect(Collectors.groupingBy(user -> user.getDepartment().getName()));
 
         return usersByDepartment.entrySet().stream()
                 .map(entry -> {

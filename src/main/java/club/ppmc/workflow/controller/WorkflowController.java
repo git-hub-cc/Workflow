@@ -1,16 +1,15 @@
 package club.ppmc.workflow.controller;
 
-import club.ppmc.workflow.domain.FormSubmission;
 import club.ppmc.workflow.domain.User;
 import club.ppmc.workflow.domain.UserGroup;
 import club.ppmc.workflow.dto.*;
-import club.ppmc.workflow.repository.FormSubmissionRepository;
 import club.ppmc.workflow.repository.UserGroupRepository;
 import club.ppmc.workflow.repository.UserRepository;
-import club.ppmc.workflow.repository.WorkflowTemplateRepository;
 import club.ppmc.workflow.service.FormService;
 import club.ppmc.workflow.service.WorkflowService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
@@ -32,7 +31,6 @@ public class WorkflowController {
     private final WorkflowService workflowService;
     private final UserRepository userRepository;
     private final UserGroupRepository userGroupRepository;
-    private final FormSubmissionRepository formSubmissionRepository;
     private final FormService formService;
 
     // --- 流程定义与部署 ---
@@ -85,13 +83,17 @@ public class WorkflowController {
     }
 
     // --- 个人流程数据 ---
+    /**
+     * 【核心修改】API: 获取我的申请列表, 支持分页和筛选
+     */
     @GetMapping("/my-submissions")
-    public ResponseEntity<List<FormSubmissionResponse>> getMySubmissions(Principal principal) {
+    public ResponseEntity<Page<FormSubmissionResponse>> getMySubmissions(
+            Principal principal,
+            @RequestParam(required = false) String keyword,
+            @RequestParam(required = false) String status,
+            Pageable pageable) {
         String userId = principal.getName();
-        List<FormSubmission> submissions = formSubmissionRepository.findBySubmitterIdOrderByCreatedAtDesc(userId);
-        List<FormSubmissionResponse> responses = submissions.stream()
-                .map(formService::convertToSubmissionResponse)
-                .collect(Collectors.toList());
+        Page<FormSubmissionResponse> responses = formService.getMySubmissions(userId, keyword, status, pageable);
         return ResponseEntity.ok(responses);
     }
 

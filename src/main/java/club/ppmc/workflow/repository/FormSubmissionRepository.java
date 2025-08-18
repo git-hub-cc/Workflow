@@ -21,10 +21,5 @@ public interface FormSubmissionRepository extends JpaRepository<FormSubmission, 
      */
     List<FormSubmission> findByFormDefinitionId(Long formDefinitionId);
 
-    /**
-     * 【修正】根据提交人ID查找所有提交记录，并按创建时间降序排列
-     * @param submitterId 提交人ID
-     * @return 提交记录列表
-     */
-    List<FormSubmission> findBySubmitterIdOrderByCreatedAtDesc(String submitterId);
+    // 【核心修改】原 findBySubmitterIdOrderByCreatedAtDesc 方法将被更灵活的 Specification 查询替代，故移除。
 }

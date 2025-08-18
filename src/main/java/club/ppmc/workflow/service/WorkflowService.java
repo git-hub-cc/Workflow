@@ -18,9 +18,14 @@ import org.camunda.bpm.engine.repository.Deployment;
 import org.camunda.bpm.engine.repository.ProcessDefinition;
 import org.camunda.bpm.engine.runtime.ProcessInstance;
 import org.camunda.bpm.engine.task.Task;
+import org.camunda.bpm.engine.task.TaskQuery;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.CollectionUtils;
+import org.springframework.util.StringUtils;
 
 import java.time.ZoneId;
 import java.util.*;
@@ -49,7 +54,6 @@ public class WorkflowService {
     private final FormDefinitionRepository formDefinitionRepository;
     private final FormSubmissionRepository formSubmissionRepository;
     private final UserRepository userRepository;
-    // --- 【新增】 ---
     private final FileAttachmentRepository fileAttachmentRepository;
 
     private final ObjectMapper objectMapper;
@@ -110,7 +114,6 @@ public class WorkflowService {
                     return dto;
                 })
                 .orElseGet(() -> {
-                    // --- 【核心修改】提供一个更完整、更健壮的默认BPMN模板 ---
                     String processDefinitionKey = "Process_Form_" + formId;
                     String defaultXml = String.format("""
                         <?xml version="1.0" encoding="UTF-8"?>
@@ -231,7 +234,6 @@ public class WorkflowService {
                 });
     }
 
-
     public void startWorkflow(FormSubmission submission) {
         try {
             identityService.setAuthenticatedUserId(submission.getSubmitterId());
@@ -253,22 +255,23 @@ public class WorkflowService {
 
                     Map<String, Object> variables = objectMapper.readValue(submission.getDataJson(), new TypeReference<>() {});
 
-                    variables.put("submitterId", submission.getSubmitterId());
-                    variables.put("formSubmissionId", submission.getId());
-
-                    // --- 【核心修复：在启动流程前，查找并设置 managerId 变量】 ---
                     User submitter = userRepository.findById(submission.getSubmitterId())
                             .orElseThrow(() -> new IllegalStateException("数据异常：找不到提交人，ID: " + submission.getSubmitterId()));
+
+                    // --- 【核心修改】增加流程变量，用于搜索 ---
+                    variables.put("submitterId", submission.getSubmitterId());
+                    variables.put("submitterName", submitter.getName());
+                    variables.put("formName", submission.getFormDefinition().getName());
+                    // ---
+                    variables.put("formSubmissionId", submission.getId());
 
                     if (submitter.getManager() != null) {
                         String managerId = submitter.getManager().getId();
                         variables.put("managerId", managerId);
                         log.info("已为提交者 '{}' 找到上级经理 '{}'，并设置为流程变量 'managerId'。", submission.getSubmitterId(), managerId);
                     } else {
-                        // 如果找不到上级，流程将无法启动，这里应抛出明确的异常
                         throw new IllegalStateException("提交者 '" + submitter.getName() + "' 没有设置上级经理，无法启动需要上级审批的流程。");
                     }
-                    // --- 【修复结束】 ---
 
                     ProcessInstance camundaInstance = runtimeService.startProcessInstanceByKey(
                             template.getProcessDefinitionKey(),
@@ -306,7 +309,6 @@ public class WorkflowService {
                 .orElseThrow(() -> new IllegalStateException("数据不一致：找不到流程实例 " + processInstanceId + " 对应的本地实例"));
         FormSubmission submission = instance.getFormSubmission();
 
-        // --- 【核心修改：处理表单数据更新】 ---
         if (request.getUpdatedFormData() != null && !request.getUpdatedFormData().isBlank()) {
             submission.setDataJson(request.getUpdatedFormData());
             log.info("已更新申请单 (ID: {}) 的表单数据。", submission.getId());
@@ -321,46 +323,34 @@ public class WorkflowService {
             }
         }
 
-        // --- 【修复】重构附件更新逻辑，防止数据丢失 ---
         if (request.getAttachmentIds() != null) {
-            // 1. 获取当前数据库中关联的附件ID集合
             Set<Long> existingIds = submission.getAttachments().stream()
                     .map(FileAttachment::getId)
                     .collect(Collectors.toSet());
-
-            // 2. 获取前端最新提交的附件ID集合
             Set<Long> newIds = new HashSet<>(request.getAttachmentIds());
 
-            // 3. 计算需要被移除的附件 (存在于旧集合，但不存在于新集合)
             List<FileAttachment> toRemove = submission.getAttachments().stream()
                     .filter(att -> !newIds.contains(att.getId()))
                     .collect(Collectors.toList());
 
-            // 4. 计算需要被新增关联的附件ID (存在于新集合，但不存在于旧集合)
             Set<Long> toAddIds = new HashSet<>(newIds);
             toAddIds.removeAll(existingIds);
 
-            // 5. 执行移除操作
             if (!toRemove.isEmpty()) {
-                // 从 submission 的集合中移除，由于 orphanRemoval=true，JPA会自动删除这些附件记录
                 submission.getAttachments().removeAll(toRemove);
                 log.info("从申请单 #{} 中移除了 {} 个旧附件。", submission.getId(), toRemove.size());
             }
 
-            // 6. 执行新增关联操作
             if (!toAddIds.isEmpty()) {
                 List<FileAttachment> attachmentsToAdd = fileAttachmentRepository.findAllById(toAddIds);
                 for (FileAttachment att : attachmentsToAdd) {
-                    att.setFormSubmission(submission); // 建立双向关联
+                    att.setFormSubmission(submission);
                     submission.getAttachments().add(att);
                 }
                 log.info("为申请单 #{} 新增了 {} 个附件关联。", submission.getId(), attachmentsToAdd.size());
             }
         }
-        // --- 【修复结束】 ---
-
         formSubmissionRepository.save(submission);
-
 
         if (request.getApprovalComment() != null && !request.getApprovalComment().isEmpty()) {
             taskService.setVariableLocal(camundaTaskId, "approvalComment", request.getApprovalComment());
@@ -372,18 +362,32 @@ public class WorkflowService {
         taskService.complete(camundaTaskId, variables);
     }
 
-    // ... [getPendingTasksForUser, getTaskDetails, convertCamundaTaskToDto, getWorkflowHistoryBySubmissionId, isTaskOwner, etc. methods remain unchanged] ...
+    /**
+     * 【核心修改】获取我的待办任务，支持分页和关键字搜索
+     */
     @Transactional(readOnly = true)
-    public List<TaskDto> getPendingTasksForUser(String assigneeId) {
-        List<Task> camundaTasks = taskService.createTaskQuery()
+    public Page<TaskDto> getPendingTasksForUser(String assigneeId, String keyword, Pageable pageable) {
+        TaskQuery query = taskService.createTaskQuery()
                 .taskAssignee(assigneeId)
-                .active()
-                .orderByTaskCreateTime().desc()
-                .list();
+                .active();
 
-        return camundaTasks.stream()
+        if (StringUtils.hasText(keyword)) {
+            query.or()
+                    .processVariableValueLike("formName", "%" + keyword + "%")
+                    .processVariableValueLike("submitterName", "%" + keyword + "%")
+                    .endOr();
+        }
+
+        long total = query.count();
+
+        List<Task> camundaTasks = query.orderByTaskCreateTime().desc()
+                .listPage((int) pageable.getOffset(), pageable.getPageSize());
+
+        List<TaskDto> taskDtos = camundaTasks.stream()
                 .map(this::convertCamundaTaskToDto)
                 .collect(Collectors.toList());
+
+        return new PageImpl<>(taskDtos, pageable, total);
     }
 
     @Transactional(readOnly = true)
@@ -408,14 +412,9 @@ public class WorkflowService {
             dto.setFormSubmissionId(((Number) formSubmissionIdObj).longValue());
         }
 
-        Object submitterIdObj = variables.get("submitterId");
-        if (submitterIdObj instanceof String) {
-            userRepository.findById((String)submitterIdObj).ifPresent(user -> dto.setSubmitterName(user.getName()));
-        }
-
-        instanceRepository.findByProcessInstanceId(camundaTask.getProcessInstanceId()).ifPresent(instance -> {
-            dto.setFormName(instance.getTemplate().getFormDefinition().getName());
-        });
+        // 使用已存储的流程变量
+        dto.setSubmitterName((String) variables.getOrDefault("submitterName", "未知"));
+        dto.setFormName((String) variables.getOrDefault("formName", "未知表单"));
 
         return dto;
     }
@@ -443,7 +442,6 @@ public class WorkflowService {
         Map<String, HistoricTaskInstance> taskInstanceMap = taskInstances.stream()
                 .collect(Collectors.toMap(HistoricTaskInstance::getId, Function.identity()));
 
-        // --- ✨ 核心变更：查询审批意见变量 ---
         List<HistoricVariableInstance> variableInstances = historyService.createHistoricVariableInstanceQuery()
                 .processInstanceId(processInstanceId)
                 .variableName("approvalComment")
@@ -492,7 +490,6 @@ public class WorkflowService {
                     .endTime(Optional.ofNullable(activity.getEndTime()).map(d -> d.toInstant().atZone(ZoneId.systemDefault()).toLocalDateTime()).orElse(null))
                     .durationInMillis(activity.getDurationInMillis());
 
-            // --- ✨ 核心修复：使用 getTaskId() 关联审批意见 ---
             if (activity.getActivityType().equals("userTask") && activity.getTaskId() != null) {
                 HistoricVariableInstance commentVar = taskComments.get(activity.getTaskId());
                 if (commentVar != null) {

@@ -52,6 +52,10 @@ public class Menu {
     // 是否可见
     private boolean visible = true;
 
+    // --- 【新增字段】数据可见范围 ---
+    @Enumerated(EnumType.STRING)
+    private DataScope dataScope;
+
     // 控制菜单访问权限的角色
     @ManyToMany(fetch = FetchType.EAGER)
     @JoinTable(

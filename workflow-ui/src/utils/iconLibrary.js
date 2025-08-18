@@ -27,6 +27,8 @@ import {
     ApartmentOutlined, BranchesOutlined, NodeIndexOutlined, DeploymentUnitOutlined,
     CheckCircleOutlined, CloseCircleOutlined, ClockCircleOutlined, PlayCircleOutlined,
     PauseCircleOutlined, StopOutlined,
+    // 【核心新增】
+    ForkOutlined, PlusCircleOutlined,
 
     // 消息与通知
     MailOutlined, BellOutlined, MessageOutlined, CommentOutlined,
@@ -51,6 +53,7 @@ export const iconMap = {
     ApartmentOutlined, BranchesOutlined, NodeIndexOutlined, DeploymentUnitOutlined,
     CheckCircleOutlined, CloseCircleOutlined, ClockCircleOutlined, PlayCircleOutlined,
     PauseCircleOutlined, StopOutlined,
+    ForkOutlined, PlusCircleOutlined, // 【核心新增】
     MailOutlined, BellOutlined, MessageOutlined, CommentOutlined,
     BankOutlined, AccountBookOutlined, CalculatorOutlined, BarChartOutlined, LineChartOutlined,
     PieChartOutlined, AreaChartOutlined, DatabaseOutlined,

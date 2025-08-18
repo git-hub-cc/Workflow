@@ -110,15 +110,17 @@ public class FormController {
     }
 
     /**
-     * 【修改】API: 获取指定表单的所有提交数据 (支持分页和过滤)
+     * 【核心修改】API: 获取指定表单的所有提交数据 (支持分页、过滤和数据范围)
+     * @param menuId (可选) 从哪个菜单入口访问，用于数据范围权限控制
      * 权限: 已认证用户
      */
     @GetMapping("/{formId}/submissions")
     public ResponseEntity<Page<FormSubmissionResponse>> getSubmissionsByFormId(
             @PathVariable Long formId,
+            @RequestParam(required = false) Long menuId,
             @RequestParam(required = false) Map<String, String> filters,
             Pageable pageable) {
-        Page<FormSubmissionResponse> responses = formService.getSubmissionsByFormId(formId, filters, pageable);
+        Page<FormSubmissionResponse> responses = formService.getSubmissionsByFormId(formId, menuId, filters, pageable);
         return ResponseEntity.ok(responses);
     }
 

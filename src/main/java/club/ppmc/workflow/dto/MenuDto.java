@@ -26,4 +26,6 @@ public class MenuDto {
     private boolean visible;
     private List<String> roleNames;
     private List<MenuDto> children;
+    // --- 【新增字段】 ---
+    private String dataScope;
 }

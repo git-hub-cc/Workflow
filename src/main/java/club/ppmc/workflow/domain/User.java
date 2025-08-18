@@ -25,22 +25,25 @@ public class User implements UserDetails {
     @Column(nullable = false)
     private String password; // 存储编码后的密码
 
-    private String department; // 用户所属部门
+    // --- 【核心修改】将 department 字段从 String 修改为与 Department 实体的关联 ---
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "department_id")
+    private Department department;
+    // --- 【修改结束】 ---
+
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "manager_id")
     private User manager;
 
-    // --- 【新增字段】 ---
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    private UserStatus status = UserStatus.ACTIVE; // 默认状态为 ACTIVE
+    private UserStatus status = UserStatus.ACTIVE;
 
     @Column(nullable = false)
-    private boolean passwordChangeRequired = false; // 是否需要强制修改密码
+    private boolean passwordChangeRequired = false;
 
-    // --- 【关系修改】 ---
-    @ManyToMany(fetch = FetchType.EAGER) // EAGER a an EAGER fetch for roles is often practical for authorization
+    @ManyToMany(fetch = FetchType.EAGER)
     @JoinTable(
             name = "user_roles",
             joinColumns = @JoinColumn(name = "user_id"),
@@ -57,11 +60,10 @@ public class User implements UserDetails {
     private Set<UserGroup> userGroups = new HashSet<>();
 
 
-    // --- UserDetails 接口实现 (已更新) ---
+    // --- UserDetails 接口实现 ---
 
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
-        // 从 roles 集合动态构建权限列表
         return this.roles.stream()
                 .map(role -> new SimpleGrantedAuthority("ROLE_" + role.getName()))
                 .collect(Collectors.toList());
@@ -69,7 +71,7 @@ public class User implements UserDetails {
 
     @Override
     public String getUsername() {
-        return this.id; // 使用 id 作为 Spring Security 的 username
+        return this.id;
     }
 
     @Override
@@ -79,24 +81,35 @@ public class User implements UserDetails {
 
     @Override
     public boolean isAccountNonExpired() {
-        return true; // 账户永不过期
+        return true;
     }
 
     @Override
     public boolean isAccountNonLocked() {
-        // 根据 status 字段判断
         return this.status != UserStatus.LOCKED;
     }
 
     @Override
     public boolean isCredentialsNonExpired() {
-        // 如果需要强制修改密码，则认为凭证已过期
         return !this.passwordChangeRequired;
     }
 
     @Override
     public boolean isEnabled() {
-        // 根据 status 字段判断
         return this.status == UserStatus.ACTIVE;
+    }
+
+    /**
+     * 【新增】用于数据迁移的辅助方法，迁移完成后可删除
+     * @return 旧的部门字符串名称
+     */
+    @Transient
+    public String getDepartmentName() {
+        // 这里的实现取决于您如何存储旧的 department 字符串。
+        // 如果您在迁移期间临时保留了旧字段，可以直接返回。
+        // 如果已经删除了，此方法将无法工作。
+        // 这是一个占位符，您需要根据实际情况调整。
+        // 例如: return this.oldDepartmentStringField;
+        return this.department != null ? this.department.getName() : null;
     }
 }

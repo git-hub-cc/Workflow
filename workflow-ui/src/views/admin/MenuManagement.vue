@@ -83,6 +83,19 @@
               </a-form-item>
             </a-col>
           </template>
+
+          <!-- 【核心新增】数据范围配置 -->
+          <a-col v-if="formState.type === 'DATA_LIST'" :span="24">
+            <a-form-item label="数据范围" name="dataScope" help="定义通过此菜单能看到的数据权限范围">
+              <a-select v-model:value="formState.dataScope">
+                <a-select-option value="ALL">全部数据 (仅管理员可用)</a-select-option>
+                <a-select-option value="BY_DEPARTMENT">按部门 (查看同部门数据)</a-select-option>
+                <a-select-option value="BY_GROUP">按用户组 (查看同组数据)</a-select-option>
+                <a-select-option value="OWNER_ONLY">仅自己</a-select-option>
+              </a-select>
+            </a-form-item>
+          </a-col>
+
           <a-col :span="12">
             <a-form-item label="排序号" name="orderNum"><a-input-number v-model:value="formState.orderNum" style="width: 100%;"/></a-form-item>
           </a-col>
@@ -153,6 +166,7 @@ const formRef = ref();
 const formState = reactive({
   id: null, parentId: null, type: 'FORM_ENTRY', name: '', icon: 'AppstoreOutlined',
   path: '', formDefinitionId: null, orderNum: 0, visible: true, roleNames: [],
+  dataScope: 'ALL', // 【新增】默认值
 });
 const showIconPicker = ref(false);
 
@@ -162,13 +176,13 @@ const rules = {
   name: [{ required: true, message: '请输入菜单名称' }],
   path: [{ required: true, message: '请输入路由路径' }],
   formDefinitionId: [{ required: true, message: '请关联一个表单' }],
+  dataScope: [{ required: true, message: '请选择数据范围' }],
 };
 
 const menuTreeForSelect = computed(() => {
   const process = (nodes) => {
     return nodes.map(node => ({
       title: node.name, value: node.id,
-      // 关键：编辑时，不能选择自己或自己的子孙作为上级
       disabled: isEditing.value && (node.id === formState.id || node.path?.startsWith(formState.path + '/')),
       children: node.children ? process(node.children) : []
     }));
@@ -186,6 +200,7 @@ const showModal = (menu, parentId = null) => {
     Object.assign(formState, {
       id: null, parentId: parentId, type: 'FORM_ENTRY', name: '', icon: 'AppstoreOutlined',
       path: '', formDefinitionId: null, orderNum: 0, visible: true, roleNames: [],
+      dataScope: 'ALL', // 【新增】重置时也设置默认值
     });
   }
   modalVisible.value = true;
@@ -195,6 +210,12 @@ const onMenuTypeChange = (type) => {
   if (type === 'DIRECTORY') {
     formState.path = undefined;
     formState.formDefinitionId = undefined;
+    formState.dataScope = undefined;
+  } else if (type === 'FORM_ENTRY') {
+    formState.dataScope = undefined;
+  } else {
+    // 默认 DATA_LIST 的数据范围为 ALL
+    formState.dataScope = 'ALL';
   }
 };
 

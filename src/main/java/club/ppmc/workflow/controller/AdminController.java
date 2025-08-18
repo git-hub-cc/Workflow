@@ -2,6 +2,7 @@ package club.ppmc.workflow.controller;
 
 import club.ppmc.workflow.dto.*;
 import club.ppmc.workflow.service.AdminService;
+import club.ppmc.workflow.service.DepartmentService;
 import club.ppmc.workflow.service.UserService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -29,6 +30,9 @@ public class AdminController {
 
     private final AdminService adminService;
     private final UserService userService;
+    // --- 【核心新增】 ---
+    private final DepartmentService departmentService;
+
 
     // --- 流程实例管理 ---
     @GetMapping("/instances")
@@ -65,11 +69,7 @@ public class AdminController {
     }
 
 
-    // --- 【核心重构】用户管理 ---
-
-    /**
-     * API: (管理员)获取所有用户的完整列表，用于用户管理页面
-     */
+    // --- 用户管理 ---
     @GetMapping("/users")
     public ResponseEntity<List<UserDto>> getAllUsersForAdmin() {
         return ResponseEntity.ok(adminService.getAllUsers());
@@ -144,6 +144,33 @@ public class AdminController {
         adminService.deleteGroup(id);
         return ResponseEntity.noContent().build();
     }
+
+
+    // --- 【核心新增】部门管理 API ---
+    @PostMapping("/departments")
+    public ResponseEntity<DepartmentDto> createDepartment(@RequestBody DepartmentDto departmentDto) {
+        DepartmentDto createdDept = departmentService.createDepartment(departmentDto);
+        return new ResponseEntity<>(createdDept, HttpStatus.CREATED);
+    }
+
+    @PutMapping("/departments/{id}")
+    public ResponseEntity<DepartmentDto> updateDepartment(@PathVariable Long id, @RequestBody DepartmentDto departmentDto) {
+        DepartmentDto updatedDept = departmentService.updateDepartment(id, departmentDto);
+        return ResponseEntity.ok(updatedDept);
+    }
+
+    @DeleteMapping("/departments/{id}")
+    public ResponseEntity<Void> deleteDepartment(@PathVariable Long id) {
+        departmentService.deleteDepartment(id);
+        return ResponseEntity.noContent().build();
+    }
+
+    @GetMapping("/departments/tree")
+    public ResponseEntity<List<DepartmentDto>> getDepartmentTree() {
+        return ResponseEntity.ok(departmentService.getDepartmentTree());
+    }
+    // --- 【新增结束】 ---
+
 
     // --- 组织架构与数据源 ---
     @GetMapping("/organization-tree")

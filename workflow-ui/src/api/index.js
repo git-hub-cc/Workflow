@@ -72,12 +72,9 @@ export const importFromWord = (file) => {
 // --- 文件 API ---
 export const uploadFile = (file) => {
     const formData = new FormData();
-    formData.append('file', file); // 'file' 必须与后端 @RequestParam("file") 的名称匹配
+    formData.append('file', file);
     return service.post('/files/upload', formData, {
-        headers: {
-            'Content-Type': 'multipart/form-data',
-        },
-        // 可以为大文件上传设置更长的超时时间
+        headers: { 'Content-Type': 'multipart/form-data' },
         timeout: 30000
     });
 };
@@ -90,11 +87,11 @@ export const getWorkflowTemplate = (formId) => service.get(`/workflows/templates
 export const getWorkflowHistory = (submissionId) => service.get(`/workflows/history/${submissionId}`);
 export const updateWorkflowTemplate = (formId, data) => service.put(`/workflows/templates/${formId}`, data);
 export const getGroupsForWorkflow = () => service.get('/workflows/groups');
-// 【修改】获取用户列表的API指向新的、专门为选择器优化的接口
 export const getUsersForPicker = () => service.get('/workflows/users');
+export const getMySubmissions = (params) => service.get('/workflows/my-submissions', { params });
 
 // --- 任务 API ---
-export const getPendingTasks = () => service.get('/tasks/pending');
+export const getPendingTasks = (params) => service.get('/tasks/pending', { params });
 export const getTaskById = (taskId) => service.get(`/tasks/${taskId}`);
 export const completeTask = (taskId, data) => service.post(`/tasks/${taskId}/complete`, data);
 
@@ -102,12 +99,17 @@ export const completeTask = (taskId, data) => service.post(`/tasks/${taskId}/com
 export const changePassword = (data) => service.post('/users/me/change-password');
 export const getOrganizationTree = () => service.get('/admin/organization-tree');
 
-// --- 【核心重构】Admin User Management ---
-// 获取完整用户列表的API指向新的、专门为管理页面优化的接口
+// --- 【核心新增】部门管理 API ---
+export const getDepartmentTree = () => service.get('/admin/departments/tree');
+export const createDepartment = (data) => service.post('/admin/departments', data);
+export const updateDepartment = (id, data) => service.put(`/admin/departments/${id}`, data);
+export const deleteDepartment = (id) => service.delete(`/admin/departments/${id}`);
+
+// --- Admin User Management ---
 export const getAllUsers = () => service.get('/admin/users');
 export const createUser = (data) => service.post('/admin/users', data);
 export const updateUser = (id, data) => service.put(`/admin/users/${id}`, data);
-export const deleteUser = (id) => service.delete(`/admin/users/${id}`); // 语义上是禁用
+export const deleteUser = (id) => service.delete(`/admin/users/${id}`);
 export const resetPassword = (id) => service.post(`/admin/users/${id}/reset-password`);
 
 // --- 角色管理 API ---
