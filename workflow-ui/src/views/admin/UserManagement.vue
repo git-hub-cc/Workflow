@@ -203,6 +203,7 @@ const getStatusColor = (status) => {
 const getStatusText = (status) => ({ ACTIVE: '正常', INACTIVE: '禁用', LOCKED: '锁定' }[status] || '未知');
 const getManagerName = (managerId) => {
   if (!managerId) return '-';
+  // 【状态管理修复】从 picker 列表（轻量级）中查找，提高效率
   const manager = userStore.usersForPicker.find(u => u.id === managerId);
   return manager ? manager.name : managerId;
 };
@@ -273,8 +274,9 @@ const handleOk = async () => {
       message.success('用户创建成功！');
     }
     modalVisible.value = false;
+    // --- 【状态管理修复】统一调用Store的Action来刷新数据 ---
     await userStore.fetchUsersForManagement();
-    await userStore.fetchUsersForPicker();
+    await userStore.fetchUsersForPicker(); // 同样刷新选择器列表
   } catch (error) {
     console.error('Form validation/submission failed:', error);
   } finally {
@@ -303,6 +305,7 @@ const handleDelete = (userId) => {
       try {
         await deleteUser(userId);
         message.success('用户禁用成功！');
+        // --- 【状态管理修复】统一调用Store的Action来刷新数据 ---
         await userStore.fetchUsersForManagement();
       } catch (error) {}
     },

@@ -128,6 +128,7 @@ const handleOk = async () => {
       message.success('角色创建成功！');
     }
     modalVisible.value = false;
+    // --- 【状态管理修复】统一调用Store的Action来刷新数据 ---
     await userStore.fetchAllRoles();
   } catch (error) {
     console.error('Form validation/submission failed:', error);
@@ -150,6 +151,7 @@ const handleDelete = async (roleId) => {
   try {
     await deleteRole(roleId);
     message.success('角色删除成功！');
+    // --- 【状态管理修复】统一调用Store的Action来刷新数据 ---
     await userStore.fetchAllRoles();
   } catch (error) {
     // API 错误已全局处理

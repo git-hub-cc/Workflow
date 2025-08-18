@@ -16,6 +16,19 @@ import java.time.LocalDateTime;
 @Table(name = "file_attachment")
 public class FileAttachment {
 
+    // --- 【数据不一致修复】新增文件状态枚举 ---
+    public enum FileStatus {
+        /**
+         * 临时状态：文件已上传，但尚未关联到任何最终提交记录。此状态下的文件可被定时任务清理。
+         */
+        TEMPORARY,
+        /**
+         * 已关联状态：文件已成功关联到一份表单提交记录。
+         */
+        LINKED
+    }
+
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -43,8 +56,15 @@ public class FileAttachment {
     @Column(updatable = false)
     private LocalDateTime uploadedAt;
 
+    // --- 【数据不一致修复】新增状态字段 ---
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private FileStatus status;
+
     @PrePersist
     protected void onCreate() {
         uploadedAt = LocalDateTime.now();
+        // --- 【数据不一致修复】新上传的文件默认为临时状态 ---
+        status = FileStatus.TEMPORARY;
     }
 }

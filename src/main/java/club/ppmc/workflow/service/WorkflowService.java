@@ -443,6 +443,7 @@ public class WorkflowService {
         Map<String, HistoricTaskInstance> taskInstanceMap = taskInstances.stream()
                 .collect(Collectors.toMap(HistoricTaskInstance::getId, Function.identity()));
 
+        // --- ✨ 核心变更：查询审批意见变量 ---
         List<HistoricVariableInstance> variableInstances = historyService.createHistoricVariableInstanceQuery()
                 .processInstanceId(processInstanceId)
                 .variableName("approvalComment")
@@ -491,8 +492,9 @@ public class WorkflowService {
                     .endTime(Optional.ofNullable(activity.getEndTime()).map(d -> d.toInstant().atZone(ZoneId.systemDefault()).toLocalDateTime()).orElse(null))
                     .durationInMillis(activity.getDurationInMillis());
 
-            if (activity.getActivityType().equals("userTask") && taskInstanceMap.containsKey(activity.getId())) {
-                HistoricVariableInstance commentVar = taskComments.get(activity.getId());
+            // --- ✨ 核心修复：使用 getTaskId() 关联审批意见 ---
+            if (activity.getActivityType().equals("userTask") && activity.getTaskId() != null) {
+                HistoricVariableInstance commentVar = taskComments.get(activity.getTaskId());
                 if (commentVar != null) {
                     dtoBuilder.comment((String) commentVar.getValue());
                 }

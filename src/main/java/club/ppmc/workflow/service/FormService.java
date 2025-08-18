@@ -116,6 +116,8 @@ public class FormService {
             List<FileAttachment> attachments = fileAttachmentRepository.findAllById(request.getAttachmentIds());
             for (FileAttachment attachment : attachments) {
                 attachment.setFormSubmission(savedSubmission);
+                // --- 【数据不一致修复】将文件状态从 TEMPORARY 更新为 LINKED ---
+                attachment.setStatus(FileAttachment.FileStatus.LINKED);
             }
             fileAttachmentRepository.saveAll(attachments);
         }

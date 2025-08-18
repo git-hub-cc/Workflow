@@ -62,10 +62,10 @@ public class WorkflowController {
 
     /**
      * API: 获取用户列表 (专门用于前端选择器，如审批人选择)
-     * 权限: 已认证用户
+     * 权限: 【安全修复】已将权限从 isAuthenticated() 收紧为 hasRole('ADMIN')，防止信息泄露
      */
     @GetMapping("/users")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<List<UserPickerDto>> getUsersForPicker() {
         List<User> users = userRepository.findAll();
         List<UserPickerDto> userDtos = users.stream().map(this::toUserPickerDto).collect(Collectors.toList());

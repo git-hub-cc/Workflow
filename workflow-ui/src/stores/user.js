@@ -35,8 +35,9 @@ export const useUserStore = defineStore('user', () => {
             await fetchAndSetMenus();
 
             // 登录后预加载基础数据
-            await fetchUsersForPicker();
+            // 【安全修复】调整预加载逻辑，只有管理员才加载特定数据
             if (isAdmin.value) {
+                await fetchUsersForPicker();
                 await fetchUsersForManagement();
                 await fetchAllRoles();
                 await fetchAllGroups();
@@ -90,7 +91,13 @@ export const useUserStore = defineStore('user', () => {
     }
 
     async function fetchUsersForPicker() {
-        if (!isAuthenticated.value) return;
+        // --- 【安全修复】增加前端权限判断，与后端API权限保持一致 ---
+        // 确保只有管理员才能调用这个获取全量用户的接口
+        if (!isAdmin.value) {
+            console.warn("Attempted to fetch all users for picker without admin rights. Skipped.");
+            usersForPicker.value = []; // 清空可能存在的旧数据
+            return;
+        }
         try {
             usersForPicker.value = await getUsersForPicker();
         } catch (error) {

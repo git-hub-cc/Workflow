@@ -37,8 +37,9 @@ public class SecurityConfig {
                         .requestMatchers("/api/files/**").authenticated()
                         .requestMatchers(HttpMethod.POST, "/api/users/me/change-password").authenticated()
                         // --- 【核心重构】明确API权限 ---
-                        // 流程设计器中的用户选择器，所有认证用户可用
-                        .requestMatchers("/api/workflows/users").authenticated()
+                        // --- 【安全修复】将用户选择器API的权限收紧为仅限管理员 ---
+                        // 流程设计器中的用户选择器，现在仅限管理员可用，防止普通用户获取全量用户列表
+                        .requestMatchers("/api/workflows/users").hasRole("ADMIN")
                         .requestMatchers("/api/workflows/groups").authenticated()
                         .requestMatchers(HttpMethod.POST, "/api/forms/import-word").hasRole("ADMIN")
                         // 所有 /api/admin/ 下的请求都需要ADMIN角色

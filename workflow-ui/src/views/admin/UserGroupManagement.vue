@@ -128,6 +128,7 @@ const handleOk = async () => {
       message.success('用户组创建成功！');
     }
     modalVisible.value = false;
+    // --- 【状态管理修复】统一调用Store的Action来刷新数据 ---
     await userStore.fetchAllGroups();
   } catch (error) {
     console.error('Form validation/submission failed:', error);
@@ -150,6 +151,7 @@ const handleDelete = async (groupId) => {
   try {
     await deleteGroup(groupId);
     message.success('用户组删除成功！');
+    // --- 【状态管理修复】统一调用Store的Action来刷新数据 ---
     await userStore.fetchAllGroups();
   } catch (error) {
     // API 错误已全局处理

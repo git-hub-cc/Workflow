@@ -234,12 +234,9 @@ const checkTasks = async () => {
 
 onMounted(() => {
   if (userStore.isAuthenticated) {
-    userStore.fetchUsersForPicker();
-    if(userStore.isAdmin) {
-      userStore.fetchUsersForManagement();
-      userStore.fetchAllRoles();
-      userStore.fetchAllGroups();
-    }
+    // --- 【安全修复与状态管理修复】调整预加载逻辑 ---
+    // AppLayout 不再负责加载数据，登录时 userStore 已完成预加载。
+    // 这里只负责检查任务状态。
     checkTasks();
   }
 });
