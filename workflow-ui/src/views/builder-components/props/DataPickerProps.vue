@@ -5,14 +5,25 @@
 
     <a-divider>数据选择器配置</a-divider>
 
-    <!-- Modal Title -->
     <a-form-item label="弹窗标题">
       <a-input v-model:value="field.props.modalTitle" />
     </a-form-item>
 
-    <!-- Data URL -->
-    <a-form-item label="数据接口URL" help="接口需支持分页(page, size)和搜索(search)参数">
-      <a-input v-model:value="field.props.dataUrl" />
+    <!-- 【核心修改】API URL 从输入框变为选择器 -->
+    <a-form-item label="数据接口" help="从预定义的API列表中选择">
+      <a-select v-model:value="field.props.dataUrl" @change="onApiChange">
+        <a-select-option v-for="api in predefinedApis" :key="api.url" :value="api.url">
+          {{ api.name }}
+        </a-select-option>
+      </a-select>
+    </a-form-item>
+
+    <!-- 【核心新增】API 测试按钮 -->
+    <a-form-item>
+      <a-button @click="testApi" :loading="testingApi" :disabled="!field.props.dataUrl">
+        <template #icon><ApiOutlined /></template>
+        测试接口并自动填充
+      </a-button>
     </a-form-item>
 
     <!-- Table Columns Configuration -->
@@ -50,17 +61,57 @@
 </template>
 
 <script setup>
-import { computed } from 'vue';
-import { DeleteOutlined, PlusOutlined } from '@ant-design/icons-vue';
-// --- 【路径已修改】 ---
+import { computed, ref } from 'vue';
+import { DeleteOutlined, PlusOutlined, ApiOutlined } from '@ant-design/icons-vue';
 import { flattenFields } from '@/utils/formUtils.js';
-import GenericProps from './GenericProps.vue'; // Re-use generic part
+import GenericProps from './GenericProps.vue';
+// --- 【核心新增】引入预定义 API 列表和通用请求方法 ---
+import { predefinedApis } from '@/utils/apiLibrary.js';
+import { fetchTableData } from '@/api';
+import { message } from 'ant-design-vue';
 
 const props = defineProps(['field', 'allFields']);
+const testingApi = ref(false);
 
 const availableTargetFields = computed(() => {
   return flattenFields(props.allFields).filter(f => !['GridRow', 'GridCol', 'DataPicker', 'Subform'].includes(f.type));
 });
+
+// 清空配置
+const onApiChange = () => {
+  props.field.props.columns = [];
+  props.field.props.mappings = [];
+}
+
+const testApi = async () => {
+  testingApi.value = true;
+  try {
+    // 只获取第一条数据用于分析结构
+    const response = await fetchTableData(props.field.props.dataUrl, { page: 0, size: 1 });
+    const dataList = Array.isArray(response) ? response : response.content;
+
+    if (!dataList || dataList.length === 0) {
+      message.warn('接口返回数据为空，无法自动填充配置。');
+      return;
+    }
+
+    const firstItem = dataList[0];
+    const keys = Object.keys(firstItem);
+
+    // 自动填充表格列
+    props.field.props.columns = keys.map(key => ({ title: key, dataIndex: key }));
+    // 自动填充字段映射（默认为空，让用户选择）
+    props.field.props.mappings = keys.map(key => ({ sourceField: key, targetField: '' }));
+
+    message.success('接口测试成功，已自动填充列和映射配置！');
+
+  } catch (error) {
+    message.error('接口测试失败，请检查URL是否正确或联系管理员。');
+  } finally {
+    testingApi.value = false;
+  }
+};
+
 
 // Columns management
 const addColumn = () => {

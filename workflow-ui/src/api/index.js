@@ -70,7 +70,17 @@ export const importFromWord = (file) => {
 };
 
 // --- 文件 API ---
-export const uploadFile = (file) => { /* ... */ };
+export const uploadFile = (file) => {
+    const formData = new FormData();
+    formData.append('file', file); // 'file' 必须与后端 @RequestParam("file") 的名称匹配
+    return service.post('/files/upload', formData, {
+        headers: {
+            'Content-Type': 'multipart/form-data',
+        },
+        // 可以为大文件上传设置更长的超时时间
+        timeout: 30000
+    });
+};
 export const downloadFile = (fileId) => service.get(`/files/${fileId}`, { responseType: 'blob' });
 export const getFilesForSubmission = (submissionId) => service.get(`/files/submission/${submissionId}`);
 

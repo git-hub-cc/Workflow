@@ -22,6 +22,8 @@
     <ValidationRulesConfig
         v-if="field.rules !== undefined"
         :rules="field.rules"
+        :field="field"
+        :all-fields="allFields"
         @update:rules="newRules => field.rules = newRules"
     />
 

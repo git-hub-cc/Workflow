@@ -1,5 +1,8 @@
 <template>
   <div>
+    <!-- 引入通用属性配置 -->
+    <GenericProps :field="field" :all-fields="allFields" />
+
     <a-divider>子表单列配置</a-divider>
     <div v-for="(col, index) in field.props.columns" :key="col.id" class="subform-column">
       <a-input v-model:value="col.label" placeholder="列标题" style="flex: 1;" />
@@ -17,7 +20,18 @@
 <script setup>
 import { v4 as uuidv4 } from 'uuid';
 import { DeleteOutlined, PlusOutlined } from '@ant-design/icons-vue';
-const props = defineProps(['field']);
+import GenericProps from './GenericProps.vue';
+
+const props = defineProps({
+  field: {
+    type: Object,
+    required: true,
+  },
+  allFields: {
+    type: Array,
+    required: true,
+  },
+});
 
 const addColumn = () => {
   props.field.props.columns.push({

@@ -13,6 +13,8 @@ import org.springframework.web.multipart.MultipartFile;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.*;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * @author cc
@@ -24,6 +26,16 @@ import java.util.*;
 public class WordImportService {
 
     private final ObjectMapper objectMapper;
+
+    // --- 【新增】定义用于文本模式识别的正则表达式 ---
+    private static final Map<Pattern, String> TEXT_PATTERNS = new LinkedHashMap<>();
+
+    static {
+        // 匹配 "标签：_____" 或 "Label: ____" 形式
+        TEXT_PATTERNS.put(Pattern.compile("(.+?)[：:]([\\s_]+)$"), "Input");
+        // 匹配 "标签：" 或 "Label:" 后面紧跟换行符的情况
+        TEXT_PATTERNS.put(Pattern.compile("(.+?)[：:]$"), "Input");
+    }
 
     /**
      * 解析上传的 Word 文件并生成表单定义 DTO
@@ -79,6 +91,25 @@ public class WordImportService {
             return;
         }
 
+        // --- 【核心修改：优先进行模式匹配】 ---
+        for (Map.Entry<Pattern, String> entry : TEXT_PATTERNS.entrySet()) {
+            Matcher matcher = entry.getKey().matcher(text);
+            if (matcher.find()) {
+                String label = matcher.group(1).trim();
+                if (!label.isEmpty()) {
+                    // 如果匹配成功，创建一个 GridRow 来放置标签和输入框
+                    List<Map<String, Object>> columns = List.of(
+                            createGridColumnWithFields(6, List.of(createStaticTextComponent("<p style=\"text-align: right; font-weight: bold;\">" + label + "</p>", "p"))),
+                            createGridColumnWithFields(18, List.of(createInputComponent(label)))
+                    );
+                    fields.add(createGridRow(columns));
+                    return; // 成功匹配并处理后，不再执行后续逻辑
+                }
+            }
+        }
+        // --- 【修改结束】 ---
+
+
         // 简单的启发式规则：如果段落居中且有加粗，则认为是标题
         boolean isCentered = paragraph.getAlignment() == ParagraphAlignment.CENTER;
         boolean isBold = paragraph.getRuns().stream().anyMatch(XWPFRun::isBold);
@@ -97,50 +128,57 @@ public class WordImportService {
      * @param fields 表单字段列表
      */
     private void processTable(XWPFTable table, List<Map<String, Object>> fields) {
-        // --- 【核心修正】 ---
-        // 首先，确保表格有行，否则无法判断列数
         if (table.getRows() == null || table.getRows().isEmpty()) {
             log.warn("跳过一个没有行的空表格。");
             return;
         }
 
-        // 通过第一行的单元格数量来获取列数
-        int numCols = table.getRow(0).getTableCells().size();
-
-        // MVP 阶段：只处理常见的两列表单
-        if (numCols != 2) {
-            log.warn("跳过一个非2列表格的解析，列数: {}", numCols);
-            return;
-        }
-        // --- 【修正结束】 ---
-
-        List<Map<String, Object>> columns = new ArrayList<>();
-        // 左列
-        columns.add(createGridColumn(12));
-        // 右列
-        columns.add(createGridColumn(12));
-
         for (XWPFTableRow row : table.getRows()) {
             List<XWPFTableCell> cells = row.getTableCells();
-            // 再次确认当前行是否也是2列，以应对合并单元格等复杂情况
-            if (cells.size() == 2) {
-                String label = cells.get(0).getText().trim().replaceAll("[:：\\s]+$", ""); // 清理标签文本
+            int numCells = cells.size();
 
-                if (!label.isEmpty()) {
-                    // 左侧单元格作为标签，放入左侧布局列
-                    ((List<Map<String, Object>>) columns.get(0).get("fields"))
-                            .add(createStaticTextComponent("<p style=\"text-align: right; font-weight: bold;\">" + label + "</p>", "p"));
+            // --- 【核心修改：支持2列和4列表格】 ---
+            if (numCells == 2 || numCells == 4) {
+                List<Map<String, Object>> gridColumns = new ArrayList<>();
+                int span = 24 / numCells; // 计算每列的栅格宽度
 
-                    // 右侧单元格作为输入框，放入右侧布局列
-                    ((List<Map<String, Object>>) columns.get(1).get("fields"))
-                            .add(createInputComponent(label));
+                for (int i = 0; i < numCells; i += 2) {
+                    if (i + 1 < numCells) {
+                        String label = cells.get(i).getText().trim().replaceAll("[:：\\s]+$", "");
+
+                        // 检查标签单元格是否有内容，并且值单元格是否基本为空或包含占位符
+                        String valueCellText = cells.get(i + 1).getText().trim();
+                        if (!label.isEmpty()) {
+                            // 标签列
+                            gridColumns.add(createGridColumnWithFields(span,
+                                    List.of(createStaticTextComponent("<p style=\"text-align: right; font-weight: bold;\">" + label + "</p>", "p"))));
+                            // 输入框列
+                            gridColumns.add(createGridColumnWithFields(span,
+                                    List.of(createInputComponent(label))));
+                        } else {
+                            // 如果标签单元格为空，则将两个单元格都作为空列处理，以保持布局
+                            gridColumns.add(createGridColumnWithFields(span, Collections.emptyList()));
+                            gridColumns.add(createGridColumnWithFields(span, Collections.emptyList()));
+                        }
+                    }
                 }
+                if (!gridColumns.isEmpty()) {
+                    fields.add(createGridRow(gridColumns));
+                }
+            } else if (numCells == 1) {
+                // 处理合并的单元格，可能是一个标题或一个多行文本域
+                String cellText = cells.get(0).getText().trim();
+                if (!cellText.isEmpty()) {
+                    // 简单判断：如果文本较长，则认为是多行文本，否则是标题
+                    if (cellText.length() > 50) {
+                        fields.add(createTextareaComponent(cellText));
+                    } else {
+                        fields.add(createStaticTextComponent("<h3>" + cellText + "</h3>", "h3"));
+                    }
+                }
+            } else {
+                log.warn("跳过一个非1、2、4列表格行的解析，列数: {}", numCells);
             }
-        }
-
-        // 如果表格解析出了有效的组件，则将其作为一个 GridRow 添加
-        if (!((List<Map<String,Object>>) columns.get(0).get("fields")).isEmpty()) {
-            fields.add(createGridRow(columns));
         }
     }
 
@@ -164,11 +202,25 @@ public class WordImportService {
         field.put("type", "Input");
         field.put("label", label);
         field.put("props", Map.of("placeholder", "请输入" + label));
-        // 默认校验规则
         field.put("rules", List.of(Map.of("required", false, "message", "此项为必填项")));
         field.put("visibility", Map.of("enabled", false, "condition", "AND", "rules", Collections.emptyList()));
         return field;
     }
+
+    /**
+     * 创建一个多行文本框组件 (Textarea)
+     */
+    private Map<String, Object> createTextareaComponent(String label) {
+        Map<String, Object> field = new LinkedHashMap<>();
+        field.put("id", "textarea_" + UUID.randomUUID().toString().substring(0, 4));
+        field.put("type", "Textarea");
+        field.put("label", label);
+        field.put("props", Map.of("placeholder", "请输入" + label, "rows", 4));
+        field.put("rules", List.of(Map.of("required", false, "message", "此项为必填项")));
+        field.put("visibility", Map.of("enabled", false, "condition", "AND", "rules", Collections.emptyList()));
+        return field;
+    }
+
 
     /**
      * 创建一个栅格布局行 (GridRow)
@@ -183,13 +235,13 @@ public class WordImportService {
     }
 
     /**
-     * 创建一个栅格布局列 (GridCol)
+     * 创建一个带有指定内部字段的栅格布局列 (GridCol)
      */
-    private Map<String, Object> createGridColumn(int span) {
+    private Map<String, Object> createGridColumnWithFields(int span, List<Map<String, Object>> fields) {
         Map<String, Object> col = new LinkedHashMap<>();
         col.put("type", "GridCol");
         col.put("props", Map.of("span", span));
-        col.put("fields", new ArrayList<>());
+        col.put("fields", new ArrayList<>(fields)); // 使用 new ArrayList 确保是可变的
         return col;
     }
 }

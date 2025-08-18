@@ -126,6 +126,7 @@
 </template>
 
 <script setup>
+// ... script部分保持不变 ...
 import { ref, reactive, computed } from 'vue';
 import { useRouter } from 'vue-router';
 import { message, Modal } from 'ant-design-vue';
@@ -501,13 +502,50 @@ const handleWordImport = async (event) => {
     }
   });
 };
-
 </script>
 
+<!-- 【核心修改】新增/修改样式 -->
 <style scoped>
-.builder-container { display: flex; gap: 16px; padding: 0 24px 24px; }
-.palette { width: 220px; flex-shrink: 0; }
-.canvas { flex-grow: 1; border: 1px dashed #d9d9d9; padding: 16px; background: #fafafa; min-height: 600px; overflow-y: auto; }
-.palette-item { padding: 8px 12px; margin-bottom: 8px; background: #f7f7f7; border: 1px solid #d9d9d9; border-radius: 4px; cursor: grab; text-align: center; }
-.canvas-placeholder { text-align: center; color: #aaa; padding: 64px 0; }
+.page-container {
+  display: flex;
+  flex-direction: column;
+  height: 100%; /* 确保 page-container 占满其在 AppLayout 中的父容器高度 */
+}
+
+.builder-container {
+  display: flex;
+  gap: 16px;
+  padding: 0 24px 24px;
+  flex-grow: 1; /* 关键：让此容器填满 page-container 的剩余垂直空间 */
+  min-height: 0; /* 关键：防止 flex 子项在内容过多时溢出容器 */
+}
+
+.palette {
+  width: 220px;
+  flex-shrink: 0;
+}
+
+.canvas {
+  flex-grow: 1;
+  border: 1px dashed #d9d9d9;
+  padding: 16px;
+  background: #fafafa;
+  overflow-y: auto; /* 画布内容多时，内部滚动 */
+}
+
+.palette-item {
+  padding: 8px 12px;
+  margin-bottom: 8px;
+  background: #f7f7f7;
+  border: 1px solid #d9d9d9;
+  border-radius: 4px;
+  cursor: grab;
+  text-align: center;
+}
+
+.canvas-placeholder {
+  text-align: center;
+  color: #aaa;
+  padding: 64px 0;
+}
 </style>

@@ -110,50 +110,113 @@ public class WorkflowService {
                     return dto;
                 })
                 .orElseGet(() -> {
-                    // --- 【修改】默认模板现在使用服务任务来动态查找审批人 ---
+                    // --- 【核心修改】提供一个更完整、更健壮的默认BPMN模板 ---
                     String processDefinitionKey = "Process_Form_" + formId;
                     String defaultXml = String.format("""
-
                         <?xml version="1.0" encoding="UTF-8"?>
-                        <bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" xmlns:di="http://www.omg.org/spec/DD/20100524/DI" xmlns:camunda="http://camunda.org/schema/1.0/bpmn" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" id="Definitions_1" targetNamespace="http://bpmn.io/schema/bpmn" exporter="Camunda Modeler" exporterVersion="5.20.0">
+                        <bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" xmlns:camunda="http://camunda.org/schema/1.0/bpmn" xmlns:di="http://www.omg.org/spec/DD/20100524/DI" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" id="Definitions_0zla03s" targetNamespace="http://bpmn.io/schema/bpmn" exporter="Camunda Modeler" exporterVersion="5.20.0">
                           <bpmn:process id="%s" name="新流程" isExecutable="true" camunda:historyTimeToLive="P180D">
                             <bpmn:startEvent id="StartEvent_1" name="开始">
-                              <bpmn:outgoing>Flow_1</bpmn:outgoing>
+                              <bpmn:outgoing>Flow_Start_To_Approve</bpmn:outgoing>
                             </bpmn:startEvent>
-                            <bpmn:sequenceFlow id="Flow_1" sourceRef="StartEvent_1" targetRef="Activity_ManagerApprove" />
-                            <bpmn:userTask id="Activity_ManagerApprove" name="部门经理审批" camunda:assignee="${managerId}">
-                              <bpmn:incoming>Flow_1</bpmn:incoming>
-                              <bpmn:outgoing>Flow_2</bpmn:outgoing>
+                            <bpmn:sequenceFlow id="Flow_Start_To_Approve" sourceRef="StartEvent_1" targetRef="Activity_ManagerApprove" />
+                            <bpmn:userTask id="Activity_ManagerApprove" name="上级审批" camunda:assignee="${managerId}">
+                              <bpmn:incoming>Flow_Start_To_Approve</bpmn:incoming>
+                              <bpmn:outgoing>Flow_Approve_To_Gateway</bpmn:outgoing>
                             </bpmn:userTask>
-                            <bpmn:endEvent id="EndEvent_1" name="结束">
-                              <bpmn:incoming>Flow_2</bpmn:incoming>
+                            <bpmn:exclusiveGateway id="Gateway_Approved" name="审批是否通过?">
+                              <bpmn:incoming>Flow_Approve_To_Gateway</bpmn:incoming>
+                              <bpmn:outgoing>Flow_Approved</bpmn:outgoing>
+                              <bpmn:outgoing>Flow_Rejected</bpmn:outgoing>
+                            </bpmn:exclusiveGateway>
+                            <bpmn:sequenceFlow id="Flow_Approve_To_Gateway" sourceRef="Activity_ManagerApprove" targetRef="Gateway_Approved" />
+                            <bpmn:sequenceFlow id="Flow_Approved" name="通过" sourceRef="Gateway_Approved" targetRef="Activity_Archive">
+                              <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">${approved}</bpmn:conditionExpression>
+                            </bpmn:sequenceFlow>
+                            <bpmn:sequenceFlow id="Flow_Rejected" name="拒绝" sourceRef="Gateway_Approved" targetRef="Activity_Reject" />
+                            <bpmn:serviceTask id="Activity_Archive" name="归档(通过)" camunda:delegateExpression="${archiveProcessDelegate}">
+                              <bpmn:incoming>Flow_Approved</bpmn:incoming>
+                              <bpmn:outgoing>Flow_Archive_ToEnd</bpmn:outgoing>
+                            </bpmn:serviceTask>
+                            <bpmn:endEvent id="EndEvent_Approved" name="审批通过">
+                              <bpmn:incoming>Flow_Archive_ToEnd</bpmn:incoming>
                             </bpmn:endEvent>
-                            <bpmn:sequenceFlow id="Flow_2" sourceRef="Activity_ManagerApprove" targetRef="EndEvent_1" />
+                            <bpmn:sequenceFlow id="Flow_Archive_ToEnd" sourceRef="Activity_Archive" targetRef="EndEvent_Approved" />
+                            <bpmn:serviceTask id="Activity_Reject" name="归档(拒绝)" camunda:delegateExpression="${rejectProcessDelegate}">
+                              <bpmn:incoming>Flow_Rejected</bpmn:incoming>
+                              <bpmn:outgoing>Flow_Reject_ToEnd</bpmn:outgoing>
+                            </bpmn:serviceTask>
+                            <bpmn:endEvent id="EndEvent_Rejected" name="审批拒绝">
+                              <bpmn:incoming>Flow_Reject_ToEnd</bpmn:incoming>
+                            </bpmn:endEvent>
+                            <bpmn:sequenceFlow id="Flow_Reject_ToEnd" sourceRef="Activity_Reject" targetRef="EndEvent_Rejected" />
                           </bpmn:process>
                           <bpmndi:BPMNDiagram id="BPMNDiagram_1">
                             <bpmndi:BPMNPlane id="BPMNPlane_1" bpmnElement="%s">
-                              <bpmndi:BPMNShape id="StartEvent_1_di" bpmnElement="StartEvent_1">
+                              <bpmndi:BPMNShape id="_BPMNShape_StartEvent_2" bpmnElement="StartEvent_1">
                                 <dc:Bounds x="179" y="102" width="36" height="36" />
                                 <bpmndi:BPMNLabel>
                                   <dc:Bounds x="185" y="145" width="22" height="14" />
                                 </bpmndi:BPMNLabel>
                               </bpmndi:BPMNShape>
-                              <bpmndi:BPMNShape id="Activity_ManagerApprove_di" bpmnElement="Activity_ManagerApprove">
+                              <bpmndi:BPMNShape id="Activity_1c76uyj_di" bpmnElement="Activity_ManagerApprove">
                                 <dc:Bounds x="270" y="80" width="100" height="80" />
                               </bpmndi:BPMNShape>
-                              <bpmndi:BPMNShape id="EndEvent_1_di" bpmnElement="EndEvent_1">
-                                <dc:Bounds x="432" y="102" width="36" height="36" />
+                              <bpmndi:BPMNShape id="Gateway_0j5x0jd_di" bpmnElement="Gateway_Approved" isMarkerVisible="true">
+                                <dc:Bounds x="435" y="95" width="50" height="50" />
                                 <bpmndi:BPMNLabel>
-                                  <dc:Bounds x="438" y="145" width="22" height="14" />
+                                  <dc:Bounds x="424" y="65" width="72" height="14" />
                                 </bpmndi:BPMNLabel>
                               </bpmndi:BPMNShape>
-                              <bpmndi:BPMNEdge id="Flow_1_di" bpmnElement="Flow_1">
+                              <bpmndi:BPMNShape id="Activity_0sq1112_di" bpmnElement="Activity_Archive">
+                                <dc:Bounds x="540" y="80" width="100" height="80" />
+                              </bpmndi:BPMNShape>
+                              <bpmndi:BPMNShape id="Event_1l8csf7_di" bpmnElement="EndEvent_Approved">
+                                <dc:Bounds x="702" y="102" width="36" height="36" />
+                                <bpmndi:BPMNLabel>
+                                  <dc:Bounds x="695" y="145" width="51" height="14" />
+                                </bpmndi:BPMNLabel>
+                              </bpmndi:BPMNShape>
+                              <bpmndi:BPMNShape id="Activity_0s140wi_di" bpmnElement="Activity_Reject">
+                                <dc:Bounds x="540" y="200" width="100" height="80" />
+                                <bpmndi:BPMNLabel />
+                              </bpmndi:BPMNShape>
+                              <bpmndi:BPMNShape id="Event_06d8x10_di" bpmnElement="EndEvent_Rejected">
+                                <dc:Bounds x="702" y="222" width="36" height="36" />
+                                <bpmndi:BPMNLabel>
+                                  <dc:Bounds x="695" y="265" width="51" height="14" />
+                                </bpmndi:BPMNLabel>
+                              </bpmndi:BPMNShape>
+                              <bpmndi:BPMNEdge id="Flow_00yq16d_di" bpmnElement="Flow_Start_To_Approve">
                                 <di:waypoint x="215" y="120" />
                                 <di:waypoint x="270" y="120" />
                               </bpmndi:BPMNEdge>
-                              <bpmndi:BPMNEdge id="Flow_2_di" bpmnElement="Flow_2">
+                              <bpmndi:BPMNEdge id="Flow_1c79aab_di" bpmnElement="Flow_Approve_To_Gateway">
                                 <di:waypoint x="370" y="120" />
-                                <di:waypoint x="432" y="120" />
+                                <di:waypoint x="435" y="120" />
+                              </bpmndi:BPMNEdge>
+                              <bpmndi:BPMNEdge id="Flow_08vqy1p_di" bpmnElement="Flow_Approved">
+                                <di:waypoint x="485" y="120" />
+                                <di:waypoint x="540" y="120" />
+                                <bpmndi:BPMNLabel>
+                                  <dc:Bounds x="506" y="102" width="22" height="14" />
+                                </bpmndi:BPMNLabel>
+                              </bpmndi:BPMNEdge>
+                              <bpmndi:BPMNEdge id="Flow_1y5bbd1_di" bpmnElement="Flow_Rejected">
+                                <di:waypoint x="460" y="145" />
+                                <di:waypoint x="460" y="240" />
+                                <di:waypoint x="540" y="240" />
+                                <bpmndi:BPMNLabel>
+                                  <dc:Bounds x="466" y="190" width="22" height="14" />
+                                </bpmndi:BPMNLabel>
+                              </bpmndi:BPMNEdge>
+                              <bpmndi:BPMNEdge id="Flow_0k64d3v_di" bpmnElement="Flow_Archive_ToEnd">
+                                <di:waypoint x="640" y="120" />
+                                <di:waypoint x="702" y="120" />
+                              </bpmndi:BPMNEdge>
+                              <bpmndi:BPMNEdge id="Flow_0x6o019_di" bpmnElement="Flow_Reject_ToEnd">
+                                <di:waypoint x="640" y="240" />
+                                <di:waypoint x="702" y="240" />
                               </bpmndi:BPMNEdge>
                             </bpmndi:BPMNPlane>
                           </bpmndi:BPMNDiagram>

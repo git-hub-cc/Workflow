@@ -38,7 +38,8 @@ import FormItemRenderer from './viewer-components/FormItemRenderer.vue';
 import { flattenFields, initFormData } from '@/utils/formUtils.js';
 
 
-const props = defineProps({ formId: String });
+// ⭐ 核心修改: 允许 formId 接收字符串或数字类型
+const props = defineProps({ formId: [String, Number] });
 const router = useRouter();
 
 const loading = ref(true);

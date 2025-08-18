@@ -72,94 +72,52 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted, computed } from 'vue';
+import { ref, onMounted, computed } from 'vue';
 import { getOperationLogs } from '@/api';
-import { message } from 'ant-design-vue';
 import { SearchOutlined, ReloadOutlined } from '@ant-design/icons-vue';
-import dayjs from 'dayjs';
+// --- 【核心修改】引入 usePaginatedFetch hook ---
+import { usePaginatedFetch } from '@/composables/usePaginatedFetch.js';
 
-const loading = ref(false);
-const dataSource = ref([]);
-const pagination = reactive({
-  current: 1,
-  pageSize: 10,
-  total: 0,
-  showSizeChanger: true,
-  showTotal: (total) => `共 ${total} 条`,
-});
-
-const filterState = reactive({
-  operatorId: '',
-  module: undefined,
-  dateRange: [],
-});
+// --- 【核心修改】使用 hook 管理表格数据和状态 ---
+const {
+  loading,
+  dataSource,
+  pagination,
+  filterState,
+  handleTableChange,
+  handleSearch,
+  handleReset,
+  fetchData,
+} = usePaginatedFetch(
+    getOperationLogs,
+    { operatorId: '', module: undefined, dateRange: [] }, // 初始筛选条件
+    { defaultSort: 'operationTime,desc' }
+);
 
 const columns = [
   { title: 'ID', dataIndex: 'id', key: 'id', width: 80 },
-  { title: '操作人', key: 'operator', width: 180 },
-  { title: '操作时间', dataIndex: 'operationTime', key: 'operationTime', width: 180 },
+  { title: '操作人', key: 'operator', width: 180, sorter: true, dataIndex: 'operatorId' },
+  { title: '操作时间', dataIndex: 'operationTime', key: 'operationTime', width: 180, sorter: true },
   { title: 'IP地址', dataIndex: 'ipAddress', key: 'ipAddress', width: 140 },
-  { title: '操作模块', dataIndex: 'module', key: 'module', width: 120 },
+  { title: '操作模块', dataIndex: 'module', key: 'module', width: 120, sorter: true },
   { title: '具体操作', dataIndex: 'action', key: 'action', width: 150 },
   { title: '目标ID', dataIndex: 'targetId', key: 'targetId', ellipsis: true },
   { title: '操作详情', key: 'details', align: 'center', width: 120 },
 ];
 
-const fetchLogs = async () => {
-  loading.value = true;
-  try {
-    const params = {
-      page: pagination.current - 1,
-      size: pagination.pageSize,
-      sort: 'operationTime,desc',
-      operatorId: filterState.operatorId || null,
-      module: filterState.module || null,
-      startTime: filterState.dateRange?.[0] ? filterState.dateRange[0].startOf('day').toISOString() : null,
-      endTime: filterState.dateRange?.[1] ? filterState.dateRange[1].endOf('day').toISOString() : null,
-    };
-    const response = await getOperationLogs(params);
-    dataSource.value = response.content;
-    pagination.total = response.totalElements;
-  } catch (error) {
-    message.error('加载操作日志失败');
-  } finally {
-    loading.value = false;
-  }
-};
-
-onMounted(fetchLogs);
-
-const handleTableChange = (pager) => {
-  pagination.current = pager.current;
-  pagination.pageSize = pager.pageSize;
-  fetchLogs();
-};
-
-const handleSearch = () => {
-  pagination.current = 1;
-  fetchLogs();
-};
-
-const handleReset = () => {
-  filterState.operatorId = '';
-  filterState.module = undefined;
-  filterState.dateRange = [];
-  handleSearch();
-};
+onMounted(fetchData);
 
 // Details Modal
 const detailsModalVisible = ref(false);
 const currentDetails = ref('');
-
 const formattedDetails = computed(() => {
   try {
     const obj = JSON.parse(currentDetails.value);
-    return JSON.stringify(obj, null, 2); // 格式化JSON
+    return JSON.stringify(obj, null, 2);
   } catch (e) {
-    return currentDetails.value; // 如果不是JSON，直接返回原文
+    return currentDetails.value;
   }
 });
-
 const showDetailsModal = (details) => {
   currentDetails.value = details;
   detailsModalVisible.value = true;

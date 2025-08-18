@@ -4,11 +4,7 @@ import club.ppmc.workflow.aop.LogOperation;
 import club.ppmc.workflow.domain.*;
 import club.ppmc.workflow.dto.*;
 import club.ppmc.workflow.exception.ResourceNotFoundException;
-import club.ppmc.workflow.repository.LoginLogRepository;
-import club.ppmc.workflow.repository.OperationLogRepository;
-import club.ppmc.workflow.repository.RoleRepository;
-import club.ppmc.workflow.repository.UserGroupRepository;
-import club.ppmc.workflow.repository.UserRepository;
+import club.ppmc.workflow.repository.*;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.criteria.Predicate;
 import lombok.RequiredArgsConstructor;
@@ -53,6 +49,8 @@ public class AdminService {
     private final LoginLogRepository loginLogRepository;
     private final OperationLogRepository operationLogRepository;
     private final MenuService menuService;
+    // --- 【新增依赖】 ---
+    private final WorkflowTemplateRepository workflowTemplateRepository;
 
     // --- 流程实例管理 ---
     public List<ProcessInstanceDto> getActiveProcessInstances() {
@@ -254,6 +252,16 @@ public class AdminService {
         if (!role.getUsers().isEmpty()) {
             throw new IllegalStateException("无法删除角色，因为仍有 " + role.getUsers().size() + " 个用户属于该角色。");
         }
+
+        // --- 【核心修改：检查工作流模板中的使用情况】 ---
+        // 检查角色名是否被用作camunda:candidateGroups
+        String roleSearchPattern = "camunda:candidateGroups=\"" + role.getName() + "\"";
+        long workflowUsageCount = workflowTemplateRepository.countByBpmnXmlContaining(roleSearchPattern);
+        if (workflowUsageCount > 0) {
+            throw new IllegalStateException("无法删除角色 '" + role.getName() + "'，因为它正被 " + workflowUsageCount + " 个工作流模板用作候选组。");
+        }
+        // --- 【修改结束】 ---
+
         roleRepository.delete(role);
     }
 
@@ -293,6 +301,16 @@ public class AdminService {
         if (!group.getUsers().isEmpty()) {
             throw new IllegalStateException("无法删除用户组，因为仍有 " + group.getUsers().size() + " 个用户属于该组。");
         }
+
+        // --- 【核心修改：检查工作流模板中的使用情况】 ---
+        // 检查用户组名是否被用作camunda:candidateGroups
+        String groupSearchPattern = "camunda:candidateGroups=\"" + group.getName() + "\"";
+        long workflowUsageCount = workflowTemplateRepository.countByBpmnXmlContaining(groupSearchPattern);
+        if (workflowUsageCount > 0) {
+            throw new IllegalStateException("无法删除用户组 '" + group.getName() + "'，因为它正被 " + workflowUsageCount + " 个工作流模板用作候选组。");
+        }
+        // --- 【修改结束】 ---
+
         userGroupRepository.delete(group);
     }
 

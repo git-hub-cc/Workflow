@@ -18,4 +18,12 @@ public interface WorkflowTemplateRepository extends JpaRepository<WorkflowTempla
      * @return Optional<WorkflowTemplate>
      */
     Optional<WorkflowTemplate> findByFormDefinitionId(Long formDefinitionId);
+
+    /**
+     * 【新增】统计有多少工作流模板的BPMN XML内容包含了指定的文本。
+     * 这对于检查角色或用户组是否在任何流程定义中被使用非常有用。
+     * @param searchText 要在 bpmnXml 字段中搜索的文本
+     * @return 包含该文本的模板数量
+     */
+    long countByBpmnXmlContaining(String searchText);
 }

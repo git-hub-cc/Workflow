@@ -23,7 +23,6 @@ export const useUserStore = defineStore('user', () => {
 
     // --- Actions ---
     async function handleLogin(credentials) {
-        // ...登录逻辑无变化
         loading.value = true;
         try {
             const response = await login(credentials);
@@ -32,6 +31,7 @@ export const useUserStore = defineStore('user', () => {
             localStorage.setItem('token', token.value);
             localStorage.setItem('user', JSON.stringify(currentUser.value));
 
+            // ⭐ 核心修改: 先获取并设置菜单，再进行路由跳转
             await fetchAndSetMenus();
 
             // 登录后预加载基础数据
@@ -42,12 +42,11 @@ export const useUserStore = defineStore('user', () => {
                 await fetchAllGroups();
             }
 
-            const firstMenu = findFirstNavigableMenu(menus.value);
-            const redirectPath = firstMenu ? firstMenu.path : '/';
-            await router.push(redirectPath);
+            // ⭐ 核心修改: 统一跳转到根路径，让导航守卫处理后续逻辑
+            await router.push('/');
             message.success(`欢迎回来, ${currentUser.value.name}`);
 
-        } catch (error) { /* ... */ } finally {
+        } catch (error) { /* 错误由拦截器处理 */ } finally {
             loading.value = false;
         }
     }
@@ -108,12 +107,6 @@ export const useUserStore = defineStore('user', () => {
         if (!isAdmin.value) return;
         try { allGroups.value = await getGroups(); } catch (error) { console.error(error); }
     }
-
-    // --- 【核心重构】不再需要手动更新 state 的 actions ---
-    // 增删改操作完成后，将直接调用 fetchUsersForManagement 来刷新整个列表，保证数据绝对同步。
-    // 这简化了逻辑，避免了手动操作可能带来的不一致性。
-
-    function findFirstNavigableMenu(menuItems) { /* ... */ }
 
     return {
         token, currentUser, menus,

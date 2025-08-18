@@ -1,5 +1,9 @@
 <template>
   <div>
+    <!-- 引入通用属性配置 -->
+    <GenericProps :field="field" :all-fields="allFields" />
+
+    <a-divider>文件上传配置</a-divider>
     <a-form-item label="是否允许多选">
       <a-switch v-model:checked="field.props.multiple" />
     </a-form-item>
@@ -10,5 +14,16 @@
 </template>
 
 <script setup>
-defineProps(['field']);
+import GenericProps from './GenericProps.vue';
+
+defineProps({
+  field: {
+    type: Object,
+    required: true,
+  },
+  allFields: {
+    type: Array,
+    required: true,
+  },
+});
 </script>
