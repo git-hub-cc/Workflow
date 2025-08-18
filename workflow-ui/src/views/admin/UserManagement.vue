@@ -33,28 +33,43 @@
           <template v-else-if="column.key === 'managerName'">
             {{ getManagerName(record.managerId) }}
           </template>
+          <!-- 【核心优化】将 Dropdown 菜单改为直接显示的文字链接按钮 -->
           <template v-else-if="column.key === 'actions'">
-            <a-dropdown>
-              <a-button type="link">操作 <DownOutlined /></a-button>
-              <template #overlay>
-                <a-menu>
-                  <a-menu-item @click="showModal(record)">
-                    <EditOutlined /> 编辑
-                  </a-menu-item>
-                  <a-menu-item @click="handleResetPassword(record.id)">
-                    <ReloadOutlined /> 重置密码
-                  </a-menu-item>
-                  <a-menu-divider />
-                  <a-menu-item
-                      @click="handleDelete(record.id)"
-                      danger
-                      :disabled="record.id === userStore.currentUser.id || record.status === 'INACTIVE'"
-                  >
-                    <UserDeleteOutlined /> 禁用
-                  </a-menu-item>
-                </a-menu>
-              </template>
-            </a-dropdown>
+            <a-space>
+              <a-button type="link" size="small" @click="showModal(record)">
+                编辑
+              </a-button>
+              <a-button type="link" size="small" @click="handleResetPassword(record.id)">
+                重置密码
+              </a-button>
+              <a-popconfirm
+                  v-if="record.status === 'ACTIVE'"
+                  title="确认禁用用户？"
+                  content="该用户将无法登录系统。"
+                  ok-text="确认禁用"
+                  @confirm="handleDisable(record.id)"
+              >
+                <a-button
+                    type="link"
+                    size="small"
+                    danger
+                    :disabled="record.id === userStore.currentUser.id"
+                >
+                  禁用
+                </a-button>
+              </a-popconfirm>
+              <a-popconfirm
+                  v-if="record.status === 'INACTIVE'"
+                  title="确认启用用户？"
+                  content="该用户将可以正常登录系统。"
+                  ok-text="确认启用"
+                  @confirm="handleEnable(record.id)"
+              >
+                <a-button type="link" size="small">
+                  启用
+                </a-button>
+              </a-popconfirm>
+            </a-space>
           </template>
         </template>
       </a-table>
@@ -141,9 +156,10 @@
 <script setup>
 import { ref, reactive, onMounted, computed } from 'vue';
 import { useUserStore } from '@/stores/user';
-import { createUser, updateUser, deleteUser, resetPassword, getOrganizationTree, getDepartmentTree } from '@/api';
+import { createUser, updateUser, disableUser, enableUser, resetPassword, getOrganizationTree, getDepartmentTree } from '@/api';
 import { message, Modal } from 'ant-design-vue';
-import { PlusOutlined, DownOutlined, EditOutlined, ReloadOutlined, UserDeleteOutlined } from '@ant-design/icons-vue';
+// 【核心优化】移除了不再使用的 Dropdown 菜单相关图标
+import { PlusOutlined } from '@ant-design/icons-vue';
 
 const userStore = useUserStore();
 const loading = ref(false);
@@ -295,21 +311,20 @@ const resetForm = () => {
   });
 };
 
-const handleDelete = (userId) => {
-  Modal.confirm({
-    title: '确认禁用用户',
-    content: `确定要禁用用户 ${userId} 吗？该用户将无法登录系统。`,
-    okText: '确认禁用',
-    okType: 'danger',
-    cancelText: '取消',
-    onOk: async () => {
-      try {
-        await deleteUser(userId);
-        message.success('用户禁用成功！');
-        await userStore.fetchUsersForManagement();
-      } catch (error) {}
-    },
-  });
+const handleDisable = async (userId) => {
+  try {
+    await disableUser(userId);
+    message.success('用户禁用成功！');
+    await userStore.fetchUsersForManagement();
+  } catch (error) {}
+};
+
+const handleEnable = async (userId) => {
+  try {
+    await enableUser(userId);
+    message.success('用户启用成功！');
+    await userStore.fetchUsersForManagement();
+  } catch (error) {}
 };
 
 const handleResetPassword = (userId) => {

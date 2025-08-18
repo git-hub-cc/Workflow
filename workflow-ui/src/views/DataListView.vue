@@ -1,13 +1,20 @@
 <template>
   <div class="page-container">
-    <a-page-header :title="pageTitle" />
+    <a-page-header :title="pageTitle">
+      <!-- 【新增】新增按钮 -->
+      <template #extra>
+        <a-button type="primary" @click="handleAddNew">
+          <template #icon><PlusOutlined /></template>
+          新增
+        </a-button>
+      </template>
+    </a-page-header>
 
     <div style="padding: 24px;">
-      <!-- 筛选区域 -->
+      <!-- 【核心修改】筛选区域动态生成 -->
       <a-card :bordered="false" style="margin-bottom: 24px;">
         <a-form :model="filterState" layout="inline">
-          <!-- 动态生成筛选条件 -->
-          <a-form-item v-for="filter in filterConfig" :key="filter.id" :label="filter.label">
+          <a-form-item v-for="filter in filterableFields" :key="filter.id" :label="filter.label">
             <component
                 :is="getComponentByType(filter.type)"
                 v-model:value="filterState[filter.id]"
@@ -47,38 +54,63 @@
           <template v-else-if="column.key === 'createdAt'">
             {{ new Date(record.createdAt).toLocaleString() }}
           </template>
+          <!-- 【核心修改】操作列 -->
           <template v-else-if="column.key === 'actions'">
-            <a-button type="link" @click="goToDetail(record.id)">查看详情</a-button>
+            <a-space>
+              <a-button type="link" size="small" @click="goToDetail(record.id)">查看</a-button>
+              <a-button type="link" size="small" @click="handleEdit(record)">编辑</a-button>
+              <a-popconfirm
+                  title="确定要删除这条记录吗？"
+                  content="如果有关联的流程正在运行，删除将失败。"
+                  @confirm="handleDelete(record)"
+              >
+                <a-button type="link" size="small" danger>删除</a-button>
+              </a-popconfirm>
+            </a-space>
           </template>
           <template v-else>
-            <!-- 【核心修改】从 record 中直接取值，因为后端返回的数据已包含 dataJson 的内容 -->
-            {{ record[column.dataIndex] }}
+            {{ record.dataJson ? JSON.parse(record.dataJson)[column.dataIndex] : 'N/A' }}
           </template>
         </template>
       </a-table>
     </div>
+
+    <!-- 【新增】编辑模态框 -->
+    <EditSubmissionModal
+        v-model:open="editModalVisible"
+        :submission-id="currentEditingId"
+        @refresh="fetchData"
+    />
   </div>
 </template>
 
 <script setup>
 import { ref, computed, watch, onMounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { getFormById, getSubmissions } from '@/api';
-import { message } from 'ant-design-vue';
-import { SearchOutlined, ReloadOutlined } from '@ant-design/icons-vue';
-import { flattenFields } from '@/utils/formUtils.js';
+// 【核心修改】引入新的API
+import { getFormById, getSubmissions, deleteSubmission } from '@/api';
+import { message, Modal } from 'ant-design-vue';
+import { SearchOutlined, ReloadOutlined, PlusOutlined } from '@ant-design/icons-vue';
 import { usePaginatedFetch } from '@/composables/usePaginatedFetch.js';
+// 【核心修改】引入新增的组件
+import EditSubmissionModal from '@/views/viewer-components/EditSubmissionModal.vue';
 
 const route = useRoute();
 const router = useRouter();
 
 const pageTitle = ref(route.meta.title || '数据列表');
 const formId = ref(route.meta.formId);
-const menuId = ref(route.meta.menuId); // 【新增】获取 menuId
-const formDefinition = ref(null);
-const filterConfig = ref([]);
+const menuId = ref(route.meta.menuId);
 
-// 【核心修改】更新 API 调用函数，传递 menuId
+// 【核心修改】动态字段配置状态
+const formDefinition = ref(null);
+const filterableFields = ref([]);
+const listDisplayFields = ref([]);
+
+// 【新增】编辑模态框状态
+const editModalVisible = ref(false);
+const currentEditingId = ref(null);
+
 const apiFunction = (params) => getSubmissions(formId.value, { ...params, menuId: menuId.value });
 
 const {
@@ -90,88 +122,92 @@ const {
   handleSearch,
   handleReset,
   fetchData,
-} = usePaginatedFetch(
-    apiFunction,
-    {},
-    { defaultSort: 'createdAt,desc' }
-);
+} = usePaginatedFetch(apiFunction, {}, { defaultSort: 'createdAt,desc' });
 
-// 动态生成表格列
+// 【核心修改】动态生成表格列
 const columns = computed(() => {
-  if (!formDefinition.value) return [];
-  const allFields = flattenFields(formDefinition.value.schema.fields);
-
+  if (!listDisplayFields.value) return [];
   const baseColumns = [
     { title: '提交人', dataIndex: 'submitterName', key: 'submitterName', width: 120 },
     { title: '流程状态', dataIndex: 'workflowStatus', key: 'workflowStatus', width: 120, align: 'center' },
   ];
 
-  // 动态列现在从 dataJson 中提取
-  const dynamicColumns = allFields
-      .filter(f => !['GridRow', 'GridCol', 'Collapse', 'StaticText', 'RichText', 'Subform'].includes(f.type)) // 过滤掉不适合在表格中展示的组件
-      .slice(0, 4) // 最多显示4个动态列
-      .map(field => ({
-        title: field.label,
-        dataIndex: field.id, // dataIndex 直接使用字段 ID
-        key: field.id,
-        ellipsis: true,
-      }));
+  const dynamicColumns = listDisplayFields.value.map(field => ({
+    title: field.label,
+    dataIndex: field.id,
+    key: field.id,
+    ellipsis: true,
+  }));
 
   const finalColumns = [
     { title: '提交时间', dataIndex: 'createdAt', key: 'createdAt', width: 180, sorter: true },
-    { title: '操作', key: 'actions', width: 120, align: 'center' },
+    { title: '操作', key: 'actions', width: 180, align: 'center' },
   ];
   return [...baseColumns, ...dynamicColumns, ...finalColumns];
 });
 
-// 获取表单定义并初始化页面
 const initialize = async () => {
   if (!formId.value) {
     message.error("页面配置错误：未关联表单定义！");
     return;
   }
+  loading.value = true;
   try {
     const res = await getFormById(formId.value);
-    res.schema = JSON.parse(res.schemaJson);
     formDefinition.value = res;
+    filterableFields.value = res.filterableFields || [];
+    listDisplayFields.value = res.listDisplayFields || [];
 
-    // 动态设置筛选条件
-    const allFields = flattenFields(res.schema.fields);
-    filterConfig.value = allFields.filter(f => ['Input', 'Select', 'DatePicker'].includes(f.type)).slice(0, 2);
-    filterConfig.value.forEach(f => {
+    // 初始化筛选条件
+    filterableFields.value.forEach(f => {
       if (!(f.id in filterState)) {
         filterState[f.id] = undefined;
       }
     });
 
     await fetchData();
-
   } catch (error) {
     message.error("初始化页面失败");
+  } finally {
+    loading.value = false;
   }
 };
 
-// 监听路由元信息变化，支持在同一组件实例中切换不同菜单
 watch(() => route.meta, (newMeta) => {
   if (newMeta && newMeta.menuId && newMeta.menuId !== menuId.value) {
     pageTitle.value = newMeta.title;
     formId.value = newMeta.formId;
     menuId.value = newMeta.menuId;
-    handleReset(); // 重置筛选条件
-    initialize();   // 重新初始化页面
+    handleReset();
+    initialize();
   }
 }, { immediate: true });
 
-onMounted(() => {
-  // watch 的 immediate: true 已经会调用一次 initialize
-});
+// --- 【新增】操作处理函数 ---
+const handleAddNew = () => {
+  router.push({ name: 'form-viewer', params: { formId: formId.value } });
+};
+
+const handleEdit = (record) => {
+  currentEditingId.value = record.id;
+  editModalVisible.value = true;
+};
+
+const handleDelete = async (record) => {
+  try {
+    await deleteSubmission(record.id);
+    message.success("删除成功！");
+    await fetchData(); // 刷新列表
+  } catch (error) {
+    // 错误已由API拦截器处理
+  }
+};
 
 const goToDetail = (submissionId) => {
   router.push({ name: 'submission-detail', params: { submissionId } });
 };
 
-// Helper Functions
-const getComponentByType = (type) => ({ 'Input': 'a-input', 'DatePicker': 'a-date-picker' }[type] || 'a-input');
+const getComponentByType = (type) => ({ 'Input': 'a-input', 'DatePicker': 'a-date-picker', 'Select': 'a-select' }[type] || 'a-input');
 const getStatusColor = (status) => ({ '审批中': 'processing', '已通过': 'success', '已拒绝': 'error' }[status] || 'default');
 </script>
 

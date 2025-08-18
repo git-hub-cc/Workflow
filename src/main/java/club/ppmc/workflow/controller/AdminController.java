@@ -88,9 +88,15 @@ public class AdminController {
     }
 
     @DeleteMapping("/users/{id}")
-    public ResponseEntity<Void> deleteUser(@PathVariable String id) {
-        adminService.deleteUser(id);
+    public ResponseEntity<Void> disableUser(@PathVariable String id) {
+        adminService.disableUser(id);
         return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/users/{id}/enable")
+    public ResponseEntity<Void> enableUser(@PathVariable String id) {
+        adminService.enableUser(id);
+        return ResponseEntity.ok().build();
     }
 
     @PostMapping("/users/{id}/reset-password")

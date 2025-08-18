@@ -2,16 +2,18 @@ package club.ppmc.workflow.service;
 
 import club.ppmc.workflow.aop.LogOperation;
 import club.ppmc.workflow.domain.*;
-import club.ppmc.workflow.dto.CreateFormDefinitionRequest;
-import club.ppmc.workflow.dto.CreateFormSubmissionRequest;
-import club.ppmc.workflow.dto.FormDefinitionResponse;
-import club.ppmc.workflow.dto.FormSubmissionResponse;
+import club.ppmc.workflow.dto.*;
+import club.ppmc.workflow.exception.ResourceInUseException;
 import club.ppmc.workflow.exception.ResourceNotFoundException;
 import club.ppmc.workflow.exception.UnauthorizedException;
 import club.ppmc.workflow.repository.*;
+import club.ppmc.workflow.utils.FormSchemaParser;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.persistence.criteria.Join;
 import jakarta.persistence.criteria.Predicate;
+import jakarta.persistence.criteria.Subquery;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
@@ -22,10 +24,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.CollectionUtils;
 import org.springframework.util.StringUtils;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 import java.util.stream.Collectors;
 
 /**
@@ -35,6 +34,7 @@ import java.util.stream.Collectors;
 @Service("appFormService")
 @RequiredArgsConstructor
 @Transactional
+@Slf4j
 public class FormService {
 
     private final FormDefinitionRepository formDefinitionRepository;
@@ -45,6 +45,7 @@ public class FormService {
     private final FileService fileService;
     private final MenuRepository menuRepository;
     private final WorkflowTemplateRepository workflowTemplateRepository;
+    private final ObjectMapper objectMapper;
 
     @LogOperation(module = "表单管理", action = "创建表单定义", targetIdExpression = "#result.name")
     public FormDefinitionResponse createFormDefinition(CreateFormDefinitionRequest request) {
@@ -70,16 +71,35 @@ public class FormService {
         return convertToDefinitionResponse(formDefinition);
     }
 
+    /**
+     * 【新增】更新表单定义
+     * @param id 表单ID
+     * @param request 更新请求
+     * @return 更新后的表单定义 DTO
+     */
+    @LogOperation(module = "表单管理", action = "更新表单定义", targetIdExpression = "#id")
+    public FormDefinitionResponse updateFormDefinition(Long id, CreateFormDefinitionRequest request) {
+        FormDefinition formDefinition = formDefinitionRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("未找到 ID 为 " + id + " 的表单定义"));
+
+        formDefinition.setName(request.getName());
+        formDefinition.setSchemaJson(request.getSchemaJson());
+
+        // @PreUpdate 注解会自动处理 updatedAt 字段的更新
+        FormDefinition updatedForm = formDefinitionRepository.save(formDefinition);
+        return convertToDefinitionResponse(updatedForm);
+    }
+
     @LogOperation(module = "表单管理", action = "删除表单定义", targetIdExpression = "#id")
     public void deleteFormDefinition(Long id) {
         if (!formDefinitionRepository.existsById(id)) {
             throw new ResourceNotFoundException("未找到表单定义 ID: " + id);
         }
         if (workflowTemplateRepository.findByFormDefinitionId(id).isPresent()) {
-            throw new IllegalStateException("无法删除：该表单已关联一个工作流模板。请先在流程设计器中解除关联或删除流程。");
+            throw new ResourceInUseException("无法删除：该表单已关联一个工作流模板。请先在流程设计器中解除关联或删除流程。");
         }
         if (menuRepository.existsByFormDefinitionId(id)) {
-            throw new IllegalStateException("无法删除：该表单已被一个或多个菜单项使用。请先在菜单管理中解除关联。");
+            throw new ResourceInUseException("无法删除：该表单已被一个或多个菜单项使用。请先在菜单管理中解除关联。");
         }
         formDefinitionRepository.deleteById(id);
     }
@@ -112,6 +132,32 @@ public class FormService {
         return convertToSubmissionResponse(finalSubmission);
     }
 
+    @LogOperation(module = "数据列表", action = "更新提交记录", targetIdExpression = "#submissionId")
+    public FormSubmissionResponse updateSubmission(Long submissionId, UpdateFormSubmissionRequest request) {
+        FormSubmission submission = formSubmissionRepository.findById(submissionId)
+                .orElseThrow(() -> new ResourceNotFoundException("未找到提交记录 ID: " + submissionId));
+
+        submission.setDataJson(request.getDataJson());
+
+        updateAttachments(submission, request.getAttachmentIds());
+
+        FormSubmission updatedSubmission = formSubmissionRepository.save(submission);
+        return convertToSubmissionResponse(updatedSubmission);
+    }
+
+    @LogOperation(module = "数据列表", action = "删除提交记录", targetIdExpression = "#submissionId")
+    public void deleteSubmission(Long submissionId) {
+        FormSubmission submission = formSubmissionRepository.findById(submissionId)
+                .orElseThrow(() -> new ResourceNotFoundException("未找到提交记录 ID: " + submissionId));
+
+        if (submission.getWorkflowInstance() != null && submission.getWorkflowInstance().getStatus() == WorkflowInstance.Status.PROCESSING) {
+            throw new ResourceInUseException("无法删除：该记录关联的流程正在进行中。");
+        }
+
+        formSubmissionRepository.delete(submission);
+    }
+
+
     @Transactional(readOnly = true)
     public Page<FormSubmissionResponse> getMySubmissions(String userId, String keyword, String status, Pageable pageable) {
         Specification<FormSubmission> spec = (root, query, cb) -> {
@@ -125,7 +171,7 @@ public class FormService {
             }
 
             if (StringUtils.hasText(status)) {
-                Join<FormSubmission, WorkflowInstance> instanceJoin = root.join("workflowInstance");
+                Join<FormSubmission, WorkflowInstance> instanceJoin = root.join("workflowInstance", jakarta.persistence.criteria.JoinType.LEFT);
                 predicates.add(cb.equal(instanceJoin.get("status"), WorkflowInstance.Status.valueOf(status)));
             }
 
@@ -137,9 +183,8 @@ public class FormService {
 
     @Transactional(readOnly = true)
     public Page<FormSubmissionResponse> getSubmissionsByFormId(Long formDefinitionId, Long menuId, Map<String, String> filters, Pageable pageable) {
-        if (!formDefinitionRepository.existsById(formDefinitionId)) {
-            throw new ResourceNotFoundException("未找到 ID 为 " + formDefinitionId + " 的表单定义");
-        }
+        formDefinitionRepository.findById(formDefinitionId)
+                .orElseThrow(() -> new ResourceNotFoundException("未找到 ID 为 " + formDefinitionId + " 的表单定义"));
 
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         User currentUser = (User) authentication.getPrincipal();
@@ -148,73 +193,16 @@ public class FormService {
             List<Predicate> predicates = new ArrayList<>();
             predicates.add(cb.equal(root.get("formDefinition").get("id"), formDefinitionId));
 
-            if (menuId != null) {
-                Menu menu = menuRepository.findById(menuId)
-                        .orElseThrow(() -> new ResourceNotFoundException("未找到菜单ID: " + menuId));
-
-                // --- 【核心修复】开始 ---
-                // 1. 检查当前用户是否为管理员
-                boolean isAdmin = currentUser.getAuthorities().stream()
-                        .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
-
-                // 2. 检查当前用户是否拥有菜单的显式角色
-                boolean hasExplicitRole = currentUser.getRoles().stream()
-                        .anyMatch(userRole -> menu.getRoles().contains(userRole));
-
-                // 3. 如果用户既不是管理员，也没有被显式授权，才抛出异常
-                if (!isAdmin && !hasExplicitRole) {
-                    throw new UnauthorizedException("您没有权限访问此菜单的数据");
-                }
-                // --- 【核心修复】结束 ---
-
-                DataScope dataScope = menu.getDataScope();
-                if (dataScope != null) {
-                    switch (dataScope) {
-                        case BY_DEPARTMENT:
-                            if (currentUser.getDepartment() != null) {
-                                // 这里需要一个别名来避免JPA的路径冲突
-                                Join<FormSubmission, User> submitterJoinDept = root.join("submitter");
-                                predicates.add(cb.equal(submitterJoinDept.get("department").get("id"), currentUser.getDepartment().getId()));
-                            } else {
-                                // 如果用户自己没有部门，则他看不到任何按部门筛选的数据
-                                predicates.add(cb.disjunction()); // 总是返回 false
-                            }
-                            break;
-                        case BY_GROUP:
-                            Set<UserGroup> userGroups = currentUser.getUserGroups();
-                            if (!userGroups.isEmpty()) {
-                                Join<FormSubmission, User> submitterJoinGroup = root.join("submitter");
-                                predicates.add(submitterJoinGroup.join("userGroups").in(userGroups));
-                            } else {
-                                // 如果用户不在任何组，则他看不到任何按组筛选的数据
-                                predicates.add(cb.disjunction());
-                            }
-                            break;
-                        case OWNER_ONLY:
-                            predicates.add(cb.equal(root.get("submitterId"), currentUser.getId()));
-                            break;
-                        case ALL:
-                            // 即使是管理员，也需要经过这个case，但这里的检查确保只有管理员能看到ALL数据
-                            if (!isAdmin) {
-                                throw new UnauthorizedException("只有管理员才能查看全部数据");
-                            }
-                            // 管理员无需添加额外条件
-                            break;
-                    }
-                }
-            } else {
-                // 如果没有通过菜单访问，则只允许管理员访问（例如，从表单管理页的“查看数据”按钮进入）
-                if (!currentUser.getAuthorities().stream().anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"))) {
-                    throw new UnauthorizedException("访问此数据列表需要通过指定的菜单入口");
-                }
-            }
+            applyDataScope(predicates, query, cb, root, menuId, currentUser);
 
             if (filters != null) {
                 filters.forEach((key, value) -> {
-                    if (StringUtils.hasText(value) && !"page".equals(key) && !"size".equals(key) && !"sort".equals(key) && !"menuId".equals(key)) {
-                        // 示例：这里可以根据表单字段的schema来构建更复杂的查询
-                        // 为简单起见，我们只查询提交人ID
-                        predicates.add(cb.like(root.get("submitterId"), "%" + value + "%"));
+                    if (StringUtils.hasText(value) && !isPaginationParam(key) && !"menuId".equals(key)) {
+                        Predicate jsonPredicate = cb.like(
+                                cb.function("JSON_EXTRACT", String.class, root.get("dataJson"), cb.literal("$." + key)),
+                                "%" + value + "%"
+                        );
+                        predicates.add(jsonPredicate);
                     }
                 });
             }
@@ -231,6 +219,17 @@ public class FormService {
         dto.setSchemaJson(entity.getSchemaJson());
         dto.setCreatedAt(entity.getCreatedAt());
         dto.setUpdatedAt(entity.getUpdatedAt());
+
+        try {
+            FormSchemaParser.ParsedSchema schema = FormSchemaParser.parse(entity.getSchemaJson(), objectMapper);
+            dto.setFilterableFields(schema.getFilterableFields());
+            dto.setListDisplayFields(schema.getListDisplayFields());
+        } catch (Exception e) {
+            log.error("解析表单 {} 的 schemaJson 失败", entity.getId(), e);
+            dto.setFilterableFields(Collections.emptyList());
+            dto.setListDisplayFields(Collections.emptyList());
+        }
+
         return dto;
     }
 
@@ -261,5 +260,101 @@ public class FormService {
             });
         }
         return dto;
+    }
+
+    // --- Private Helper Methods ---
+
+    private void applyDataScope(List<Predicate> predicates, jakarta.persistence.criteria.CriteriaQuery<?> query, jakarta.persistence.criteria.CriteriaBuilder cb, jakarta.persistence.criteria.Root<FormSubmission> root, Long menuId, User currentUser) {
+        if (menuId != null) {
+            Menu menu = menuRepository.findById(menuId)
+                    .orElseThrow(() -> new ResourceNotFoundException("未找到菜单ID: " + menuId));
+
+            boolean isAdmin = currentUser.getAuthorities().stream().anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
+            boolean hasExplicitRole = currentUser.getRoles().stream().anyMatch(userRole -> menu.getRoles().contains(userRole));
+
+            if (!isAdmin && !hasExplicitRole) {
+                throw new UnauthorizedException("您没有权限访问此菜单的数据");
+            }
+
+            DataScope dataScope = menu.getDataScope();
+            if (dataScope != null && !isAdmin) {
+                switch (dataScope) {
+                    case BY_DEPARTMENT:
+                        if (currentUser.getDepartment() != null) {
+                            // 【核心修复】使用子查询代替错误的join
+                            Subquery<String> subquery = query.subquery(String.class);
+                            jakarta.persistence.criteria.Root<User> userRoot = subquery.from(User.class);
+                            subquery.select(userRoot.get("id"))
+                                    .where(cb.equal(userRoot.get("department").get("id"), currentUser.getDepartment().getId()));
+                            predicates.add(root.get("submitterId").in(subquery));
+                        } else {
+                            predicates.add(cb.disjunction()); // 总是返回 false
+                        }
+                        break;
+                    case BY_GROUP:
+                        Set<UserGroup> userGroups = currentUser.getUserGroups();
+                        if (!userGroups.isEmpty()) {
+                            // 【核心修复】使用子查询代替错误的join
+                            Subquery<String> subquery = query.subquery(String.class);
+                            jakarta.persistence.criteria.Root<User> userRoot = subquery.from(User.class);
+                            subquery.select(userRoot.get("id"))
+                                    .where(userRoot.join("userGroups").in(userGroups));
+                            predicates.add(root.get("submitterId").in(subquery));
+                        } else {
+                            predicates.add(cb.disjunction());
+                        }
+                        break;
+                    case OWNER_ONLY:
+                        predicates.add(cb.equal(root.get("submitterId"), currentUser.getId()));
+                        break;
+                    case ALL:
+                        if (!isAdmin) {
+                            throw new UnauthorizedException("只有管理员才能查看全部数据");
+                        }
+                        break;
+                }
+            }
+        } else {
+            if (!currentUser.getAuthorities().stream().anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"))) {
+                throw new UnauthorizedException("访问此数据列表需要通过指定的菜单入口");
+            }
+        }
+    }
+
+    private boolean isPaginationParam(String key) {
+        return "page".equals(key) || "size".equals(key) || "sort".equals(key);
+    }
+
+    private void updateAttachments(FormSubmission submission, List<Long> newAttachmentIds) {
+        if (newAttachmentIds == null) {
+            newAttachmentIds = Collections.emptyList();
+        }
+
+        List<FileAttachment> toRemove = new ArrayList<>();
+        for (FileAttachment existingAttachment : submission.getAttachments()) {
+            if (!newAttachmentIds.contains(existingAttachment.getId())) {
+                toRemove.add(existingAttachment);
+            }
+        }
+
+        List<Long> existingIds = submission.getAttachments().stream()
+                .map(FileAttachment::getId)
+                .collect(Collectors.toList());
+        List<Long> toAddIds = newAttachmentIds.stream()
+                .filter(id -> !existingIds.contains(id))
+                .collect(Collectors.toList());
+
+        if (!toRemove.isEmpty()) {
+            submission.getAttachments().removeAll(toRemove);
+        }
+
+        if (!toAddIds.isEmpty()) {
+            List<FileAttachment> attachmentsToAdd = fileAttachmentRepository.findAllById(toAddIds);
+            for (FileAttachment attachment : attachmentsToAdd) {
+                attachment.setFormSubmission(submission);
+                attachment.setStatus(FileAttachment.FileStatus.LINKED);
+                submission.getAttachments().add(attachment);
+            }
+        }
     }
 }

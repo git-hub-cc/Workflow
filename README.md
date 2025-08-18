@@ -1,229 +1,196 @@
-# 表单工作流引擎 (Vue + Spring Boot + Embedded Camunda)
+# 表单工作流引擎 (Form Workflow Engine)
 
-这是一个功能完备、前后端分离的表单与工作流解决方案。它允许用户通过可视化的界面**拖拽生成表单**，并为表单**设计BPMN 2.0审批流程**。整个应用打包成一个独立的单元，后端内置了 Camunda 7 流程引擎和 H2 内存数据库，实现了**零外部依赖**，一键启动。
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Backend](https://img.shields.io/badge/Backend-Spring%20Boot%203-brightgreen)](https://spring.io/projects/spring-boot)
+[![Frontend](https://img.shields.io/badge/Frontend-Vue%203%20+%20Vite-blue)](https://vuejs.org/)
+[![Workflow](https://img.shields.io/badge/Workflow-Camunda%207-orange)](https://camunda.com/)
 
-## 📸 预览
+**一个功能强大且高度可扩展的低代码平台，旨在通过可视化的方式，让业务人员也能轻松构建、部署和管理复杂的业务流程。**
 
----
+本项目深度整合了 **可视化表单设计器** 和 **BPMN 2.0 流程设计器**
+，实现了从数据结构定义、用户交互界面创建到业务流程编排的全链路可视化配置。它不仅仅是一个工作流引擎，更是一个能够快速响应业务变化的敏捷开发平台。
 
-## ✨ 核心功能
+## ✨ 核心特性
 
--   **可视化表单设计器**：通过拖拽方式动态创建和配置表单，支持文本、下拉框、日期等多种组件。
--   **BPMN 2.0 流程设计器**：集成了 `bpmn-js`，允许管理员为表单在线绘制、配置和部署审批流程。
--   **我的待办任务**：清晰的任务列表，让审批人可以方便地处理分配给自己的任务。
--   **流程发起与审批**：普通用户可以填写表单并发起申请，申请将自动进入预设的审批流程。
--   **数据记录与追踪**：可以查看所有表单的提交记录及其当前的流程状态（审批中、已通过、已拒绝）。
--   **管理员后台**：
-    -   **用户管理**：集中管理系统中的所有用户及其角色（管理员/普通用户）。
-    -   **实例管理**：监控所有正在运行的流程实例，并能在必要时**强制终止**异常流程。
--   **前后端分离架构**：前端使用 Vue 3 + Ant Design，后端使用 Spring Boot，通过 JWT (JSON Web Token) 进行安全认证。
--   **内嵌式引擎**：后端服务已内嵌 Camunda 7 流程引擎和 H2 数据库，无需安装 Docker 或配置外部数据库。
+- **🚀 可视化表单设计器**:
+    - **拖拽式布局**: 通过拖拽组件（如输入框、选择器、布局容器等）即可构建复杂的表单界面。
+    - **丰富的组件库**: 内置20多种常用组件，包括布局（栅格、折叠面板）、基础（文本、日期、下拉框）、高级（文件上传、富文本、子表单、数据选择器、人员选择器）等。
+    - **动态数据源**: 下拉框、树形选择器等组件支持配置静态数据或通过API动态获取。
+    - **JSON Schema 驱动**: 所有表单定义最终生成并存储为JSON格式，易于扩展和迁移。
+    - **Word文档一键导入**: 支持上传 `.docx` 格式的文档，系统能智能解析表格和文本，自动生成表单，极大提升表单创建效率。
 
----
+- **🎨 BPMN 2.0 流程设计器**:
+    - **Web端可视化建模**: 集成强大的 `bpmn-js` 库，提供符合 BPMN 2.0 规范的在线流程设计体验。
+    - **深度集成 Camunda**: 完美支持 Camunda 的属性配置，如处理人、候选组、监听器、代理表达式等。
+    - **完全汉化**: 对设计器界面及属性面板进行了全面的中文本地化，提升国内用户体验。
+    - **一键部署**: 在设计器中完成流程绘制后，可一键将BPMN模型部署到后端Camunda引擎。
 
-## 🏛️ 系统架构
+- **🔑 动态菜单与精细化权限控制**:
+    - **菜单动态生成**: 系统侧边栏菜单完全由后端根据用户角色动态生成，实现千人千面。
+    - **RBAC权限模型**: 基于“用户-角色-菜单”的经典权限模型，轻松控制不同角色对不同功能的访问权限。
+    - **数据范围控制 (Data Scope)**: 独创的数据权限控制机制，可为每个“数据列表”类型的菜单配置不同的数据可见范围（如：*
+      *仅本人、按部门、按用户组、全部数据**），实现精细化的数据隔离。
 
-本系统采用经典的前后端分离架构，后端作为一个独立的 Spring Boot 应用，内部集成了所有必要的服务。
+- **📊 灵活的动态数据视图**:
+    - **通用数据列表**: 提供一个高度复用的数据列表组件 (`DataListView.vue`)，可根据任何表单的配置，动态生成筛选条件和表格列。
+    - **无代码配置**: 只需在表单设计器中勾选“用作列表筛选”和“在列表中显示”，即可自动生成功能完善的数据查询和展示页面。
 
-```
-┌───────────────────────────────────────────┐
-│              用户浏览器                  │
-└───────────────────────────────────────────┘
-│
-▼
-┌───────────────────────────────────────────┐
-│     前端应用 (Vue 3 + Vite)               │
-│     运行在: http://localhost:5173         │
-└───────────────────────────────────────────┘
-│ (通过 /api 代理进行 RESTful API 调用)
-▼
-┌───────────────────────────────────────────┐
-│     后端服务 (Spring Boot)                │
-│     运行在: http://localhost:8080         │
-│ ┌───────────────────┬───────────────────┐ │
-│ │  API & 安全层     │  业务服务层       │ │
-│ │ (Controllers)     │ (Form, Workflow)  │ │
-│ │ (Spring Security) │                   │ │
-│ └───────────────────┴───────────────────┘ │
-│                    │                      │
-│ ┌───────────────────────────────────────┐ │
-│ │      内嵌 Camunda 7 流程引擎          │ │
-│ └───────────────────────────────────────┘ │
-│                    │                      │
-│ ┌───────────────────────────────────────┐ │
-│ │      内嵌 H2 内存数据库               │ │
-│ └───────────────────────────────────────┘ │
-└───────────────────────────────────────────┘
-```
+- **🏢 完善的后台管理功能**:
+    - **组织架构管理**: 支持可视化的部门层级管理，可通过拖拽方式调整员工所属部门。
+    - **用户/角色/用户组管理**: 提供完整的用户、角色、用户组的增删改查功能。
+    - **流程实例监控**: 实时查看运行中、已挂起、已结束的流程实例，并可进行 **挂起、激活、终止、转办** 等管理操作。
+    - **审计日志**: 内置详细的 **登录日志** 和 **操作日志**，所有关键操作均有据可查，满足合规性要求。
 
----
+- **⚙️ 健全的系统功能**:
+    - **JWT认证**: 使用基于JWT的无状态认证机制，安全可靠。
+    - **文件管理**: 支持多文件上传，并与业务表单深度绑定。内置定时任务，可自动清理未关联的临时文件，防止数据不一致。
+    - **消息通知**: 通过异步任务，在流程流转到下一节点时，自动向审批人发送邮件通知。
+    - **系统仪表盘**: 提供关键指标的可视化概览，如运行中流程数、任务耗时排行等，帮助管理者洞察系统状态。
+    - **全局异常处理**: 统一的后端异常处理机制，为前端提供结构化、友好的错误提示。
+
+## 📸 项目截图
+
+| **仪表盘 (Dashboard)**                  | **表单设计器 (Form Builder)**           |
+| :-------------------------------------: | :-------------------------------------: |
+| ![Dashboard.png](screenshots/Dashboard.png) | ![Form Builder.png](screenshots/Form%20Builder.png) |
+| **流程设计器 (Workflow Designer)**      | **菜单管理 (Menu Management)**          |
+| :-------------------------------------: | :-------------------------------------: |
+| ![Workflow Designer.png](screenshots/Workflow%20Designer.png) | ![Menu.png](screenshots/Menu.png) |
+| **组织架构管理 (Org Management)**       | **操作日志管理 (Logs Management)**      |
+| :-------------------------------------: | :-------------------------------------: |
+| ![Organization.png](screenshots/Organization.png) | ![log.png](screenshots/log.png) |
 
 ## 🛠️ 技术栈
 
-<table width="100%">
-  <tr>
-    <td width="50%" valign="top">
-      <h3>后端 (Backend)</h3>
-      <ul>
-        <li><b>框架:</b> Spring Boot 3.x</li>
-        <li><b>安全:</b> Spring Security (JWT)</li>
-        <li><b>数据库:</b> JPA (Hibernate) + H2 In-Memory Database</li>
-        <li><b>工作流引擎:</b> Camunda 7 (Embedded Engine)</li>
-        <li><b>构建工具:</b> Maven</li>
-        <li><b>语言:</b> Java 17</li>
-      </ul>
-    </td>
-    <td width="50%" valign="top">
-      <h3>前端 (Frontend)</h3>
-      <ul>
-        <li><b>框架:</b> Vue 3 (Composition API)</li>
-        <li><b>构建工具:</b> Vite</li>
-        <li><b>状态管理:</b> Pinia</li>
-        <li><b>路由:</b> Vue Router</li>
-        <li><b>UI 库:</b> Ant Design Vue 4.x</li>
-        <li><b>流程图:</b> bpmn-js</li>
-      </ul>
-    </td>
-  </tr>
-</table>
-
----
+<div style="display: flex; gap: 20px;">
+<div style="width: 50%;">
+  <h4>后端技术</h4>
+  <ul>
+    <li><b>核心框架:</b> Spring Boot 3</li>
+    <li><b>工作流引擎:</b> Camunda 7</li>
+    <li><b>安全认证:</b> Spring Security 6, JWT</li>
+    <li><b>数据库:</b> Spring Data JPA (Hibernate), H2 (演示)</li>
+    <li><b>异步任务:</b> Spring @Async, @Scheduled</li>
+    <li><b>邮件服务:</b> Spring Mail</li>
+    <li><b>日志切面:</b> Spring AOP</li>
+    <li><b>构建工具:</b> Maven</li>
+  </ul>
+</div>
+<div style="width: 50%;">
+  <h4>前端技术</h4>
+  <ul>
+    <li><b>核心框架:</b> Vue 3 (Composition API)</li>
+    <li><b>构建工具:</b> Vite</li>
+    <li><b>UI 框架:</b> Ant Design Vue 4.x</li>
+    <li><b>状态管理:</b> Pinia</li>
+    <li><b>路由:</b> Vue Router 4</li>
+    <li><b>HTTP 请求:</b> Axios</li>
+    <li><b>BPMN 设计器:</b> bpmn-js, bpmn-js-properties-panel</li>
+    <li><b>富文本编辑器:</b> QuillEditor</li>
+    <li><b>图表库:</b> ECharts</li>
+  </ul>
+</div>
+</div>
 
 ## 🚀 快速开始
 
-请确保你的开发环境已安装以下软件：
+### 环境准备
 
-### 环境要求
+- JDK 17+
+- Maven 3.6+
+- Node.js 18+
+- MySQL (可选，如需替换H2数据库)
 
--   **JDK 17** 或更高版本
--   **Maven 3.8** 或更高版本
--   **Node.js 18** 或更高版本
--   推荐使用 IDE，如 **IntelliJ IDEA** (后端) 和 **VS Code** (前端)
+### 后端启动
 
-### 安装与配置
+1. 克隆仓库：
+   ```bash
+   git clone https://github.com/git-hub-cc/Workflow.git
+   ```
 
-1.  **克隆仓库**
-    ```bash
-    git clone https://github.com/git-hub-cc/Workflow.git
-    cd your-repo-name
-    ```
+2. 进入后端项目目录：
+   ```bash
+   cd Workflow/workflow-java
+   ```
 
-2.  **后端配置**
-    -   后端代码位于项目根目录。
-    -   使用 IntelliJ IDEA 打开项目，它会自动识别为 Maven 项目并下载所有依赖。
-    -   无需任何额外配置，`application.properties` 文件已预设使用 H2 内存数据库和内嵌 Camunda 引擎。
+3. 使用 Maven 构建项目：
+   ```bash
+   mvn clean install
+   ```
 
-3.  **前端配置**
-    -   进入前端项目目录：
-        ```bash
-        cd workflow-ui
-        ```
-    -   安装依赖：
-        ```bash
-        npm install
-        ```
+4. 运行 Spring Boot 应用：
+   ```bash
+   java -jar target/workflow-0.0.1-SNAPSHOT.jar
+   ```
 
-### 运行应用
+5. 后端服务将启动在 `http://localhost:8080`。首次启动时，会自动创建H2数据库并初始化演示数据。
 
-你需要**同时启动后端和前端**服务。
+> **注意**: 默认使用H2内存数据库。如需连接MySQL，请修改 `src/main/resources/application.properties` 文件中的数据源配置。
 
-1.  **启动后端服务**
-    -   在你的 IDE (如 IntelliJ IDEA) 中找到 `src/main/java/club/ppmc/workflow/WorkflowApplication.java` 文件。
-    -   右键点击并选择 `Run 'WorkflowApplication.main()'`.
-    -   当控制台输出以下信息时，表示后端已成功启动：
-        ```
-        ==================================================
-        应用程序启动成功！
-          -> 应用访问地址: http://localhost:8080
-          -> H2 数据库控制台: http://localhost:8080/h2-console
-          -> Camunda Webapps: http://localhost:8080/camunda/app/
-             (使用 'camunda-admin' / 'camunda-admin' 登录)
-        ==================================================
-        ```
+### 前端启动
 
-2.  **启动前端服务**
-    -   在 `workflow-ui` 目录下，打开一个新的终端。
-    -   运行开发服务器：
-        ```bash
-        npm run dev
-        ```
-    -   前端应用将运行在 `http://localhost:5173`。
+1. 进入前端项目目录：
+   ```bash
+   cd Workflow/workflow-ui
+   ```
 
-3.  **访问应用**
-    -   打开浏览器，访问 **`http://localhost:5173`**。
-    -   你将看到应用的登录界面。
+2. 安装依赖：
+   ```bash
+   npm install
+   ```
 
----
+3. 启动开发服务器：
+   ```bash
+   npm run dev
+   ```
 
-## 🧑‍💻 使用指南
+4. 前端服务将启动在 `http://localhost:5173`。`vite.config.js` 中已配置好代理，所有 `/api` 请求会自动转发到后端服务。
 
-应用内置了几个演示用户，方便你测试不同角色的功能。
+### 访问系统
 
-### 演示用户凭据
+- 打开浏览器并访问: `http://localhost:5173`
+- 使用以下演示账户登录：
+    - **系统管理员**: `admin` / `admin`
+    - **普通员工 (张三)**: `user001` / `password`
+    - **研发部经理 (李四)**: `manager001` / `password`
+    - **财务总监 (王五)**: `hr001` / `password`
 
-| 用户ID (登录名) | 密码       | 角色         | 说明             |
-| --------------- | ---------- | ------------ | ---------------- |
-| `admin`         | `admin`    | **管理员**   | 可以设计表单和流程 |
-| `user001`       | `password` | 普通用户     | 员工，可以发起申请 |
-| `manager001`    | `password` | 普通用户     | 部门经理，用于审批 |
-| `hr001`         | `password` | 普通用户     | 财务总监，用于审批 |
+> **提示**: 管理员创建的新用户或被重置密码的用户，默认密码均为 `password`，首次登录时系统会强制要求修改密码。
 
-### 端到端测试流程示例
-
-1.  **登录管理员账号** (`admin` / `admin`)。
-2.  在首页点击 **“创建新表单”**。
-3.  **设计表单**：
-    -   输入表单名称，例如“请假申请单”。
-    -   从左侧拖拽“单行文本”、“日期选择”、“多行文本”等组件到画布中。
-    -   选中画布中的组件，在右侧属性面板配置其标题、是否必填等。
-    -   点击右上角 **“保存表单”**。
-4.  **设计流程**：
-    -   返回首页，找到刚创建的表单，点击 **“设计流程”**。
-    -   在流程设计器中，你可以拖拽和连接节点。
-    -   **配置审批人**：点击“部门经理审批”节点，在右侧属性面板的 “Assignee” 字段中输入审批人的用户ID（例如 `manager001`）。
-    -   点击右上角 **“保存并部署”**。
-5.  **发起申请**：
-    -   退出登录，使用 **`user001`** / `password` 登录。
-    -   在首页找到“请假申请单”，点击 **“发起申请”**。
-    -   填写表单内容，然后点击 **“提交申请”**。
-6.  **处理任务**：
-    -   退出登录，使用审批人账号 **`manager001`** / `password` 登录。
-    -   点击右上角的 **“我的待办”** 按钮。
-    -   在待办列表中，你应该能看到 `user001` 提交的请假申请。
-    -   点击 **“去处理”**，查看申请详情，输入审批意见，然后点击 **“同意”** 或 **“拒绝”**。
-7.  **查看结果**：
-    -   再次用 `user001` 登录，在首页点击 **“数据记录”**，可以看到申请的状态已经更新为“已通过”或“已拒绝”。
-
----
-
-## 📂 项目结构
+## 📁 项目结构
 
 ```
-.
-├── src/main/java/      # Spring Boot 后端 Java 源码
-│   ├── config/         #   - Spring Security, JWT, Camunda 配置
-│   ├── controller/     #   - REST API 控制器
-│   ├── domain/         #   - JPA 实体类
-│   ├── dto/            #   - 数据传输对象
-│   ├── listener/       #   - Camunda 监听器
-│   ├── repository/     #   - JPA Repositories
-│   └── service/        #   - 业务逻辑服务
-├── src/main/resources/ # Spring Boot 资源文件
-│   └── application.properties # 核心配置文件
-├── pom.xml             # Maven 项目配置文件
-└── workflow-ui/        # Vue 前端项目源码
-├── public/         #   - 静态资源
-└── src/            #   - Vue 源码
-├── api/        #     - API 请求封装
-├── assets/     #     - 静态资源
-├── components/ #     - 公共组件
-├── router/     #     - 路由配置
-├── stores/     #     - Pinia 状态管理
-└── views/      #     - 页面视图组件
+Workflow
+├── workflow-java/         # 后端 Spring Boot 项目
+│   ├── src/main/java
+│   │   ├── aop/           # AOP 切面 (操作日志)
+│   │   ├── config/        # Spring Security, JWT 配置
+│   │   ├── controller/    # RESTful API 控制器
+│   │   ├── domain/        # JPA 实体类
+│   │   ├── dto/           # 数据传输对象
+│   │   ├── exception/     # 全局异常处理
+│   │   ├── listener/      # 事件监听器 (如登录失败)
+│   │   ├── repository/    # Spring Data JPA 仓库
+│   │   └── service/       # 业务逻辑服务
+│   └── src/main/resources
+│       └── application.properties # 配置文件
+│
+└── workflow-ui/           # 前端 Vue 项目
+    ├── public/            # 公共静态资源
+    └── src/
+        ├── api/           # API 请求封装
+        ├── assets/        # 样式和静态资源
+        ├── components/    # 全局可复用组件
+        ├── composables/   # Vue Composition API hooks
+        ├── router/        # 路由配置 (含动态路由)
+        ├── stores/        # Pinia 状态管理
+        ├── utils/         # 工具函数 (BPMN汉化, 图标库等)
+        └── views/         # 页面级组件
+            ├── admin/     # 管理员后台页面
+            ├── builder-components/ # 表单设计器组件
+            └── viewer-components/  # 表单渲染器组件
 ```
 
----
+## 📜 开源许可
 
-## 📄 许可证
-
-本项目采用 [MIT License](LICENSE)。 
+本项目基于 [MIT License](https://opensource.org/licenses/MIT) 开源。

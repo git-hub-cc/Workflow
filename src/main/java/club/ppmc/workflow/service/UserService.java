@@ -34,11 +34,13 @@ public class UserService {
 
         // 校验旧密码是否正确
         if (!passwordEncoder.matches(oldPassword, user.getPassword())) {
+            // 【核心修改】抛出带有用户友好信息的异常，将由全局异常处理器捕获并返回 400 Bad Request
             throw new IllegalArgumentException("旧密码不正确");
         }
 
         // 校验新密码复杂度（示例，真实项目应更复杂）
         if (newPassword == null || newPassword.length() < 6) {
+            // 【核心修改】抛出带有用户友好信息的异常
             throw new IllegalArgumentException("新密码长度不能少于6位");
         }
 

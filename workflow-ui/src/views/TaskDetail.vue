@@ -64,7 +64,6 @@
 
 <script setup>
 import { ref, onMounted, computed, reactive } from 'vue';
-// ✨ 核心变更：新增 getWorkflowHistory API 的导入
 import { getTaskById, getSubmissionById, getFormById, completeTask, getWorkflowHistory } from '@/api';
 import { message } from 'ant-design-vue';
 import { useRouter } from 'vue-router';
@@ -81,7 +80,6 @@ const formSchema = ref({ fields: [] });
 const formData = reactive({});
 const comment = ref('');
 const formRef = ref();
-// ✨ 核心变更：新增 state 用于存储流程历史
 const history = ref([]);
 
 const isRejectedTask = computed(() => {
@@ -103,7 +101,6 @@ onMounted(async () => {
     Object.assign(formData, JSON.parse(subRes.dataJson));
     if (subRes.attachments) {
       formData.__attachments = subRes.attachments;
-      // 初始化文件上传组件的数据
       const formDefForFile = await getFormById(subRes.formDefinitionId);
       const allFields = flattenFields(JSON.parse(formDefForFile.schemaJson).fields);
       allFields.forEach(field => {
@@ -113,7 +110,6 @@ onMounted(async () => {
       });
     }
 
-    // ✨ 核心变更：并发获取表单定义和流程历史，提高加载效率
     const [formRes, historyRes] = await Promise.all([
       getFormById(subRes.formDefinitionId),
       getWorkflowHistory(taskRes.formSubmissionId)
@@ -123,7 +119,7 @@ onMounted(async () => {
     history.value = historyRes;
 
   } catch (error) {
-    message.error('加载任务详情失败');
+    // 错误由全局拦截器处理，这里无需显示消息
   } finally {
     loading.value = false;
   }
@@ -136,7 +132,7 @@ const handleApproval = async (decision) => {
     message.success('任务处理成功！');
     router.push({ name: 'task-list' });
   } catch (error) {
-    message.error('处理失败');
+    // 错误由全局拦截器处理
   } finally {
     submitting.value = false;
   }
@@ -161,17 +157,16 @@ const handleResubmit = async () => {
     message.success('申请已重新提交！');
     router.push({ name: 'task-list' });
   } catch(error) {
+    // 只处理 antd 表单校验失败的错误
     if(error && error.errorFields) {
       message.warn('请填写所有必填项');
-    } else {
-      message.error('提交失败');
     }
+    // API 相关的错误（如网络问题、后端业务逻辑错误）将由全局拦截器自动提示，此处无需处理
   } finally {
     submitting.value = false;
   }
 };
 
-// ✨ 核心变更：新增用于渲染时间线的辅助函数
 const getTimelineColor = (item) => {
   if (item.activityType.endsWith('EndEvent')) {
     return item.decision === 'REJECTED' ? 'red' : 'green';
@@ -191,7 +186,6 @@ const formatDuration = (ms) => {
 };
 </script>
 
-<!-- ✨ 核心变更：新增样式以匹配新布局 -->
 <style scoped>
 .detail-layout {
   display: flex;

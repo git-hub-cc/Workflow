@@ -11,6 +11,15 @@
       <a-input v-model:value="field.props.placeholder" />
     </a-form-item>
 
+    <!-- 【新增】列表页配置 -->
+    <a-form-item label="用作列表筛选条件" help="在数据列表页面，此字段将作为一个筛选查询条件。">
+      <a-switch v-model:checked="field.isFilterable" />
+    </a-form-item>
+    <a-form-item label="在列表中作为列显示" help="在数据列表页面，此字段的值将作为一列进行展示。">
+      <a-switch v-model:checked="field.showInList" />
+    </a-form-item>
+
+
     <!-- 数据源配置 -->
     <DataSourceConfig
         v-if="field.dataSource"

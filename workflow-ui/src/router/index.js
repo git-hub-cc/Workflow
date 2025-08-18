@@ -28,14 +28,35 @@ const staticRoutes = [
             { path: 'admin/groups', name: 'admin-groups', component: () => import('../views/admin/UserGroupManagement.vue'), meta: { title: '用户组管理', requiresAdmin: true } },
             { path: 'admin/menus', name: 'admin-menus', component: () => import('../views/admin/MenuManagement.vue'), meta: { title: '菜单管理', requiresAdmin: true } },
             { path: 'admin/instances', name: 'admin-instances', component: () => import('../views/admin/InstanceManagement.vue'), meta: { title: '实例管理', requiresAdmin: true } },
-            // 【核心修改】组织架构路由现在指向可视化图表页
             { path: 'admin/org-chart', name: 'admin-org-chart', component: () => import('../views/admin/OrganizationChart.vue'), meta: { title: '组织架构图', requiresAdmin: true } },
-            // 【核心新增】新增组织架构管理页面的路由
             { path: 'admin/org-management', name: 'admin-org-management', component: () => import('../views/admin/OrganizationManagement.vue'), meta: { title: '组织架构管理', requiresAdmin: true } },
             { path: 'admin/logs/login', name: 'admin-login-log', component: () => import('../views/admin/LoginLog.vue'), meta: { title: '登录日志', requiresAdmin: true } },
             { path: 'admin/logs/operation', name: 'admin-operation-log', component: () => import('../views/admin/OperationLog.vue'), meta: { title: '操作日志', requiresAdmin: true } },
-            // 固定的表单/流程/任务相关页面
-            { path: 'form/builder', name: 'form-builder', component: () => import('../views/FormBuilder.vue'), meta: { title: '表单设计器', requiresAdmin: true } },
+
+            // 【核心修改】将表单设计器路由拆分为创建和编辑
+            {
+                path: 'form/builder',
+                name: 'form-builder-create',
+                component: () => import('../views/FormBuilder.vue'),
+                meta: { title: '新建表单', requiresAdmin: true }
+            },
+            {
+                path: 'form/builder/:formId',
+                name: 'form-builder-edit',
+                component: () => import('../views/FormBuilder.vue'),
+                props: true,
+                meta: { title: '编辑表单', requiresAdmin: true }
+            },
+
+            // 【核心修复】在这里为 FormViewer.vue 添加一个固定的、命名的路由
+            {
+                path: 'form/viewer/:formId', // 定义一个清晰的路径，并接收 formId 参数
+                name: 'form-viewer',         // 这就是 DataListView.vue 中需要的路由名称
+                component: () => import('../views/FormViewer.vue'),
+                props: true,                 // 将路由参数 (formId) 作为 props 传递给组件
+                meta: { title: '填写申请' }    // 设置页面标题
+            },
+
             { path: 'forms/:formId/submissions', name: 'form-submissions', component: () => import('../views/Submissions.vue'), props: true, meta: { title: '提交记录' } },
             { path: 'submission/:submissionId', name: 'submission-detail', component: () => import('../views/SubmissionDetail.vue'), props: true, meta: { title: '申请详情' } },
             { path: 'workflow/designer/:formId', name: 'workflow-designer', component: () => import('../views/WorkflowDesigner.vue'), props: true, meta: { title: '流程设计器', requiresAdmin: true } },

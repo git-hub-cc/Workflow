@@ -3,6 +3,7 @@ package club.ppmc.workflow.service;
 import club.ppmc.workflow.aop.LogOperation;
 import club.ppmc.workflow.domain.*;
 import club.ppmc.workflow.dto.*;
+import club.ppmc.workflow.exception.ResourceInUseException;
 import club.ppmc.workflow.exception.ResourceNotFoundException;
 import club.ppmc.workflow.repository.*;
 import jakarta.persistence.EntityManager;
@@ -50,7 +51,6 @@ public class AdminService {
     private final OperationLogRepository operationLogRepository;
     private final MenuService menuService;
     private final WorkflowTemplateRepository workflowTemplateRepository;
-    // --- 【核心新增】 ---
     private final DepartmentRepository departmentRepository;
     private final DepartmentService departmentService;
 
@@ -181,7 +181,6 @@ public class AdminService {
     }
 
     private void updateUserRelations(User user, UserDto userDto) {
-        // --- 【核心修改】更新部门关联 ---
         if (userDto.getDepartmentId() != null) {
             Department department = departmentRepository.findById(userDto.getDepartmentId())
                     .orElseThrow(() -> new ResourceNotFoundException("未找到部门 ID: " + userDto.getDepartmentId()));
@@ -189,8 +188,6 @@ public class AdminService {
         } else {
             user.setDepartment(null);
         }
-        // --- 【修改结束】 ---
-
 
         if (StringUtils.hasText(userDto.getManagerId())) {
             if (user.getId() != null && user.getId().equals(userDto.getManagerId())) {
@@ -217,10 +214,18 @@ public class AdminService {
     }
 
     @LogOperation(module = "用户管理", action = "禁用用户", targetIdExpression = "#id")
-    public void deleteUser(String id) {
+    public void disableUser(String id) {
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("未找到用户: " + id));
         user.setStatus(UserStatus.INACTIVE);
+        userRepository.save(user);
+    }
+
+    @LogOperation(module = "用户管理", action = "启用用户", targetIdExpression = "#id")
+    public void enableUser(String id) {
+        User user = userRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("未找到用户: " + id));
+        user.setStatus(UserStatus.ACTIVE);
         userRepository.save(user);
     }
 
@@ -256,13 +261,20 @@ public class AdminService {
         entityManager.refresh(role);
 
         if (!role.getUsers().isEmpty()) {
-            throw new IllegalStateException("无法删除角色，因为仍有 " + role.getUsers().size() + " 个用户属于该角色。");
+            // 【核心修改】抛出更具体的异常
+            throw new ResourceInUseException("无法删除角色，因为仍有 " + role.getUsers().size() + " 个用户属于该角色。");
+        }
+
+        // 检查菜单关联
+        if (!role.getMenus().isEmpty()) {
+            throw new ResourceInUseException("无法删除角色，因为它已被 " + role.getMenus().size() + " 个菜单项使用。");
         }
 
         String roleSearchPattern = "camunda:candidateGroups=\"" + role.getName() + "\"";
         long workflowUsageCount = workflowTemplateRepository.countByBpmnXmlContaining(roleSearchPattern);
         if (workflowUsageCount > 0) {
-            throw new IllegalStateException("无法删除角色 '" + role.getName() + "'，因为它正被 " + workflowUsageCount + " 个工作流模板用作候选组。");
+            // 【核心修改】抛出更具体的异常
+            throw new ResourceInUseException("无法删除角色 '" + role.getName() + "'，因为它正被 " + workflowUsageCount + " 个工作流模板用作候选组。");
         }
 
         roleRepository.delete(role);
@@ -302,13 +314,15 @@ public class AdminService {
         entityManager.refresh(group);
 
         if (!group.getUsers().isEmpty()) {
-            throw new IllegalStateException("无法删除用户组，因为仍有 " + group.getUsers().size() + " 个用户属于该组。");
+            // 【核心修改】抛出更具体的异常
+            throw new ResourceInUseException("无法删除用户组，因为仍有 " + group.getUsers().size() + " 个用户属于该组。");
         }
 
         String groupSearchPattern = "camunda:candidateGroups=\"" + group.getName() + "\"";
         long workflowUsageCount = workflowTemplateRepository.countByBpmnXmlContaining(groupSearchPattern);
         if (workflowUsageCount > 0) {
-            throw new IllegalStateException("无法删除用户组 '" + group.getName() + "'，因为它正被 " + workflowUsageCount + " 个工作流模板用作候选组。");
+            // 【核心修改】抛出更具体的异常
+            throw new ResourceInUseException("无法删除用户组 '" + group.getName() + "'，因为它正被 " + workflowUsageCount + " 个工作流模板用作候选组。");
         }
 
         userGroupRepository.delete(group);
@@ -324,12 +338,10 @@ public class AdminService {
         if (user.getManager() != null) {
             dto.setManagerId(user.getManager().getId());
         }
-        // --- 【核心修改】填充部门ID和名称 ---
         if (user.getDepartment() != null) {
             dto.setDepartmentId(user.getDepartment().getId());
             dto.setDepartmentName(user.getDepartment().getName());
         }
-        // --- 【修改结束】 ---
         if (user.getRoles() != null) {
             dto.setRoleNames(user.getRoles().stream().map(Role::getName).collect(Collectors.toList()));
         }
@@ -358,28 +370,19 @@ public class AdminService {
 
     // --- 组织架构与日志 ---
 
-    /**
-     * 【核心重构】重写组织架构树的生成逻辑，以新的 Department 实体为基础
-     */
     @Transactional(readOnly = true)
     public List<DepartmentTreeNode> getOrganizationTree() {
-        // 1. 获取所有部门的树形结构
         List<DepartmentDto> departmentTree = departmentService.getDepartmentTree();
-        // 2. 获取所有用户并按部门ID分组
         List<User> allUsers = userRepository.findAll();
         Map<Long, List<User>> usersByDeptId = allUsers.stream()
                 .filter(u -> u.getDepartment() != null)
                 .collect(Collectors.groupingBy(u -> u.getDepartment().getId()));
 
-        // 3. 将用户节点挂载到部门树上
         return departmentTree.stream()
                 .map(deptDto -> convertDeptDtoToTreeNode(deptDto, usersByDeptId))
                 .collect(Collectors.toList());
     }
 
-    /**
-     * 递归辅助方法，将 DepartmentDto 树转换为 DepartmentTreeNode 树，并挂载用户
-     */
     private DepartmentTreeNode convertDeptDtoToTreeNode(DepartmentDto deptDto, Map<Long, List<User>> usersByDeptId) {
         DepartmentTreeNode deptNode = new DepartmentTreeNode();
         deptNode.setTitle(deptDto.getName());
@@ -388,7 +391,6 @@ public class AdminService {
         deptNode.setType("department");
         deptNode.setLeaf(false);
 
-        // 挂载子部门
         if (!CollectionUtils.isEmpty(deptDto.getChildren())) {
             List<DepartmentTreeNode> childDeptNodes = deptDto.getChildren().stream()
                     .map(childDto -> convertDeptDtoToTreeNode(childDto, usersByDeptId))
@@ -396,7 +398,6 @@ public class AdminService {
             deptNode.getChildren().addAll(childDeptNodes);
         }
 
-        // 挂载当前部门下的用户
         List<User> usersInDept = usersByDeptId.get(deptDto.getId());
         if (!CollectionUtils.isEmpty(usersInDept)) {
             List<DepartmentTreeNode> userNodes = usersInDept.stream()
@@ -416,7 +417,6 @@ public class AdminService {
 
         return deptNode;
     }
-    // --- 【重构结束】 ---
 
     @Transactional(readOnly = true)
     public List<TreeNodeDto> getDepartmentTree() {

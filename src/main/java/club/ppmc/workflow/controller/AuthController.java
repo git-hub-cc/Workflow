@@ -5,10 +5,8 @@ import club.ppmc.workflow.dto.AuthResponse;
 import club.ppmc.workflow.service.AuthService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.authentication.CredentialsExpiredException;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.Map;
 
 /**
  * @author cc
@@ -28,15 +26,11 @@ public class AuthController {
      * @return 包含JWT和用户信息的响应
      */
     @PostMapping("/login")
-    public ResponseEntity<?> login(@RequestBody AuthRequest request) {
-        try {
-            AuthResponse response = authService.authenticate(request);
-            return ResponseEntity.ok(response);
-        } catch (CredentialsExpiredException e) {
-            // 【新增】捕获凭证过期异常，向前段返回特定状态码或消息
-            return ResponseEntity.status(499) // 自定义状态码
-                    .body(Map.of("error", "PASSWORD_CHANGE_REQUIRED", "message", e.getMessage()));
-        }
-        // 其他认证异常（如密码错误、用户不存在）会由全局异常处理器或Spring Security默认处理为401/403
+    public ResponseEntity<AuthResponse> login(@RequestBody AuthRequest request) {
+        // 【核心修改】移除了 try-catch 块。
+        // 所有认证相关的异常（密码错误、用户不存在、凭证过期等）
+        // 现在将由 GlobalExceptionHandler 统一处理，以确保返回结构化的错误信息。
+        AuthResponse response = authService.authenticate(request);
+        return ResponseEntity.ok(response);
     }
 }

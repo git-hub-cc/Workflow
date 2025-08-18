@@ -1,10 +1,7 @@
 package club.ppmc.workflow.controller;
 
 import club.ppmc.workflow.domain.FormSubmission;
-import club.ppmc.workflow.dto.CreateFormDefinitionRequest;
-import club.ppmc.workflow.dto.CreateFormSubmissionRequest;
-import club.ppmc.workflow.dto.FormDefinitionResponse;
-import club.ppmc.workflow.dto.FormSubmissionResponse;
+import club.ppmc.workflow.dto.*;
 import club.ppmc.workflow.exception.ResourceNotFoundException;
 import club.ppmc.workflow.repository.FormSubmissionRepository;
 import club.ppmc.workflow.service.FormService;
@@ -83,7 +80,20 @@ public class FormController {
     }
 
     /**
-     * 【新增】API: 删除一个表单定义
+     * 【新增】API: 更新一个已存在的表单定义
+     * 权限: 仅限管理员
+     */
+    @PutMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<FormDefinitionResponse> updateFormDefinition(
+            @PathVariable Long id,
+            @RequestBody CreateFormDefinitionRequest request) {
+        FormDefinitionResponse response = formService.updateFormDefinition(id, request);
+        return ResponseEntity.ok(response);
+    }
+
+    /**
+     * API: 删除一个表单定义
      * 权限: 仅限管理员
      */
     @DeleteMapping("/{id}")
@@ -110,7 +120,7 @@ public class FormController {
     }
 
     /**
-     * 【核心修改】API: 获取指定表单的所有提交数据 (支持分页、过滤和数据范围)
+     * API: 获取指定表单的所有提交数据 (支持分页、过滤和数据范围)
      * @param menuId (可选) 从哪个菜单入口访问，用于数据范围权限控制
      * 权限: 已认证用户
      */
@@ -133,5 +143,23 @@ public class FormController {
         FormSubmission submission = formSubmissionRepository.findById(submissionId)
                 .orElseThrow(() -> new ResourceNotFoundException("未找到提交记录 ID: " + submissionId));
         return ResponseEntity.ok(formService.convertToSubmissionResponse(submission));
+    }
+
+    // 【新增】API: 更新指定的提交记录
+    @PutMapping("/submissions/{submissionId}")
+    @PreAuthorize("hasRole('ADMIN')") // 初始权限设置为仅管理员，可根据业务需求放宽
+    public ResponseEntity<FormSubmissionResponse> updateSubmission(
+            @PathVariable Long submissionId,
+            @RequestBody UpdateFormSubmissionRequest request) {
+        FormSubmissionResponse response = formService.updateSubmission(submissionId, request);
+        return ResponseEntity.ok(response);
+    }
+
+    // 【新增】API: 删除指定的提交记录
+    @DeleteMapping("/submissions/{submissionId}")
+    @PreAuthorize("hasRole('ADMIN')") // 初始权限设置为仅管理员
+    public ResponseEntity<Void> deleteSubmission(@PathVariable Long submissionId) {
+        formService.deleteSubmission(submissionId);
+        return ResponseEntity.noContent().build();
     }
 }

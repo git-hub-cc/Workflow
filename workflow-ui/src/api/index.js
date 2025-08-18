@@ -36,16 +36,51 @@ service.interceptors.response.use(
     },
     error => {
         console.error('API Error:', error);
-        if (error.response?.status === 499) {
+
+        // 1. 网络错误或请求被取消等没有响应体的情况
+        if (!error.response) {
+            message.error('网络错误，请检查您的连接或联系管理员。');
             return Promise.reject(error);
         }
-        if (error.response?.status === 401 || error.response?.status === 403) {
-            message.error('认证失败或权限不足，请重新登录。');
-            const userStore = useUserStore();
-            userStore.logout();
-        } else {
-            message.error(error.response?.data?.message || error.message || '请求失败');
+
+        // 2. 有响应体，根据状态码和后端返回的结构化信息进行处理
+        const status = error.response.status;
+        const data = error.response.data;
+        // 优先使用后端在 ErrorResponse DTO 中定义的友好消息
+        const errorMessage = data?.message || error.message || '请求失败';
+
+        switch (status) {
+            case 400: // Bad Request: 通常是参数验证失败
+            case 409: // Conflict: 业务逻辑冲突，如资源被占用
+                message.error(`操作失败: ${errorMessage}`);
+                break;
+            case 401: // Unauthorized: Token 无效或过期
+                message.error('认证已过期，请重新登录。');
+                try {
+                    const userStore = useUserStore();
+                    // 只有当用户当前是登录状态时才执行登出，避免在登录页重复跳转
+                    if (userStore.isAuthenticated) {
+                        userStore.logout();
+                    }
+                } catch (storeError) {
+                    // 如果 store 初始化失败或出现其他问题，强制跳转
+                    console.error("登出时 UserStore 发生错误:", storeError);
+                    window.location.href = '/login';
+                }
+                break;
+            case 403: // Forbidden: 用户已认证，但无权访问该资源
+                message.error(`权限不足: ${errorMessage}`);
+                break;
+            case 499: // 自定义状态码: 强制修改密码
+                // 此状态码由登录页面专门处理，拦截器层面仅需将其继续抛出即可
+                return Promise.reject(error);
+            case 500: // Internal Server Error: 服务器内部错误
+                message.error(`服务器内部错误: ${errorMessage}`);
+                break;
+            default:
+                message.error(`请求失败: ${errorMessage} (状态码: ${status})`);
         }
+
         return Promise.reject(error);
     }
 );
@@ -54,10 +89,14 @@ service.interceptors.response.use(
 export const getForms = () => service.get('/forms');
 export const getFormById = (id) => service.get(`/forms/${id}`);
 export const createForm = (data) => service.post('/forms', data);
+export const updateForm = (id, data) => service.put(`/forms/${id}`, data); // 【新增】更新表单API
 export const deleteForm = (id) => service.delete(`/forms/${id}`);
 export const getSubmissions = (formId, params) => service.get(`/forms/${formId}/submissions`, { params });
 export const getSubmissionById = (submissionId) => service.get(`/forms/submissions/${submissionId}`);
 export const submitForm = (formId, data) => service.post(`/forms/${formId}/submissions`, data);
+export const updateSubmission = (submissionId, data) => service.put(`/forms/submissions/${submissionId}`, data);
+export const deleteSubmission = (submissionId) => service.delete(`/forms/submissions/${submissionId}`);
+
 export const fetchTableData = (url, params) => service.get(url, { params });
 export const fetchTreeData = (source) => service.get('/admin/tree-data-source', { params: { source } });
 export const importFromWord = (file) => {
@@ -99,7 +138,7 @@ export const completeTask = (taskId, data) => service.post(`/tasks/${taskId}/com
 export const changePassword = (data) => service.post('/users/me/change-password');
 export const getOrganizationTree = () => service.get('/admin/organization-tree');
 
-// --- 【核心新增】部门管理 API ---
+// --- 部门管理 API ---
 export const getDepartmentTree = () => service.get('/admin/departments/tree');
 export const createDepartment = (data) => service.post('/admin/departments', data);
 export const updateDepartment = (id, data) => service.put(`/admin/departments/${id}`, data);
@@ -109,7 +148,8 @@ export const deleteDepartment = (id) => service.delete(`/admin/departments/${id}
 export const getAllUsers = () => service.get('/admin/users');
 export const createUser = (data) => service.post('/admin/users', data);
 export const updateUser = (id, data) => service.put(`/admin/users/${id}`, data);
-export const deleteUser = (id) => service.delete(`/admin/users/${id}`);
+export const disableUser = (id) => service.delete(`/admin/users/${id}`);
+export const enableUser = (id) => service.post(`/admin/users/${id}/enable`);
 export const resetPassword = (id) => service.post(`/admin/users/${id}/reset-password`);
 
 // --- 角色管理 API ---

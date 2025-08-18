@@ -2,7 +2,8 @@
   <div class="page-container">
     <a-page-header title="表单管理" sub-title="管理所有已创建的业务表单">
       <template #extra>
-        <a-button type="primary" @click="$router.push({ name: 'form-builder' })">
+        <!-- 【核心修改】导航到具名的创建路由 -->
+        <a-button type="primary" @click="$router.push({ name: 'form-builder-create' })">
           <template #icon><PlusOutlined /></template>
           新建表单
         </a-button>
@@ -22,10 +23,16 @@
           </template>
           <template v-else-if="column.key === 'actions'">
             <a-space>
+              <!-- 编辑：次要操作，使用 link 按钮 -->
+              <a-button type="link" size="small" @click="goToBuilder(record.id)">
+                编辑
+              </a-button>
+              <!-- 设计流程：主要操作，使用 primary 按钮 -->
               <a-button type="primary" size="small" @click="goToDesigner(record.id)">
                 设计流程
               </a-button>
-              <a-button size="small" @click="viewSubmissions(record.id)">
+              <!-- 查看数据：次要操作，使用 link 按钮 -->
+              <a-button type="link" size="small" @click="viewSubmissions(record.id)">
                 查看数据
               </a-button>
               <a-popconfirm
@@ -35,7 +42,8 @@
                   cancel-text="取消"
                   @confirm="handleDelete(record.id)"
               >
-                <a-button type="primary" danger size="small">删除</a-button>
+                <!-- 删除：危险操作，使用 link danger 按钮 -->
+                <a-button type="link" danger size="small">删除</a-button>
               </a-popconfirm>
             </a-space>
           </template>
@@ -77,13 +85,18 @@ const fetchForms = async () => {
 
 onMounted(fetchForms);
 
+/**
+ * 【新增】跳转到表单设计器（编辑模式）
+ */
+const goToBuilder = (formId) => {
+  router.push({ name: 'form-builder-edit', params: { formId } });
+};
+
 const goToDesigner = (formId) => {
   router.push({ name: 'workflow-designer', params: { formId } });
 };
 
 const viewSubmissions = (formId) => {
-  // 注意：这里我们复用了 SubmissionDetail.vue 组件，它实际上是一个列表页
-  // 我们需要确保有一个路由可以接收 formId 并导航到它
   router.push({ name: 'form-submissions', params: { formId } });
 };
 
