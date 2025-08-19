@@ -1,7 +1,6 @@
 <template>
   <div class="page-container">
     <a-page-header :title="pageTitle">
-      <!-- 【新增】新增按钮 -->
       <template #extra>
         <a-button type="primary" @click="handleAddNew">
           <template #icon><PlusOutlined /></template>
@@ -11,7 +10,7 @@
     </a-page-header>
 
     <div style="padding: 24px;">
-      <!-- 【核心修改】筛选区域动态生成 -->
+      <!-- 筛选区域动态生成 -->
       <a-card :bordered="false" style="margin-bottom: 24px;">
         <a-form :model="filterState" layout="inline">
           <a-form-item v-for="filter in filterableFields" :key="filter.id" :label="filter.label">
@@ -54,7 +53,6 @@
           <template v-else-if="column.key === 'createdAt'">
             {{ new Date(record.createdAt).toLocaleString() }}
           </template>
-          <!-- 【核心修改】操作列 -->
           <template v-else-if="column.key === 'actions'">
             <a-space>
               <a-button type="link" size="small" @click="goToDetail(record.id)">查看</a-button>
@@ -75,7 +73,7 @@
       </a-table>
     </div>
 
-    <!-- 【新增】编辑模态框 -->
+    <!-- 编辑模态框 -->
     <EditSubmissionModal
         v-model:open="editModalVisible"
         :submission-id="currentEditingId"
@@ -87,27 +85,23 @@
 <script setup>
 import { ref, computed, watch, onMounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-// 【核心修改】引入新的API
 import { getFormById, getSubmissions, deleteSubmission } from '@/api';
-import { message, Modal } from 'ant-design-vue';
+import { message } from 'ant-design-vue';
 import { SearchOutlined, ReloadOutlined, PlusOutlined } from '@ant-design/icons-vue';
 import { usePaginatedFetch } from '@/composables/usePaginatedFetch.js';
-// 【核心修改】引入新增的组件
 import EditSubmissionModal from '@/views/viewer-components/EditSubmissionModal.vue';
 
 const route = useRoute();
 const router = useRouter();
 
-const pageTitle = ref(route.meta.title || '数据列表');
-const formId = ref(route.meta.formId);
-const menuId = ref(route.meta.menuId);
+const pageTitle = ref('');
+const formId = ref(null);
+const menuId = ref(null);
 
-// 【核心修改】动态字段配置状态
 const formDefinition = ref(null);
 const filterableFields = ref([]);
 const listDisplayFields = ref([]);
 
-// 【新增】编辑模态框状态
 const editModalVisible = ref(false);
 const currentEditingId = ref(null);
 
@@ -124,11 +118,11 @@ const {
   fetchData,
 } = usePaginatedFetch(apiFunction, {}, { defaultSort: 'createdAt,desc' });
 
-// 【核心修改】动态生成表格列
 const columns = computed(() => {
   if (!listDisplayFields.value) return [];
+
   const baseColumns = [
-    { title: '提交人', dataIndex: 'submitterName', key: 'submitterName', width: 120 },
+    { title: '提交人', dataIndex: 'submitterName', key: 'submitterName', width: 120, fixed: 'left' },
     { title: '流程状态', dataIndex: 'workflowStatus', key: 'workflowStatus', width: 120, align: 'center' },
   ];
 
@@ -141,12 +135,18 @@ const columns = computed(() => {
 
   const finalColumns = [
     { title: '提交时间', dataIndex: 'createdAt', key: 'createdAt', width: 180, sorter: true },
-    { title: '操作', key: 'actions', width: 180, align: 'center' },
+    { title: '操作', key: 'actions', width: 180, align: 'center', fixed: 'right' },
   ];
   return [...baseColumns, ...dynamicColumns, ...finalColumns];
 });
 
+// --- 【核心修复】创建可复用的初始化函数 ---
 const initialize = async () => {
+  // 从当前路由获取最新的元数据
+  pageTitle.value = route.meta.title || '数据列表';
+  formId.value = route.meta.formId;
+  menuId.value = route.meta.menuId;
+
   if (!formId.value) {
     message.error("页面配置错误：未关联表单定义！");
     return;
@@ -158,32 +158,36 @@ const initialize = async () => {
     filterableFields.value = res.filterableFields || [];
     listDisplayFields.value = res.listDisplayFields || [];
 
-    // 初始化筛选条件
+    // 清空旧的筛选条件并根据新表单定义初始化
+    Object.keys(filterState).forEach(key => delete filterState[key]);
     filterableFields.value.forEach(f => {
-      if (!(f.id in filterState)) {
-        filterState[f.id] = undefined;
-      }
+      filterState[f.id] = undefined;
     });
 
-    await fetchData();
+    await fetchData(); // 初始化完成后，获取第一页数据
   } catch (error) {
-    message.error("初始化页面失败");
+    // 错误已由全局拦截器处理，无需再次弹窗
+    console.error("初始化页面失败:", error);
   } finally {
     loading.value = false;
   }
 };
 
-watch(() => route.meta, (newMeta) => {
-  if (newMeta && newMeta.menuId && newMeta.menuId !== menuId.value) {
-    pageTitle.value = newMeta.title;
-    formId.value = newMeta.formId;
-    menuId.value = newMeta.menuId;
-    handleReset();
+// --- 【核心修复】使用 onMounted 来处理组件的首次加载 ---
+onMounted(() => {
+  initialize();
+});
+
+// --- 【核心修复】保留 watch 用于处理在不同数据列表页之间的切换 ---
+watch(() => route.meta, (newMeta, oldMeta) => {
+  // 仅当 menuId 确实发生变化时才重新初始化，避免不必要的重载
+  if (newMeta && newMeta.menuId && newMeta.menuId !== oldMeta.menuId) {
     initialize();
   }
-}, { immediate: true });
+});
 
-// --- 【新增】操作处理函数 ---
+
+// --- 其他函数保持不变 ---
 const handleAddNew = () => {
   router.push({ name: 'form-viewer', params: { formId: formId.value } });
 };
@@ -197,9 +201,9 @@ const handleDelete = async (record) => {
   try {
     await deleteSubmission(record.id);
     message.success("删除成功！");
-    await fetchData(); // 刷新列表
+    await fetchData();
   } catch (error) {
-    // 错误已由API拦截器处理
+    // error handled by interceptor
   }
 };
 
@@ -209,6 +213,7 @@ const goToDetail = (submissionId) => {
 
 const getComponentByType = (type) => ({ 'Input': 'a-input', 'DatePicker': 'a-date-picker', 'Select': 'a-select' }[type] || 'a-input');
 const getStatusColor = (status) => ({ '审批中': 'processing', '已通过': 'success', '已拒绝': 'error' }[status] || 'default');
+
 </script>
 
 <style scoped>

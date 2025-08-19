@@ -1,6 +1,7 @@
 package club.ppmc.workflow.domain;
 
 import jakarta.persistence.*;
+import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -14,6 +15,7 @@ import java.util.Set;
 @Entity
 @Getter
 @Setter
+@EqualsAndHashCode(of = "id") // 2. 添加注解，指定基于 id 字段进行比较
 @Table(name = "app_role")
 public class Role {
 

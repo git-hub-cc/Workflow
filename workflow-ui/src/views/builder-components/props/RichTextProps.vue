@@ -5,13 +5,6 @@
 
     <a-divider>富文本工具栏配置</a-divider>
 
-    <!--
-      【核心修复】
-      v-model 现在直接绑定到 field.props.toolbarOptions 的子属性上。
-      这之所以安全，是因为父组件 PropertiesPanel.vue 传入的 'field' prop
-      本身就是一个可变的本地副本，而不是原始的 store state。
-      这消除了响应式循环，解决了闪烁问题。
-    -->
     <a-form-item label="基础样式">
       <a-checkbox-group v-model:value="field.props.toolbarOptions.basic">
         <a-checkbox value="bold">加粗</a-checkbox>
@@ -53,7 +46,7 @@ import GenericProps from './GenericProps.vue';
 const props = defineProps(['field', 'allFields']);
 
 /**
- * 【核心修复】
+ * 【加固】
  * 确保 toolbarOptions 对象及其所有子数组都存在，防止 v-model 绑定到 undefined。
  * 这个初始化逻辑对于新拖入的组件至关重要，并为它们提供了合理的默认值。
  */
@@ -80,6 +73,4 @@ const initToolbarOptions = () => {
 
 // 立即执行初始化
 initToolbarOptions();
-
-// 之前导致闪烁的 watchEffect 循环已被完全移除。
 </script>

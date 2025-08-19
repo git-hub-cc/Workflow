@@ -12,36 +12,36 @@
 </template>
 
 <script setup>
-// ... script部分保持不变 ...
 import { ref, watch, computed, defineAsyncComponent, nextTick } from 'vue';
 
 const props = defineProps(['selectedField', 'allFields']);
 const emit = defineEmits(['update:field']);
 
 const localField = ref(null);
-let isInternalUpdate = false;
 let debounceTimer = null;
 
+// 【核心修复】修改 watch 逻辑
 watch(() => props.selectedField, (newField) => {
-  clearTimeout(debounceTimer);
-  isInternalUpdate = true;
-  if (newField) {
-    localField.value = JSON.parse(JSON.stringify(newField));
-  } else {
-    localField.value = null;
+  // 只有当选择的字段ID发生变化时 (即用户点击了另一个组件)，才重置 localField
+  if (newField?.id !== localField.value?.id) {
+    if (newField) {
+      // 使用深拷贝创建一个可编辑的本地副本
+      localField.value = JSON.parse(JSON.stringify(newField));
+    } else {
+      localField.value = null;
+    }
   }
-  nextTick(() => {
-    isInternalUpdate = false;
-  });
 }, { deep: true, immediate: true });
 
-watch(localField, (newVal) => {
-  if (isInternalUpdate) return;
-  if (newVal) {
+
+// 这个 watch 保持不变，它负责将本地的修改同步到父组件
+watch(localField, (newVal, oldVal) => {
+  // 仅当 newVal 存在且与 oldVal 的 ID 相同（表示是编辑而非切换组件）时才触发更新
+  if (newVal && oldVal && newVal.id === oldVal.id) {
     clearTimeout(debounceTimer);
     debounceTimer = setTimeout(() => {
       emit('update:field', newVal);
-    }, 100);
+    }, 100); // 使用防抖减少事件触发频率
   }
 }, { deep: true });
 
@@ -74,7 +74,6 @@ const propertiesComponent = computed(() => {
       return defineAsyncComponent(() => import('./props/GenericProps.vue'));
     case 'StaticText':
       return defineAsyncComponent(() => import('./props/StaticTextProps.vue'));
-      // --- 【核心修改】新增 RichText 的属性面板 ---
     case 'RichText':
       return defineAsyncComponent(() => import('./props/RichTextProps.vue'));
     default:
@@ -83,27 +82,24 @@ const propertiesComponent = computed(() => {
 });
 </script>
 
-<!-- 【核心修改】重写整个样式部分 -->
 <style scoped>
 .properties {
   width: 320px;
   flex-shrink: 0;
-  display: flex; /* 1. 使自身成为 flex 容器 */
-  flex-direction: column; /* 垂直排列 */
-}
-
-/* 2. 使用 :deep() 选择器让 antd 卡片组件充满 .properties 容器 */
-.properties :deep(.ant-card) {
-  flex-grow: 1; /* 关键：让卡片填满所有可用垂直空间 */
   display: flex;
   flex-direction: column;
 }
 
-/* 3. 让卡片的内容区域（body）成为可滚动区域 */
+.properties :deep(.ant-card) {
+  flex-grow: 1;
+  display: flex;
+  flex-direction: column;
+}
+
 .properties :deep(.ant-card-body) {
-  flex-grow: 1; /* 关键：让内容区填满卡片内剩余空间 */
-  overflow-y: auto; /* 当内容溢出时，显示滚动条 */
-  padding: 12px; /* 可以适当调整内边距 */
+  flex-grow: 1;
+  overflow-y: auto;
+  padding: 12px;
 }
 
 .properties-placeholder {
