@@ -5,23 +5,23 @@ import { message } from 'ant-design-vue';
 import router, { resetRouter, addDynamicRoutes } from '@/router';
 
 export const useUserStore = defineStore('user', () => {
-    // --- State ---
+// --- State ---
     const token = ref(localStorage.getItem('token') || null);
     const currentUser = ref(JSON.parse(localStorage.getItem('user')) || null);
     const menus = ref(JSON.parse(localStorage.getItem('menus')) || []);
-    // --- 【核心重构】数据源分离 ---
+// --- 【核心重构】数据源分离 ---
     const usersForManagement = ref([]); // 用于用户管理页面的完整用户数据
     const usersForPicker = ref([]);     // 用于选择器的简化用户数据
     const allRoles = ref([]);
     const allGroups = ref([]);
     const loading = ref(false);
 
-    // --- Getters ---
+// --- Getters ---
     const isAuthenticated = computed(() => !!token.value && !!currentUser.value);
     const isAdmin = computed(() => currentUser.value?.role === 'ADMIN');
     const passwordChangeRequired = computed(() => currentUser.value?.passwordChangeRequired || false);
 
-    // --- Actions ---
+// --- Actions ---
     async function handleLogin(credentials) {
         loading.value = true;
         try {
@@ -31,11 +31,11 @@ export const useUserStore = defineStore('user', () => {
             localStorage.setItem('token', token.value);
             localStorage.setItem('user', JSON.stringify(currentUser.value));
 
-            // ⭐ 核心修改: 先获取并设置菜单，再进行路由跳转
+// ⭐ 核心修改: 先获取并设置菜单，再进行路由跳转
             await fetchAndSetMenus();
 
-            // 登录后预加载基础数据
-            // 【安全修复】调整预加载逻辑，只有管理员才加载特定数据
+// 登录后预加载基础数据
+// 【安全修复】调整预加载逻辑，只有管理员才加载特定数据
             if (isAdmin.value) {
                 await fetchUsersForPicker();
                 await fetchUsersForManagement();
@@ -43,7 +43,7 @@ export const useUserStore = defineStore('user', () => {
                 await fetchAllGroups();
             }
 
-            // ⭐ 核心修改: 统一跳转到根路径，让导航守卫处理后续逻辑
+// ⭐ 核心修改: 统一跳转到根路径，让导航守卫处理后续逻辑
             await router.push('/');
             message.success(`欢迎回来, ${currentUser.value.name}`);
 
@@ -80,7 +80,7 @@ export const useUserStore = defineStore('user', () => {
         router.push('/login');
     }
 
-    // --- 【核心重构】数据获取方法分离 ---
+// --- 【核心重构】数据获取方法分离 ---
     async function fetchUsersForManagement() {
         if (!isAdmin.value) return;
         try {
@@ -91,8 +91,8 @@ export const useUserStore = defineStore('user', () => {
     }
 
     async function fetchUsersForPicker() {
-        // --- 【安全修复】增加前端权限判断，与后端API权限保持一致 ---
-        // 确保只有管理员才能调用这个获取全量用户的接口
+// --- 【安全修复】增加前端权限判断，与后端API权限保持一致 ---
+// 确保只有管理员才能调用这个获取全量用户的接口
         if (!isAdmin.value) {
             console.warn("Attempted to fetch all users for picker without admin rights. Skipped.");
             usersForPicker.value = []; // 清空可能存在的旧数据

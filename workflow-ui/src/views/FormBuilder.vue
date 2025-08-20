@@ -161,12 +161,10 @@ const jsonFileInputRef = ref(null);
 const wordFileInputRef = ref(null);
 const importingWord = ref(false);
 
-// --- 组件面板定义 (保持不变) ---
+// --- 【核心修改】组件面板定义 ---
 const paletteItems = {
   layout: [
-    { type: 'GridRow', label: '两栏布局', options: { spans: [12, 12] } },
-    { type: 'GridRow', label: '三栏布局', options: { spans: [8, 8, 8] } },
-    { type: 'GridRow', label: '四栏布局', options: { spans: [6, 6, 6, 6] } },
+    { type: 'GridRow', label: '栅格布局', options: { spans: [12, 12] } }, // 统一为一个栅格布局组件
     { type: 'Collapse', label: '折叠面板' },
     { type: 'DescriptionList', label: '描述列表' },
     { type: 'StaticText', label: '静态文本' },
@@ -272,7 +270,7 @@ const createNewField = (item) => {
       baseField.id = 'nextAssignee'; baseField.label = '下一步审批人'; baseField.rules[0].required = true; baseField.dataSource = { type: 'system-users' };
       break;
     case 'DataPicker':
-      baseField.props.modalTitle = '选择数据'; baseField.props.dataUrl = '/api/workflows/users';
+      baseField.props.modalTitle = '选择数据'; baseField.props.dataUrl = '/workflows/users';
       baseField.props.columns = [{ title: 'ID', dataIndex: 'id' }, { title: '姓名', dataIndex: 'name' }];
       baseField.props.mappings = [{ sourceField: 'id', targetField: '' }, { sourceField: 'name', targetField: '' }];
       break;

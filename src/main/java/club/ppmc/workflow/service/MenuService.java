@@ -32,7 +32,8 @@ public class MenuService {
     private final FormDefinitionRepository formDefinitionRepository;
 
     /**
-     * 获取指定用户的可访问菜单树
+     * 【核心修复】获取指定用户的可访问菜单树
+     *  - 为管理员(ADMIN)增加特殊逻辑，使其能够看到所有菜单。
      *
      * @param userId 用户ID
      * @return 菜单 DTO 树形列表
@@ -42,12 +43,30 @@ public class MenuService {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("未找到用户: " + userId));
         Set<Role> userRoles = user.getRoles();
-        if (userRoles.isEmpty()) {
-            return Collections.emptyList();
+
+        // 检查用户是否拥有 "ADMIN" 角色
+        boolean isAdmin = userRoles.stream()
+                .anyMatch(role -> "ADMIN".equals(role.getName()));
+
+        List<Menu> accessibleMenus;
+
+        if (isAdmin) {
+            // 如果是管理员，获取所有菜单
+            accessibleMenus = menuRepository.findAll();
+            // 确保管理员看到的菜单也是排好序的
+            accessibleMenus.sort(Comparator.comparing(Menu::getOrderNum, Comparator.nullsLast(Comparator.naturalOrder()))
+                    .thenComparing(Menu::getName));
+        } else {
+            // 如果不是管理员，则按角色获取可见菜单
+            if (userRoles.isEmpty()) {
+                return Collections.emptyList();
+            }
+            accessibleMenus = menuRepository.findVisibleMenusByRoles(userRoles);
         }
-        List<Menu> accessibleMenus = menuRepository.findVisibleMenusByRoles(userRoles);
+
         return buildMenuTree(accessibleMenus.stream().map(this::toDto).collect(Collectors.toList()));
     }
+
 
     /**
      * 获取所有菜单的完整树形结构 (供管理员使用)

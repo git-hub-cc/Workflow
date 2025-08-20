@@ -1,133 +1,146 @@
 <template>
   <div>
-    <a-input-search
-        :value="displayValue"
-        placeholder="点击选择"
-        readonly
-        @search="openModal"
-    >
-      <template #enterButton>
-        <a-button>选择</a-button>
-      </template>
-    </a-input-search>
+    <!-- Generic Properties -->
+    <GenericProps :field="field" :all-fields="allFields" />
 
-    <a-modal
-        v-model:open="modalVisible"
-        :title="field.props.modalTitle || '选择数据'"
-        width="800px"
-        @ok="handleOk"
-        @cancel="modalVisible = false"
-    >
-      <a-input-search
-          v-model:value="searchQuery"
-          placeholder="输入关键词搜索"
-          @search="fetchData(1)"
-          style="margin-bottom: 16px;"
-      />
-      <!-- 【核心修改】将 loading 状态绑定到表格上 -->
-      <a-table
-          :columns="field.props.columns"
-          :data-source="tableData"
-          :loading="loading"
-          :pagination="pagination"
-          row-key="id"
-          :row-selection="{ type: 'radio', selectedRowKeys: selectedKeys, onChange: onSelectChange }"
-          @change="handleTableChange"
-          size="small"
-      />
-    </a-modal>
+    <a-divider>数据选择器配置</a-divider>
+
+    <a-form-item label="弹窗标题">
+      <a-input v-model:value="field.props.modalTitle" />
+    </a-form-item>
+
+    <a-form-item label="数据接口" help="从预定义的API列表中选择">
+      <a-select v-model:value="field.props.dataUrl" @change="onApiChange">
+        <a-select-option v-for="api in predefinedApis" :key="api.url" :value="api.url">
+          {{ api.name }}
+        </a-select-option>
+      </a-select>
+    </a-form-item>
+
+    <a-form-item>
+      <a-button @click="testApi" :loading="testingApi" :disabled="!field.props.dataUrl">
+        <template #icon><ApiOutlined /></template>
+        测试接口并自动填充
+      </a-button>
+    </a-form-item>
+
+    <!-- Table Columns Configuration -->
+    <a-form-item label="弹窗表格列">
+      <div v-for="(col, index) in field.props.columns" :key="index" class="config-row">
+        <a-input v-model:value="col.title" placeholder="列标题 (Title)" />
+        <a-input v-model:value="col.dataIndex" placeholder="数据字段 (DataIndex)" />
+        <a-button type="text" danger @click="removeColumn(index)">
+          <DeleteOutlined />
+        </a-button>
+      </div>
+      <a-button type="dashed" block @click="addColumn">
+        <PlusOutlined /> 添加列
+      </a-button>
+    </a-form-item>
+
+    <!-- Field Mappings Configuration -->
+    <a-form-item label="回填字段映射" help="将选中行的源字段值，回填到当前表单的目标字段中">
+      <div v-for="(mapping, index) in field.props.mappings" :key="index" class="config-row">
+        <a-input v-model:value="mapping.sourceField" placeholder="源字段 (Source)" />
+        <a-select v-model:value="mapping.targetField" placeholder="目标字段 (Target)">
+          <a-select-option v-for="f in availableTargetFields" :key="f.id" :value="f.id">
+            {{ f.label }} ({{ f.id }})
+          </a-select-option>
+        </a-select>
+        <a-button type="text" danger @click="removeMapping(index)">
+          <DeleteOutlined />
+        </a-button>
+      </div>
+      <a-button type="dashed" block @click="addMapping">
+        <PlusOutlined /> 添加映射
+      </a-button>
+    </a-form-item>
   </div>
 </template>
 
 <script setup>
-import { ref, computed } from 'vue';
-import { message } from 'ant-design-vue';
+import { computed, ref } from 'vue';
+import { DeleteOutlined, PlusOutlined, ApiOutlined } from '@ant-design/icons-vue';
+import { flattenFields } from '@/utils/formUtils.js';
+import GenericProps from './GenericProps.vue';
+import { predefinedApis } from '@/utils/apiLibrary.js';
 import { fetchTableData } from '@/api';
+import { message } from 'ant-design-vue';
 
-const props = defineProps(['value', 'field']);
-const emit = defineEmits(['update:value', 'update:form-data']);
+const props = defineProps(['field', 'allFields']);
+const testingApi = ref(false);
 
-const modalVisible = ref(false);
-const loading = ref(false); // 表格的局部加载状态
-const tableData = ref([]);
-const searchQuery = ref('');
-const pagination = ref({
-  current: 1,
-  pageSize: 10,
-  total: 0,
-});
-const selectedKeys = ref([]);
-const selectedRow = ref(null);
-
-const displayValue = computed(() => {
-  return props.value || '';
+const availableTargetFields = computed(() => {
+  return flattenFields(props.allFields).filter(f => !['GridRow', 'GridCol', 'DataPicker', 'Subform'].includes(f.type));
 });
 
-const fetchData = async (page = 1) => {
-  loading.value = true;
-  try {
-    const params = {
-      page: page - 1, // 后端分页从0开始
-      size: pagination.value.pageSize,
-      search: searchQuery.value,
-    };
-    const response = await fetchTableData(props.field.props.dataUrl, params);
-
-    // 兼容数组和分页对象两种返回格式
-    if (Array.isArray(response)) {
-      tableData.value = response;
-      pagination.value.total = response.length;
-    } else {
-      tableData.value = response.content;
-      pagination.value.total = response.totalElements;
-    }
-    pagination.value.current = page;
-
-  } catch (error) {
-    message.error('数据加载失败');
-  } finally {
-    loading.value = false;
-  }
+// 【核心修复】当API选择变化时，自动调用测试接口的逻辑
+const onApiChange = async () => {
+  // 自动调用测试/填充功能，改善用户体验
+  await testApi();
 };
 
-const openModal = () => {
-  modalVisible.value = true;
-  // 清空上次选择
-  selectedKeys.value = [];
-  selectedRow.value = null;
-  fetchData();
-};
-
-const onSelectChange = (keys, rows) => {
-  selectedKeys.value = keys;
-  selectedRow.value = rows[0];
-};
-
-const handleTableChange = (pager) => {
-  fetchData(pager.current);
-};
-
-const handleOk = () => {
-  if (!selectedRow.value) {
-    message.warn('请选择一条数据');
+const testApi = async () => {
+  if (!props.field.props.dataUrl) {
+    message.warn("请先选择一个数据接口");
     return;
   }
+  testingApi.value = true;
+  try {
+    // 只获取第一条数据用于分析结构
+    const response = await fetchTableData(props.field.props.dataUrl, { page: 0, size: 1 });
+    const dataList = Array.isArray(response) ? response : response.content;
 
-  const mappings = {};
-  props.field.props.mappings.forEach(m => {
-    if (m.sourceField && m.targetField) {
-      // 使用 emit 更新整个 formData，而不仅仅是单个字段
-      emit('update:form-data', m.targetField, selectedRow.value[m.sourceField]);
+    if (!dataList || dataList.length === 0) {
+      message.warn('接口返回数据为空，无法自动填充配置。');
+      // 清空旧配置以避免混淆
+      props.field.props.columns = [];
+      props.field.props.mappings = [];
+      return;
     }
-  });
 
-  // 主字段的值通常是第一个映射的源字段值，或者是行的ID
-  const primarySourceField = props.field.props.mappings[0]?.sourceField || 'id';
-  const primaryValue = selectedRow.value[primarySourceField];
+    const firstItem = dataList[0];
+    const keys = Object.keys(firstItem);
 
-  // 使用 v-model 更新主字段的值
-  emit('update:value', primaryValue);
+    // 自动填充表格列
+    props.field.props.columns = keys.map(key => ({ title: key, dataIndex: key }));
+    // 自动填充字段映射（默认为空，让用户选择）
+    props.field.props.mappings = keys.map(key => ({ sourceField: key, targetField: '' }));
 
-  modalVisible.value = false;
+    message.success('接口测试成功，已自动填充列和映射配置！');
+
+  } catch (error) {
+    message.error('接口测试失败，请检查URL是否正确或联系管理员。');
+  } finally {
+    testingApi.value = false;
+  }
+};
+
+
+// Columns management
+const addColumn = () => {
+  if (!props.field.props.columns) props.field.props.columns = [];
+  props.field.props.columns.push({ title: '', dataIndex: '' });
+};
+const removeColumn = (index) => {
+  props.field.props.columns.splice(index, 1);
+};
+
+// Mappings management
+const addMapping = () => {
+  if (!props.field.props.mappings) props.field.props.mappings = [];
+  props.field.props.mappings.push({ sourceField: '', targetField: '' });
+};
+const removeMapping = (index) => {
+  props.field.props.mappings.splice(index, 1);
 };
 </script>
+
+<style scoped>
+.config-row {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 8px;
+  align-items: center;
+}
+</style>

@@ -64,6 +64,13 @@ const staticRoutes = [
             { path: 'tasks/:taskId', name: 'task-detail', component: () => import('../views/TaskDetail.vue'), props: true, meta: { title: '任务处理' } },
             { path: 'my-submissions', name: 'my-submissions', component: () => import('../views/MySubmissions.vue'), meta: { title: '我的申请' } },
         ]
+    },
+    // --- 【核心新增】通配符路由，用于捕获所有未匹配的路径 ---
+    // --- 必须放在所有路由规则的最后 ---
+    {
+        path: '/:pathMatch(.*)*',
+        name: 'not-found',
+        redirect: { name: 'home' } // 重定向到首页
     }
 ];
 

@@ -23,6 +23,7 @@ let debounceTimer = null;
 // 【核心修复】修改 watch 逻辑
 watch(() => props.selectedField, (newField) => {
   // 只有当选择的字段ID发生变化时 (即用户点击了另一个组件)，才重置 localField
+  // 使用 ?. 可选链操作符，安全地访问可能为 null 的 localField.value
   if (newField?.id !== localField.value?.id) {
     if (newField) {
       // 使用深拷贝创建一个可编辑的本地副本
@@ -51,7 +52,8 @@ const propertiesComponent = computed(() => {
   const type = localField.value.type;
   switch (type) {
     case 'GridRow':
-      return defineAsyncComponent(() => import('./props/GridRowProps.vue'));
+      // 【核心修改】将 GridRow 指向统一的布局属性配置面板
+      return defineAsyncComponent(() => import('./props/LayoutProps.vue'));
     case 'GridCol':
       return defineAsyncComponent(() => import('./props/GridColProps.vue'));
     case 'Collapse':

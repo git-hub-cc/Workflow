@@ -11,39 +11,43 @@
       </template>
     </a-input-search>
 
-    <a-modal
-        v-model:open="modalVisible"
-        :title="field.props.modalTitle || '选择数据'"
-        width="800px"
-        @ok="handleOk"
-        @cancel="modalVisible = false"
-    >
-      <a-input-search
-          v-model:value="searchQuery"
-          placeholder="输入关键词搜索"
-          @search="fetchData(1)"
-          style="margin-bottom: 16px;"
-      />
-      <a-table
-          :columns="field.props.columns"
-          :data-source="tableData"
-          :loading="loading"
-          :pagination="pagination"
-          row-key="id"
-          :row-selection="{ type: 'radio', selectedRowKeys: selectedKeys, onChange: onSelectChange }"
-          @change="handleTableChange"
-          size="small"
-      />
-    </a-modal>
+    <!-- 【核心修复】将 a-modal 包裹在 a-form-item-rest 中 -->
+    <a-form-item-rest>
+      <a-modal
+          v-model:open="modalVisible"
+          :title="field.props.modalTitle || '选择数据'"
+          width="800px"
+          @ok="handleOk"
+          @cancel="modalVisible = false"
+      >
+        <a-input-search
+            v-model:value="searchQuery"
+            placeholder="输入关键词搜索"
+            @search="fetchData(1)"
+            style="margin-bottom: 16px;"
+        />
+        <a-table
+            :columns="field.props.columns"
+            :data-source="tableData"
+            :loading="loading"
+            :pagination="pagination"
+            row-key="id"
+            :row-selection="{ type: 'radio', selectedRowKeys: selectedKeys, onChange: onSelectChange }"
+            @change="handleTableChange"
+            size="small"
+        />
+      </a-modal>
+    </a-form-item-rest>
   </div>
 </template>
 
 <script setup>
 import { ref, computed } from 'vue';
-import { message } from 'ant-design-vue';
+// 【核心修复】从 ant-design-vue 导入 FormItemRest
+import { message, FormItemRest as AFormItemRest } from 'ant-design-vue';
 import { fetchTableData } from '@/api';
 
-const props = defineProps(['value', 'field']);
+const props = defineProps(['value', 'field', 'form-data']);
 const emit = defineEmits(['update:value', 'update:form-data']);
 
 const modalVisible = ref(false);
@@ -59,7 +63,12 @@ const selectedKeys = ref([]);
 const selectedRow = ref(null);
 
 const displayValue = computed(() => {
-  // Display value is typically the value of the main field this component is bound to
+  // 优先从 mappings 的第一个目标字段获取显示值
+  const primaryTargetField = props.field.props.mappings?.[0]?.targetField;
+  if (primaryTargetField && props.formData && props.formData[primaryTargetField]) {
+    return props.formData[primaryTargetField];
+  }
+  // 否则回退到组件自身的 v-model 值
   return props.value || '';
 });
 
@@ -67,18 +76,20 @@ const fetchData = async (page = 1) => {
   loading.value = true;
   try {
     const params = {
-      page: page,
+      page: page - 1, // 后端分页从0开始
       size: pagination.value.pageSize,
       search: searchQuery.value,
     };
-    // Note: Assuming backend returns a paginated structure like { content: [], totalElements: 0 }
-    // This needs to be adjusted based on your actual API response.
     const response = await fetchTableData(props.field.props.dataUrl, params);
 
-    // Let's assume a simple array response for now, and handle pagination on client side for demo
-    // In a real app, pagination should be driven by backend's `totalElements`.
-    tableData.value = response; // Adjust if paginated: response.content;
-    pagination.value.total = response.length; // Adjust if paginated: response.totalElements;
+    // 兼容数组和分页对象两种返回格式
+    if (Array.isArray(response)) {
+      tableData.value = response;
+      pagination.value.total = response.length;
+    } else {
+      tableData.value = response.content;
+      pagination.value.total = response.totalElements;
+    }
     pagination.value.current = page;
 
   } catch (error) {
@@ -90,6 +101,9 @@ const fetchData = async (page = 1) => {
 
 const openModal = () => {
   modalVisible.value = true;
+  // 清空上次选择
+  selectedKeys.value = [];
+  selectedRow.value = null;
   fetchData();
 };
 
@@ -108,24 +122,19 @@ const handleOk = () => {
     return;
   }
 
-  const mappings = {};
+  // 【修复】改为直接 emit 'update:form-data' 事件，并传入一个包含所有映射的对象
   props.field.props.mappings.forEach(m => {
     if (m.sourceField && m.targetField) {
-      mappings[m.targetField] = selectedRow.value[m.sourceField];
+      // 分别触发每个映射字段的更新
+      emit('update:form-data', m.targetField, selectedRow.value[m.sourceField]);
     }
   });
 
-  // The primary field value is typically the first mapping's source value, or the row's ID
+  // 更新组件自身绑定的主值
   const primarySourceField = props.field.props.mappings[0]?.sourceField || 'id';
   const primaryValue = selectedRow.value[primarySourceField];
-
-  // Emit an event to update the parent form data with all mappings
-  emit('update:form-data', mappings);
-  // Emit v-model update for the primary field
   emit('update:value', primaryValue);
 
   modalVisible.value = false;
-  selectedKeys.value = [];
-  selectedRow.value = null;
 };
 </script>

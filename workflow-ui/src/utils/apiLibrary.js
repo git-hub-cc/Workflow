@@ -7,23 +7,26 @@
 export const predefinedApis = [
     {
         name: '系统用户列表',
-        url: '/api/workflows/users',
+        // 【修复】移除冗余的 /api 前缀，axios 的 baseURL 会自动添加
+        url: '/workflows/users',
         description: '获取所有系统用户的ID和姓名。',
     },
     {
         name: '系统角色列表',
-        url: '/api/admin/roles',
+        // 【修复】移除冗余的 /api 前缀
+        url: '/admin/roles',
         description: '获取所有已定义的角色。',
     },
     {
         name: '系统用户组列表',
-        url: '/api/admin/groups',
+        // 【修复】移除冗余的 /api 前缀
+        url: '/admin/groups',
         description: '获取所有已定义的用户组。',
     },
     // 在这里可以添加更多自定义的业务API
     // {
     //   name: '产品列表',
-    //   url: '/api/products',
+    //   url: '/products',
     //   description: '获取所有产品的基本信息。',
     // },
 ];

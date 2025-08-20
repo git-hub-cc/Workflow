@@ -10,7 +10,7 @@
     </a-form-item>
 
     <!-- 【核心修改】API URL 从输入框变为选择器 -->
-    <a-form-item label="数据接口" help="从预定义的API列表中选择">
+    <a-form-item label="数据接口" help="从预定义的API列表中选择，src/utils/apiLibrary.js">
       <a-select v-model:value="field.props.dataUrl" @change="onApiChange">
         <a-select-option v-for="api in predefinedApis" :key="api.url" :value="api.url">
           {{ api.name }}
@@ -77,13 +77,16 @@ const availableTargetFields = computed(() => {
   return flattenFields(props.allFields).filter(f => !['GridRow', 'GridCol', 'DataPicker', 'Subform'].includes(f.type));
 });
 
-// 清空配置
-const onApiChange = () => {
-  props.field.props.columns = [];
-  props.field.props.mappings = [];
-}
+// 【核心修复】当API选择变化时，自动调用测试接口的逻辑
+const onApiChange = async () => {
+  await testApi();
+};
 
 const testApi = async () => {
+  if (!props.field.props.dataUrl) {
+    message.warn("请先选择一个数据接口");
+    return;
+  }
   testingApi.value = true;
   try {
     // 只获取第一条数据用于分析结构
@@ -92,6 +95,9 @@ const testApi = async () => {
 
     if (!dataList || dataList.length === 0) {
       message.warn('接口返回数据为空，无法自动填充配置。');
+      // 清空旧配置以避免混淆
+      props.field.props.columns = [];
+      props.field.props.mappings = [];
       return;
     }
 
