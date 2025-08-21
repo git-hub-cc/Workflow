@@ -1,7 +1,6 @@
 <template>
   <!-- 将 IconPickerModal 和 UserDeptSelectorModal 移至顶层，避免 FormItem 收集错误 -->
   <IconPickerModal v-if="field.type === 'IconPicker'" v-model:open="showIconPickerModal" @select="icon => localValue = icon" />
-  <UserDeptSelectorModal v-if="field.type === 'UserPicker'" v-model:open="showUserSelectorModal" @select="handleUserSelect" />
 
   <!-- 条件渲染：只有在满足显隐条件时才渲染组件 -->
   <div v-if="isVisible">
@@ -39,19 +38,28 @@
     <a-form-item v-else :label="field.label" :name="field.id" :rules="mode === 'edit' ? dynamicRules : []">
       <!-- ==================== 编辑模式 (mode === 'edit') ==================== -->
       <template v-if="mode === 'edit'">
-        <!-- 【核心修复】将 UserPicker 的触发器从 a-select 改为 a-input-search -->
-        <template v-if="field.type === 'UserPicker'">
-          <a-input-search
-              :value="formattedValue"
-              :placeholder="field.props.placeholder"
-              readonly
-              @search="showUserSelectorModal = true"
-          >
-            <template #enterButton>
-              <a-button>选择</a-button>
-            </template>
-          </a-input-search>
-        </template>
+        <!-- 【核心修改】将 FileUpload 单独处理以传递 list-type prop -->
+        <FileUploader
+            v-if="field.type === 'FileUpload'"
+            v-model:value="localValue"
+            :field="field"
+            list-type="picture-card"
+        />
+
+        <a-select
+            v-else-if="field.type === 'UserPicker'"
+            v-model:value="localValue"
+            show-search
+            :placeholder="field.props.placeholder"
+            :options="userOptions"
+            :filter-option="false"
+            :not-found-content="loadingOptions ? undefined : null"
+            @search="handleUserSearch"
+        >
+          <template v-if="loadingOptions" #notFoundContent>
+            <a-spin size="small" />
+          </template>
+        </a-select>
 
         <QuillEditor
             v-else-if="field.type === 'RichText'"
@@ -98,9 +106,9 @@
 <script setup>
 import { computed, ref, onMounted, defineAsyncComponent } from 'vue';
 import { useUserStore } from '@/stores/user';
-import { downloadFile, fetchTableData, fetchTreeData } from '@/api';
+import { downloadFile, fetchTableData, fetchTreeData, searchUsersForPicker } from '@/api';
 import { message } from 'ant-design-vue';
-import { PaperClipOutlined, UserOutlined } from '@ant-design/icons-vue';
+import { PaperClipOutlined } from '@ant-design/icons-vue';
 import FileUploader from '@/components/FileUploader.vue';
 import DataPicker from './DataPicker.vue';
 import { QuillEditor } from '@vueup/vue-quill';
@@ -108,7 +116,6 @@ import '@vueup/vue-quill/dist/vue-quill.snow.css';
 import { iconMap } from '@/utils/iconLibrary.js';
 
 import EditableSubform from './EditableSubform.vue';
-import UserDeptSelectorModal from '@/components/UserDeptSelectorModal.vue';
 import KeyValueEditor from './KeyValueEditor.vue';
 import IconPickerModal from '@/components/IconPickerModal.vue';
 import StaticTextRenderer from './StaticTextRenderer.vue';
@@ -121,8 +128,8 @@ const emit = defineEmits(['update:form-data']);
 const userStore = useUserStore();
 const dynamicOptions = ref([]);
 const loadingOptions = ref(false);
-const showUserSelectorModal = ref(false);
 const showIconPickerModal = ref(false);
+const userOptions = ref([]);
 
 const localValue = computed({
   get: () => props.formData[props.field.id],
@@ -157,7 +164,6 @@ const dynamicRules = computed(() => {
       return { pattern: new RegExp(ruleConfig.pattern), message: ruleConfig.message };
     }
     if (ruleConfig.compareField) {
-      // 自定义校验器
       const validator = (rule, value) => {
         const targetValue = props.formData[ruleConfig.compareField];
         let isValid = true;
@@ -171,21 +177,19 @@ const dynamicRules = computed(() => {
       };
       return { validator, trigger: 'blur' };
     }
-    // Antd validation types
     return { ...ruleConfig };
   });
 });
 
 const richTextToolbarOptions = computed(() => {
   const config = props.field.props?.toolbarOptions;
-  if (!config) return 'minimal'; // 默认最小配置
+  if (!config) return 'minimal';
 
   const toolbar = [];
   const allOptions = [...(config.basic || []), ...(config.header || []), ...(config.list || []), ...(config.extra || [])];
 
-  if (allOptions.length === 0) return false; // 禁用工具栏
+  if (allOptions.length === 0) return false;
 
-  // 映射到 Quill 的配置格式
   const mapping = {
     'bold': 'bold', 'italic': 'italic', 'underline': 'underline', 'strike': 'strike',
     'header': { 'header': [1, 2, 3, false] },
@@ -222,9 +226,8 @@ const formattedValue = computed(() => {
     return findOptionLabel(dynamicOptions.value, value) || value;
   }
   if (props.field.type === 'UserPicker') {
-    let user = dynamicOptions.value.find(u => u.value === value);
-    if (!user) user = userStore.usersForPicker.find(u => u.id === value);
-    return user ? (user.label || `${user.name} (${user.id})`) : value;
+    const selectedUser = userOptions.value.find(u => u.value === value);
+    return selectedUser ? selectedUser.label : value;
   }
   if (props.field.type === 'DatePicker' && value) { try { return new Date(value).toLocaleString(); } catch(e) { return value; } }
   if (props.field.type === 'DataPicker') {
@@ -242,14 +245,24 @@ const formattedValue = computed(() => {
 
 onMounted(async () => {
   const ds = props.field.dataSource;
-  if (!ds || !['Select', 'UserPicker', 'TreeSelect'].includes(props.field.type)) return;
+  if (!ds || !['Select', 'TreeSelect'].includes(props.field.type)) {
+    if (props.field.type === 'UserPicker' && localValue.value) {
+      loadingOptions.value = true;
+      try {
+        const results = await searchUsersForPicker(localValue.value);
+        if (results && results.length > 0) {
+          userOptions.value = results.map(u => ({ label: `${u.name} (${u.id})`, value: u.id }));
+        }
+      } catch (e) { /* ignore */ }
+      finally { loadingOptions.value = false; }
+    }
+    return;
+  }
+
   loadingOptions.value = true;
   try {
     if (ds.type === 'static') {
       dynamicOptions.value = ds.options || [];
-    } else if (ds.type === 'system-users') {
-      if (userStore.usersForPicker.length === 0) await userStore.fetchUsersForPicker();
-      dynamicOptions.value = userStore.usersForPicker.map(u => ({ label: `${u.name} (${u.id})`, value: u.id }));
     } else if (ds.type === 'api' && ds.url) {
       const data = await fetchTableData(ds.url);
       dynamicOptions.value = data.map(item => ({ label: item[ds.labelKey || 'label'], value: item[ds.valueKey || 'value'] }));
@@ -263,8 +276,29 @@ onMounted(async () => {
   }
 });
 
+let searchTimeout;
+const handleUserSearch = (keyword) => {
+  clearTimeout(searchTimeout);
+  if (!keyword) {
+    userOptions.value = [];
+    return;
+  }
+  loadingOptions.value = true;
+  searchTimeout = setTimeout(async () => {
+    try {
+      const results = await searchUsersForPicker(keyword);
+      userOptions.value = results.map(u => ({ label: `${u.name} (${u.id})`, value: u.id }));
+    } catch (error) {
+      userOptions.value = [];
+    } finally {
+      loadingOptions.value = false;
+    }
+  }, 300); // Debounce
+};
+
 const getComponentByType = (type) => {
-  const map = { Input: 'a-input', Textarea: 'a-textarea', Checkbox: 'a-checkbox', DatePicker: 'a-date-picker', FileUpload: FileUploader };
+  const map = { Input: 'a-input', Textarea: 'a-textarea', Checkbox: 'a-checkbox', DatePicker: 'a-date-picker' };
+  // 【核心修改】移除 FileUpload，因为它现在被单独处理
   return map[type] || 'a-input';
 };
 const filterOption = (input, option) => option.label.toLowerCase().indexOf(input.toLowerCase()) >= 0;
@@ -288,11 +322,6 @@ const handleDownload = async (fileId, filename) => {
 };
 const handleDataPickerUpdate = (mappings) => {
   for (const key in mappings) { emit('update:form-data', key, mappings[key]); }
-};
-const handleUserSelect = (user) => {
-  localValue.value = user.id;
-  const exists = dynamicOptions.value.some(opt => opt.value === user.id);
-  if (!exists) { dynamicOptions.value.push({ label: `${user.name} (${user.id})`, value: user.id }); }
 };
 </script>
 

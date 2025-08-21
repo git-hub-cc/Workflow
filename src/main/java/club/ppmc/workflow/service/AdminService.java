@@ -148,7 +148,7 @@ public class AdminService {
                 .collect(Collectors.toList());
     }
 
-    @LogOperation(module = "用户管理", action = "创建用户", targetIdExpression = "#result.id")
+    @LogOperation(module = "用户管理", action = "创建用户", targetIdExpression = "#result?.id")
     public UserDto createUser(UserDto userDto) {
         if (userRepository.existsById(userDto.getId())) {
             throw new IllegalArgumentException("用户ID '" + userDto.getId() + "' 已存在");
@@ -230,7 +230,7 @@ public class AdminService {
     }
 
     // --- 角色管理 ---
-    @LogOperation(module = "角色管理", action = "创建角色", targetIdExpression = "#result.name")
+    @LogOperation(module = "角色管理", action = "创建角色", targetIdExpression = "#result?.name")
     public RoleDto createRole(RoleDto roleDto) {
         if(roleRepository.findByName(roleDto.getName()).isPresent()) {
             throw new IllegalArgumentException("角色名称已存在: " + roleDto.getName());
@@ -282,7 +282,7 @@ public class AdminService {
 
 
     // --- 用户组管理 ---
-    @LogOperation(module = "用户组管理", action = "创建用户组", targetIdExpression = "#result.name")
+    @LogOperation(module = "用户组管理", action = "创建用户组", targetIdExpression = "#result?.name")
     public UserGroupDto createGroup(UserGroupDto groupDto) {
         if(userGroupRepository.findByName(groupDto.getName()).isPresent()) {
             throw new IllegalArgumentException("用户组名称已存在: " + groupDto.getName());

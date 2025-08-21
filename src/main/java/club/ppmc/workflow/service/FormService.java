@@ -104,7 +104,7 @@ public class FormService {
         formDefinitionRepository.deleteById(id);
     }
 
-    @LogOperation(module = "表单提交", action = "提交申请", targetIdExpression = "#result.id")
+    @LogOperation(module = "表单提交", action = "提交申请", targetIdExpression = "#result?.id")
     public FormSubmissionResponse createFormSubmission(Long formDefinitionId, CreateFormSubmissionRequest request, String submitterId) {
         FormDefinition formDefinition = formDefinitionRepository.findById(formDefinitionId)
                 .orElseThrow(() -> new ResourceNotFoundException("无法为不存在的表单 (ID: " + formDefinitionId + ") 创建提交记录"));

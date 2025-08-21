@@ -134,6 +134,9 @@ export const completeTask = (taskId, data) => service.post(`/tasks/${taskId}/com
 // --- 用户和管理 API ---
 export const changePassword = (data) => service.post('/users/me/change-password', data);
 export const getOrganizationTree = () => service.get('/admin/organization-tree');
+// 【新增】安全的用户搜索接口
+export const searchUsersForPicker = (keyword) => service.get('/users/search-for-picker', { params: { keyword } });
+
 
 // --- 部门管理 API ---
 export const getDepartmentTree = () => service.get('/admin/departments/tree');

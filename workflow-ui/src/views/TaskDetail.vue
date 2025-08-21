@@ -7,7 +7,39 @@
         <!-- 左侧主内容区: 表单 & 操作 -->
         <div class="main-content">
           <a-card :title="isRejectedTask ? '修改表单' : '表单详情'">
+            <!-- 【核心修改】当为只读模式时，使用 a-descriptions 优化展示，并支持图片预览 -->
+            <template v-if="mode === 'readonly'">
+              <a-descriptions bordered :column="1">
+                <template v-for="field in flattenedFields" :key="field.id">
+                  <!-- 文件上传字段特殊渲染 -->
+                  <a-descriptions-item v-if="field.type === 'FileUpload'" :label="field.label">
+                    <div v-if="formData[field.id] && formData[field.id].length > 0">
+                      <div v-for="file in formData[field.id]" :key="file.id" class="attachment-item">
+                        <div v-if="isImage(file)" class="image-preview-container">
+                          <a-image :width="64" :height="64" :src="`/api/files/${file.id}`" />
+                          <div class="file-info">
+                            <span class="filename" :title="file.originalFilename">{{ file.originalFilename }}</span>
+                            <a @click.prevent="handleDownload(file.id, file.originalFilename)" href="#" class="download-action">下载</a>
+                          </div>
+                        </div>
+                        <a v-else @click.prevent="handleDownload(file.id, file.originalFilename)" href="#" class="file-link">
+                          <PaperClipOutlined /> {{ file.originalFilename }}
+                        </a>
+                      </div>
+                    </div>
+                    <span v-else>(无附件)</span>
+                  </a-descriptions-item>
+                  <!-- 其他字段的只读渲染 -->
+                  <a-descriptions-item v-else :label="field.label">
+                    <div v-if="field.type === 'RichText'" v-html="formData[field.id]" class="readonly-richtext"></div>
+                    <span v-else>{{ getReadonlyDisplayValue(field, formData[field.id]) }}</span>
+                  </a-descriptions-item>
+                </template>
+              </a-descriptions>
+            </template>
+            <!-- 编辑模式保持不变 -->
             <a-form
+                v-else
                 :model="formData"
                 layout="vertical"
                 ref="formRef"
@@ -17,7 +49,7 @@
                   :key="field.id"
                   :field="field"
                   :form-data="formData"
-                  :mode="isRejectedTask ? 'edit' : 'readonly'"
+                  :mode="'edit'"
                   @update:form-data="updateFormData"
               />
             </a-form>
@@ -64,11 +96,13 @@
 
 <script setup>
 import { ref, onMounted, computed, reactive } from 'vue';
-import { getTaskById, getSubmissionById, getFormById, completeTask, getWorkflowHistory } from '@/api';
+import { getTaskById, getSubmissionById, getFormById, completeTask, getWorkflowHistory, downloadFile } from '@/api';
 import { message } from 'ant-design-vue';
 import { useRouter } from 'vue-router';
 import FormItemRenderer from './viewer-components/FormItemRenderer.vue';
-import { flattenFields, initFormData } from '@/utils/formUtils.js';
+import { flattenFields } from '@/utils/formUtils.js';
+// 【核心新增】引入图标
+import { PaperClipOutlined } from '@ant-design/icons-vue';
 
 const props = defineProps({ taskId: String });
 const router = useRouter();
@@ -87,6 +121,16 @@ const isRejectedTask = computed(() => {
   return taskName.includes('修改') || taskName.includes('调整') || taskName.includes('重新');
 });
 
+// 【核心新增】根据 isRejectedTask 决定表单模式
+const mode = computed(() => isRejectedTask.value ? 'edit' : 'readonly');
+
+// 【核心新增】扁平化字段，用于 a-descriptions 渲染
+const flattenedFields = computed(() => {
+  if (!formSchema.value) return [];
+  return flattenFields(formSchema.value.fields)
+      .filter(f => !['GridRow', 'GridCol', 'Collapse', 'CollapsePanel', 'StaticText', 'DescriptionList'].includes(f.type));
+});
+
 const updateFormData = (fieldId, value) => {
   formData[fieldId] = value;
 };
@@ -99,16 +143,6 @@ onMounted(async () => {
 
     const subRes = await getSubmissionById(taskRes.formSubmissionId);
     Object.assign(formData, JSON.parse(subRes.dataJson));
-    if (subRes.attachments) {
-      formData.__attachments = subRes.attachments;
-      const formDefForFile = await getFormById(subRes.formDefinitionId);
-      const allFields = flattenFields(JSON.parse(formDefForFile.schemaJson).fields);
-      allFields.forEach(field => {
-        if (field.type === 'FileUpload') {
-          formData[field.id] = subRes.attachments;
-        }
-      });
-    }
 
     const [formRes, historyRes] = await Promise.all([
       getFormById(subRes.formDefinitionId),
@@ -116,6 +150,16 @@ onMounted(async () => {
     ]);
 
     formSchema.value = JSON.parse(formRes.schemaJson);
+
+    // 【核心修改】确保附件数据能正确地填充到 formData 中，以便 a-descriptions 和 FormItemRenderer 都能使用
+    if (subRes.attachments && subRes.attachments.length > 0) {
+      const allFields = flattenFields(formSchema.value.fields);
+      const fileUploadField = allFields.find(f => f.type === 'FileUpload');
+      if (fileUploadField) {
+        formData[fileUploadField.id] = subRes.attachments;
+      }
+    }
+
     history.value = historyRes;
 
   } catch (error) {
@@ -157,11 +201,9 @@ const handleResubmit = async () => {
     message.success('申请已重新提交！');
     router.push({ name: 'task-list' });
   } catch(error) {
-    // 只处理 antd 表单校验失败的错误
     if(error && error.errorFields) {
       message.warn('请填写所有必填项');
     }
-    // API 相关的错误（如网络问题、后端业务逻辑错误）将由全局拦截器自动提示，此处无需处理
   } finally {
     submitting.value = false;
   }
@@ -184,6 +226,37 @@ const formatDuration = (ms) => {
   minutes %= 60;
   return `${hours}h ${minutes}m ${seconds}s`;
 };
+
+// --- 【核心新增】用于只读模式的辅助函数 ---
+const isImage = (file) => {
+  if (!file || !file.originalFilename) return false;
+  const imageNameRegex = /\.(jpg|jpeg|png|gif|svg|webp)$/i;
+  return imageNameRegex.test(file.originalFilename);
+};
+
+const handleDownload = async (fileId, filename) => {
+  try {
+    const response = await downloadFile(fileId);
+    const url = window.URL.createObjectURL(new Blob([response.data]));
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', filename);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  } catch (error) {
+    message.error('文件下载失败');
+  }
+};
+
+const getReadonlyDisplayValue = (field, value) => {
+  if (value === null || value === undefined || value === '') return '(未填写)';
+  if (field.type === 'DatePicker' && value) { try { return new Date(value).toLocaleString(); } catch(e) { return value; } }
+  if (typeof value === 'boolean') return value ? '是' : '否';
+  if (Array.isArray(value)) return value.join(', ');
+  return value;
+}
 </script>
 
 <style scoped>
@@ -213,6 +286,51 @@ const formatDuration = (ms) => {
 }
 .approval-comment strong {
   color: #262626;
+  margin-right: 8px;
+}
+.readonly-richtext :deep(img) {
+  max-width: 100%;
+  height: auto;
+}
+/* --- 【核心新增】附件列表样式 --- */
+.attachment-item {
+  padding: 8px 0;
+}
+.attachment-item:first-child {
+  padding-top: 0;
+}
+.image-preview-container {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.image-preview-container :deep(.ant-image) {
+  flex-shrink: 0;
+}
+.image-preview-container :deep(.ant-image-img) {
+  object-fit: cover;
+  border-radius: 4px;
+}
+.file-info {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-width: 0;
+}
+.filename {
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.download-action {
+  font-size: 12px;
+}
+.file-link {
+  display: inline-flex;
+  align-items: center;
+}
+.file-link .anticon {
   margin-right: 8px;
 }
 </style>

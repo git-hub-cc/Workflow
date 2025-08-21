@@ -2,15 +2,25 @@
   <div>
     <a-upload
         v-model:file-list="fileList"
+        :list-type="listType"
         :custom-request="handleUpload"
         :before-upload="beforeUpload"
         @remove="handleRemove"
         :multiple="true"
     >
-      <a-button>
-        <upload-outlined></upload-outlined>
-        点击上传
-      </a-button>
+      <!-- 根据列表类型显示不同的上传触发器 -->
+      <template v-if="listType === 'picture-card'">
+        <div v-if="fileList.length < (field.props.maxCount || 99)">
+          <plus-outlined />
+          <div style="margin-top: 8px">上传</div>
+        </div>
+      </template>
+      <template v-else>
+        <a-button>
+          <upload-outlined />
+          点击上传
+        </a-button>
+      </template>
     </a-upload>
   </div>
 </template>
@@ -18,23 +28,31 @@
 <script setup>
 import { ref, watch, toRefs } from 'vue';
 import { message } from 'ant-design-vue';
-import { UploadOutlined } from '@ant-design/icons-vue';
+// 【核心修改】引入 PlusOutlined
+import { UploadOutlined, PlusOutlined } from '@ant-design/icons-vue';
 import { uploadFile } from '@/api';
 
-// 【核心修改】将 props 从 modelValue 改为 value
 const props = defineProps({
   value: {
     type: Array,
     default: () => [],
   },
+  // 【核心新增】接收 listType prop
+  listType: {
+    type: String,
+    default: 'text', // 默认为文本列表
+  },
+  // 【核心新增】接收 field prop 以获取 maxCount 等配置
+  field: {
+    type: Object,
+    default: () => ({ props: {} }),
+  }
 });
-// 【核心修改】将 emits 从 update:modelValue 改为 update:value
 const emit = defineEmits(['update:value']);
 const { value } = toRefs(props);
 
 const fileList = ref([]);
 
-// 【核心修改】监听 value prop 的变化
 watch(value, (newVal) => {
   if (JSON.stringify(newVal) !== JSON.stringify(fileList.value.map(f => f.response))) {
     fileList.value = (newVal || []).map(file => ({
@@ -42,7 +60,9 @@ watch(value, (newVal) => {
       name: file.originalFilename,
       status: 'done',
       response: file,
+      // 【核心修改】为已有文件生成预览URL，这是显示缩略图的关键
       url: `/api/files/${file.id}`,
+      thumbUrl: `/api/files/${file.id}`, // thumbUrl 同样重要
     }));
   }
 }, { immediate: true, deep: true });
@@ -62,7 +82,6 @@ const handleUpload = async ({ file, onSuccess, onError }) => {
     onSuccess(res, file);
     message.success(`${file.name} 上传成功`);
 
-    // 【核心修改】使用正确的 prop (value) 和 emit (update:value)
     const newAttachments = [...(value.value || []), res];
     emit('update:value', newAttachments);
 
@@ -75,7 +94,6 @@ const handleUpload = async ({ file, onSuccess, onError }) => {
 const handleRemove = (file) => {
   const fileIdToRemove = file.response?.id;
   if (fileIdToRemove) {
-    // 【核心修改】使用正确的 prop (value) 和 emit (update:value)
     const currentAttachments = value.value || [];
     const newAttachments = currentAttachments.filter(att => att.id !== fileIdToRemove);
     emit('update:value', newAttachments);
