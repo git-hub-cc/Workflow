@@ -34,18 +34,26 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         // 公开访问的端点
                         .requestMatchers("/api/auth/**", "/h2-console/**",  "/camunda/**", "/api/public/**").permitAll()
-                        // --- 【核心修改】允许对文件进行公开的GET请求（如图标、背景图），而其他操作（如POST上传）仍需认证 ---
+                        // 允许对文件进行公开的GET请求（如图标、背景图），而其他操作（如POST上传）仍需认证
                         .requestMatchers(HttpMethod.GET, "/api/files/**").permitAll()
                         // 需要认证的端点
                         .requestMatchers("/api/menus/my-menus").authenticated()
                         .requestMatchers("/api/files/**").authenticated() // 此规则现在主要对非GET请求（如上传）生效
                         .requestMatchers(HttpMethod.POST, "/api/users/me/change-password").authenticated()
+                        // --- 【核心新增】为表单中的用户选择器提供一个安全的搜索接口，所有登录用户可用 ---
+                        .requestMatchers("/api/users/search-for-picker").authenticated()
                         // 流程设计器中的用户选择器，现在仅限管理员可用，防止普通用户获取全量用户列表
                         .requestMatchers("/api/workflows/users").hasRole("ADMIN")
                         .requestMatchers("/api/workflows/groups").authenticated()
                         .requestMatchers(HttpMethod.POST, "/api/forms/import-word").hasRole("ADMIN")
-                        // 所有 /api/admin/ 下的请求都需要ADMIN角色
+
+                        // --- 【核心修改】将组织树接口权限放宽至所有登录用户，以便表单中的人员选择器使用 ---
+                        // 这条规则必须放在下面的 "/api/admin/**" 规则之前才会生效
+                        .requestMatchers("/api/admin/organization-tree").authenticated()
+
+                        // 所有 /api/admin/ 下的其他请求仍需要ADMIN角色
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
+
                         .anyRequest().authenticated()
                 )
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))

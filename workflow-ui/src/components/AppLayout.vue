@@ -137,8 +137,9 @@ const adminMenus = [
       {
         id: 'admin-logs', name: '日志管理', icon: 'FileSearchOutlined', type: 'DIRECTORY',
         children: [
-          { id: 'admin-login-log', name: '登录日志', path: '/admin/logs/login', type: 'DATA_LIST' },
-          { id: 'admin-operation-log', name: '操作日志', path: '/admin/logs/operation', type: 'DATA_LIST' },
+          // 【核心修改】为子菜单添加图标
+          { id: 'admin-login-log', name: '登录日志', path: '/admin/logs/login', icon: 'TableOutlined', type: 'DATA_LIST' },
+          { id: 'admin-operation-log', name: '操作日志', path: '/admin/logs/operation', icon: 'ProfileOutlined', type: 'DATA_LIST' },
         ]
       },
       { id: 'admin-settings', name: '系统设置', path: '/admin/settings', icon: 'BuildOutlined', type: 'DATA_LIST' },

@@ -1,6 +1,8 @@
 package club.ppmc.workflow.service;
 
 import club.ppmc.workflow.domain.WorkflowInstance;
+import club.ppmc.workflow.integration.erp.ErpService;
+import club.ppmc.workflow.integration.erp.dto.InventoryDeductionRequest;
 import club.ppmc.workflow.repository.WorkflowInstanceRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -22,6 +24,8 @@ import java.time.LocalDateTime;
 public class ArchiveProcessDelegate implements JavaDelegate {
 
     private final WorkflowInstanceRepository instanceRepository;
+    // --- 【核心修改】注入 ErpService 接口 ---
+    private final ErpService erpService;
 
     @Override
     @Transactional
@@ -42,6 +46,18 @@ public class ArchiveProcessDelegate implements JavaDelegate {
             instanceRepository.save(instance);
 
             log.info("流程实例 {} 的状态已成功更新为 APPROVED。", instance.getId());
+
+
+            // --- 【核心修改】调用ERP服务进行库存扣减 ---
+            // 在实际项目中，SKU和数量应从流程变量中获取
+            // 例如: String sku = (String) execution.getVariable("productSku");
+            //       Integer quantity = (Integer) execution.getVariable("quantity");
+            // 这里为了演示，我们使用固定值
+            String skuFromProcess = "SKU12345";
+            int quantityToDeduct = 10;
+            erpService.deductInventory(new InventoryDeductionRequest(skuFromProcess, quantityToDeduct));
+            // --- 【修改结束】 ---
+
 
         } catch (Exception e) {
             log.error("在 ArchiveProcessDelegate 中执行归档操作时发生异常", e);

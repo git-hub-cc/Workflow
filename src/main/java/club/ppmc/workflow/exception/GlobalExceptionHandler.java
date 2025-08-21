@@ -6,7 +6,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.BadCredentialsException;
-import org.springframework.security.authentication.CredentialsExpiredException;
+// --- 【核心修改】移除不再使用的导入 ---
+// import org.springframework.security.authentication.CredentialsExpiredException;
 import org.springframework.security.authentication.DisabledException;
 import org.springframework.security.authentication.LockedException;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
@@ -84,16 +85,16 @@ public class GlobalExceptionHandler {
         return new ResponseEntity<>(errorResponse, HttpStatus.FORBIDDEN);
     }
 
-    /**
-     * 处理认证失败 - 密码需要强制修改
-     * 返回自定义的 HTTP 499 状态码
-     */
+    // --- 【核心修改】移除 handleCredentialsExpiredException 方法 ---
+    /*
     @ExceptionHandler(CredentialsExpiredException.class)
     public ResponseEntity<ErrorResponse> handleCredentialsExpiredException(CredentialsExpiredException ex, HttpServletRequest request) {
         HttpStatus customStatus = HttpStatus.valueOf(499);
         ErrorResponse errorResponse = new ErrorResponse(customStatus, "为了您的账户安全，请先修改初始密码。", request.getRequestURI());
         return new ResponseEntity<>(errorResponse, customStatus);
     }
+    */
+
 
     /**
      * 处理权限不足的异常 (包括 @PreAuthorize 失败)

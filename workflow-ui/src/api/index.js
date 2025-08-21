@@ -71,9 +71,6 @@ service.interceptors.response.use(
             case 403: // Forbidden: 用户已认证，但无权访问该资源
                 message.error(`权限不足: ${errorMessage}`);
                 break;
-            case 499: // 自定义状态码: 强制修改密码
-                // 此状态码由登录页面专门处理，拦截器层面仅需将其继续抛出即可
-                return Promise.reject(error);
             case 500: // Internal Server Error: 服务器内部错误
                 message.error(`服务器内部错误: ${errorMessage}`);
                 break;
@@ -135,7 +132,7 @@ export const getTaskById = (taskId) => service.get(`/tasks/${taskId}`);
 export const completeTask = (taskId, data) => service.post(`/tasks/${taskId}/complete`, data);
 
 // --- 用户和管理 API ---
-export const changePassword = (data) => service.post('/users/me/change-password');
+export const changePassword = (data) => service.post('/users/me/change-password', data);
 export const getOrganizationTree = () => service.get('/admin/organization-tree');
 
 // --- 部门管理 API ---
@@ -189,5 +186,9 @@ export const getOperationLogs = (params) => service.get('/admin/logs/operation',
 export const getPublicSettings = () => service.get('/public/settings');
 export const getAdminSettings = () => service.get('/admin/settings');
 export const updateSettings = (settingsMap) => service.put('/admin/settings', settingsMap);
+
+// --- 【核心修改】外部系统 API (模拟) ---
+export const getExternalSuppliers = () => service.get('/external/suppliers');
+
 
 export default service;

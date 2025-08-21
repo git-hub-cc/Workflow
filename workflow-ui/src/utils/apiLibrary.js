@@ -23,6 +23,12 @@ export const predefinedApis = [
         url: '/admin/groups',
         description: '获取所有已定义的用户组。',
     },
+    // --- 【核心修改】新增模拟的ERP供应商API ---
+    {
+        name: 'ERP供应商列表 (模拟)',
+        url: '/external/suppliers',
+        description: '从模拟的ERP接口获取供应商列表，用于开发和测试。',
+    },
     // 在这里可以添加更多自定义的业务API
     // {
     //   name: '产品列表',

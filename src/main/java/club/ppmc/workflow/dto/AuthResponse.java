@@ -26,5 +26,7 @@ public class AuthResponse {
         private String id;
         private String name;
         private String role; // 仍然保留一个主角色，用于前端快速判断权限
+        // --- 【核心新增】 ---
+        private boolean passwordChangeRequired;
     }
 }

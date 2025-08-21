@@ -68,8 +68,18 @@
           </a-card>
 
           <a-card v-if="submission.attachments && submission.attachments.length > 0" title="相关附件">
+            <!-- 【核心修改】区分图片和普通文件进行展示 -->
             <div v-for="file in submission.attachments" :key="file.id" class="attachment-item">
-              <a @click.prevent="handleDownload(file.id, file.originalFilename)" href="#">
+              <!-- 如果是图片，使用 a-image 进行预览 -->
+              <div v-if="isImage(file)" class="image-preview-container">
+                <a-image :width="64" :height="64" :src="`/api/files/${file.id}`" />
+                <div class="file-info">
+                  <span class="filename" :title="file.originalFilename">{{ file.originalFilename }}</span>
+                  <a @click.prevent="handleDownload(file.id, file.originalFilename)" href="#" class="download-action">下载</a>
+                </div>
+              </div>
+              <!-- 否则，显示为普通链接 -->
+              <a v-else @click.prevent="handleDownload(file.id, file.originalFilename)" href="#" class="file-link">
                 <PaperClipOutlined /> {{ file.originalFilename }}
               </a>
             </div>
@@ -139,6 +149,13 @@ onMounted(async () => {
 });
 
 // --- 用于显示和格式化的辅助函数 ---
+
+// 【核心新增】判断文件是否为图片
+const isImage = (file) => {
+  if (!file || !file.originalFilename) return false;
+  const imageNameRegex = /\.(jpg|jpeg|png|gif|svg|webp)$/i;
+  return imageNameRegex.test(file.originalFilename);
+};
 
 const getSubformColumns = (field) => field.props.columns.map(col => ({ title: col.label, dataIndex: col.id, key: col.id }));
 
@@ -245,20 +262,58 @@ const formatDuration = (ms) => {
   height: auto;
 }
 
-/* 附件列表项的样式 */
+/* --- 【核心修改】附件列表样式 --- */
 .attachment-item {
-  padding: 4px 0;
+  padding: 8px 0;
 }
-.attachment-item a {
-  /* 【核心修改】使用 CSS 变量来应用主题色 */
+.attachment-item + .attachment-item {
+  border-top: 1px solid #f0f0f0;
+}
+
+/* 图片附件样式 */
+.image-preview-container {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.image-preview-container :deep(.ant-image) {
+  flex-shrink: 0;
+}
+.image-preview-container :deep(.ant-image-img) {
+  object-fit: cover;
+  border-radius: 4px;
+}
+.file-info {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-width: 0;
+}
+.filename {
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.download-action {
+  font-size: 12px;
   color: var(--ant-primary-color);
-  transition: color 0.3s;
 }
-.attachment-item a:hover {
-  /* 【核心修改】使用 antd 提供的悬浮颜色变量 */
+.download-action:hover {
   color: var(--ant-primary-color-hover);
 }
-.attachment-item .anticon {
+
+/* 普通文件附件样式 */
+.file-link {
+  color: var(--ant-primary-color);
+  transition: color 0.3s;
+  display: inline-flex;
+  align-items: center;
+}
+.file-link:hover {
+  color: var(--ant-primary-color-hover);
+}
+.file-link .anticon {
   margin-right: 8px;
 }
 </style>

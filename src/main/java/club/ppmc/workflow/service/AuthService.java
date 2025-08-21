@@ -9,6 +9,7 @@ import club.ppmc.workflow.repository.UserRepository;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.CredentialsExpiredException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
@@ -32,18 +33,22 @@ public class AuthService {
      * @return 包含 Token 和用户信息的响应
      */
     public AuthResponse authenticate(AuthRequest request) {
-        // 使用 Spring Security 的 AuthenticationManager 进行认证
-        // 它会自动调用 UserDetailsServiceImpl 和 PasswordEncoder
-        // 如果需要强制修改密码，UserDetailsServiceImpl 中的 isCredentialsNonExpired 会返回 false，
-        // authenticationManager 将抛出 CredentialsExpiredException
-        authenticationManager.authenticate(
-                new UsernamePasswordAuthenticationToken(
-                        request.getUserId(),
-                        request.getPassword()
-                )
-        );
+        // --- 【核心修改】将认证逻辑包裹在 try-catch 中 ---
+        try {
+            // 使用 Spring Security 的 AuthenticationManager 进行认证
+            authenticationManager.authenticate(
+                    new UsernamePasswordAuthenticationToken(
+                            request.getUserId(),
+                            request.getPassword()
+                    )
+            );
+        } catch (CredentialsExpiredException e) {
+            // 这是“需要修改密码”的特定场景。我们捕获它，并继续执行，
+            // 因为我们需要为用户生成一个临时 token 以便他们能够调用修改密码的接口。
+            // 其他认证异常（如密码错误）会正常抛出，由全局异常处理器处理。
+        }
 
-        // 如果上面的代码没有抛出异常，说明认证成功
+        // 如果代码能执行到这里，说明要么认证成功，要么是需要修改密码
         User user = userRepository.findById(request.getUserId())
                 .orElseThrow(() -> new UsernameNotFoundException("认证成功但无法在数据库中找到用户，数据不一致"));
 
@@ -64,12 +69,6 @@ public class AuthService {
         // 生成 JWT
         String jwtToken = jwtService.generateToken(user);
 
-        // 构建响应 DTO
-        UserDto userDto = new UserDto();
-        userDto.setId(user.getId());
-        userDto.setName(user.getName());
-        // 【修改】返回角色列表
-        userDto.setRoleNames(user.getRoles().stream().map(Role::getName).collect(Collectors.toList()));
         // 【新增】判断是否为管理员
         boolean isAdmin = user.getRoles().stream().anyMatch(role -> "ADMIN".equals(role.getName()));
 
@@ -78,7 +77,8 @@ public class AuthService {
                 .user(new AuthResponse.UserAuthInfo(
                         user.getId(),
                         user.getName(),
-                        isAdmin ? "ADMIN" : "USER" // 为了兼容旧前端，仍然保留一个主 role
+                        isAdmin ? "ADMIN" : "USER", // 为了兼容旧前端，仍然保留一个主 role
+                        user.isPasswordChangeRequired() // 【核心修改】将 passwordChangeRequired 标志放入响应体
                 ))
                 .build();
     }

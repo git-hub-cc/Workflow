@@ -1,0 +1,176 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" xmlns:camunda="http://camunda.org/schema/1.0/bpmn" xmlns:di="http://www.omg.org/spec/DD/20100524/DI" xmlns:modeler="http://camunda.org/schema/modeler/1.0" id="Definitions_1" targetNamespace="http://bpmn.io/schema/bpmn" exporter="Camunda Modeler" exporterVersion="5.20.0" modeler:executionPlatform="Camunda Platform" modeler:executionPlatformVersion="7.20.0">
+  <bpmn:process id="goods_receipt_process" name="货物入库流程" isExecutable="true">
+    <bpmn:startEvent id="StartEvent_GoodsReceipt" name="入库员提交申请" camunda:initiator="initiator">
+      <bpmn:outgoing>Flow_To_FindManager</bpmn:outgoing>
+    </bpmn:startEvent>
+    <bpmn:sequenceFlow id="Flow_To_FindManager" sourceRef="StartEvent_GoodsReceipt" targetRef="Activity_FindManager" />
+    <bpmn:serviceTask id="Activity_FindManager" name="查找直接上级" camunda:delegateExpression="${findManagerDelegate}">
+      <bpmn:extensionElements>
+        <camunda:field name="managerLevel">
+          <camunda:string>1</camunda:string>
+        </camunda:field>
+        <camunda:inputOutput>
+          <camunda:inputParameter name="userId">${initiator}</camunda:inputParameter>
+          <camunda:outputParameter name="assignee">${managerId}</camunda:outputParameter>
+        </camunda:inputOutput>
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_To_FindManager</bpmn:incoming>
+      <bpmn:outgoing>Flow_To_ManagerApproval</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:sequenceFlow id="Flow_To_ManagerApproval" sourceRef="Activity_FindManager" targetRef="Activity_ManagerApproval" />
+    <bpmn:userTask id="Activity_ManagerApproval" name="主管审核" camunda:assignee="${assignee}">
+      <bpmn:incoming>Flow_To_ManagerApproval</bpmn:incoming>
+      <bpmn:outgoing>Flow_To_QCInspection</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:sequenceFlow id="Flow_To_QCInspection" sourceRef="Activity_ManagerApproval" targetRef="Activity_QCInspection" />
+    <bpmn:userTask id="Activity_QCInspection" name="QC检验" camunda:candidateGroups="QC_GROUP">
+      <bpmn:incoming>Flow_To_QCInspection</bpmn:incoming>
+      <bpmn:outgoing>Flow_To_QCGateway</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:sequenceFlow id="Flow_To_QCGateway" sourceRef="Activity_QCInspection" targetRef="Gateway_QCCheck" />
+    <bpmn:exclusiveGateway id="Gateway_QCCheck" name="质检是否合格?">
+      <bpmn:incoming>Flow_To_QCGateway</bpmn:incoming>
+      <bpmn:outgoing>Flow_QCPassed</bpmn:outgoing>
+      <bpmn:outgoing>Flow_QCFailed</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:sequenceFlow id="Flow_QCPassed" name="合格" sourceRef="Gateway_QCCheck" targetRef="Activity_PutAwayGoods">
+      <!-- 【核心修改】将 qc_passed 改为 approved -->
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">${approved == true}</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:userTask id="Activity_PutAwayGoods" name="上架入库" camunda:assignee="${initiator}">
+      <bpmn:incoming>Flow_QCPassed</bpmn:incoming>
+      <bpmn:outgoing>Flow_To_ArchivePassed</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:sequenceFlow id="Flow_To_ArchivePassed" sourceRef="Activity_PutAwayGoods" targetRef="Activity_ArchivePassed" />
+    <bpmn:serviceTask id="Activity_ArchivePassed" name="归档 (已通过)" camunda:delegateExpression="${archiveProcessDelegate}">
+      <bpmn:incoming>Flow_To_ArchivePassed</bpmn:incoming>
+      <bpmn:outgoing>Flow_To_EndPassed</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:endEvent id="EndEvent_Passed" name="流程通过结束">
+      <bpmn:incoming>Flow_To_EndPassed</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:sequenceFlow id="Flow_To_EndPassed" sourceRef="Activity_ArchivePassed" targetRef="EndEvent_Passed" />
+    <bpmn:sequenceFlow id="Flow_QCFailed" name="不合格" sourceRef="Gateway_QCCheck" targetRef="Activity_HandleException">
+      <!-- 【可选增强】明确指定不合格的条件 -->
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">${approved == false}</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:userTask id="Activity_HandleException" name="异常处理" camunda:assignee="${assignee}">
+      <bpmn:incoming>Flow_QCFailed</bpmn:incoming>
+      <bpmn:outgoing>Flow_To_ArchiveRejected</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:sequenceFlow id="Flow_To_ArchiveRejected" sourceRef="Activity_HandleException" targetRef="Activity_ArchiveRejected" />
+    <bpmn:serviceTask id="Activity_ArchiveRejected" name="归档 (已拒绝)" camunda:delegateExpression="${rejectProcessDelegate}">
+      <bpmn:incoming>Flow_To_ArchiveRejected</bpmn:incoming>
+      <bpmn:outgoing>Flow_To_EndRejected</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:endEvent id="EndEvent_Rejected" name="流程拒绝结束">
+      <bpmn:incoming>Flow_To_EndRejected</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:sequenceFlow id="Flow_To_EndRejected" sourceRef="Activity_ArchiveRejected" targetRef="EndEvent_Rejected" />
+  </bpmn:process>
+  <bpmndi:BPMNDiagram id="BPMNDiagram_1">
+    <bpmndi:BPMNPlane id="BPMNPlane_1" bpmnElement="goods_receipt_process">
+      <bpmndi:BPMNShape id="StartEvent_GoodsReceipt_di" bpmnElement="StartEvent_GoodsReceipt">
+        <dc:Bounds x="179" y="102" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="162" y="145" width="70" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Activity_FindManager_di" bpmnElement="Activity_FindManager">
+        <dc:Bounds x="270" y="80" width="100" height="80" />
+        <bpmndi:BPMNLabel />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Activity_ManagerApproval_di" bpmnElement="Activity_ManagerApproval">
+        <dc:Bounds x="430" y="80" width="100" height="80" />
+        <bpmndi:BPMNLabel />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Activity_QCInspection_di" bpmnElement="Activity_QCInspection">
+        <dc:Bounds x="590" y="80" width="100" height="80" />
+        <bpmndi:BPMNLabel />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gateway_QCCheck_di" bpmnElement="Gateway_QCCheck" isMarkerVisible="true">
+        <dc:Bounds x="755" y="95" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="739" y="65" width="82" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Activity_PutAwayGoods_di" bpmnElement="Activity_PutAwayGoods">
+        <dc:Bounds x="870" y="-40" width="100" height="80" />
+        <bpmndi:BPMNLabel />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Activity_ArchivePassed_di" bpmnElement="Activity_ArchivePassed">
+        <dc:Bounds x="1030" y="-40" width="100" height="80" />
+        <bpmndi:BPMNLabel />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="EndEvent_Passed_di" bpmnElement="EndEvent_Passed">
+        <dc:Bounds x="1192" y="-22" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1175" y="21" width="70" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Activity_HandleException_di" bpmnElement="Activity_HandleException">
+        <dc:Bounds x="870" y="200" width="100" height="80" />
+        <bpmndi:BPMNLabel />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Activity_ArchiveRejected_di" bpmnElement="Activity_ArchiveRejected">
+        <dc:Bounds x="1030" y="200" width="100" height="80" />
+        <bpmndi:BPMNLabel />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="EndEvent_Rejected_di" bpmnElement="EndEvent_Rejected">
+        <dc:Bounds x="1192" y="222" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1175" y="265" width="70" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="Flow_To_FindManager_di" bpmnElement="Flow_To_FindManager">
+        <di:waypoint x="215" y="120" />
+        <di:waypoint x="270" y="120" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_To_ManagerApproval_di" bpmnElement="Flow_To_ManagerApproval">
+        <di:waypoint x="370" y="120" />
+        <di:waypoint x="430" y="120" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_To_QCInspection_di" bpmnElement="Flow_To_QCInspection">
+        <di:waypoint x="530" y="120" />
+        <di:waypoint x="590" y="120" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_To_QCGateway_di" bpmnElement="Flow_To_QCGateway">
+        <di:waypoint x="690" y="120" />
+        <di:waypoint x="755" y="120" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_QCPassed_di" bpmnElement="Flow_QCPassed">
+        <di:waypoint x="780" y="95" />
+        <di:waypoint x="780" y="0" />
+        <di:waypoint x="870" y="0" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="788" y="45" width="22" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_To_ArchivePassed_di" bpmnElement="Flow_To_ArchivePassed">
+        <di:waypoint x="970" y="0" />
+        <di:waypoint x="1030" y="0" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_To_EndPassed_di" bpmnElement="Flow_To_EndPassed">
+        <di:waypoint x="1130" y="0" />
+        <di:waypoint x="1192" y="0" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_QCFailed_di" bpmnElement="Flow_QCFailed">
+        <di:waypoint x="780" y="145" />
+        <di:waypoint x="780" y="240" />
+        <di:waypoint x="870" y="240" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="781" y="190" width="34" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_To_ArchiveRejected_di" bpmnElement="Flow_To_ArchiveRejected">
+        <di:waypoint x="970" y="240" />
+        <di:waypoint x="1030" y="240" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_To_EndRejected_di" bpmnElement="Flow_To_EndRejected">
+        <di:waypoint x="1130" y="240" />
+        <di:waypoint x="1192" y="240" />
+      </bpmndi:BPMNEdge>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+</bpmn:definitions>

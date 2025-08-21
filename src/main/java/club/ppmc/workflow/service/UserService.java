@@ -2,12 +2,19 @@ package club.ppmc.workflow.service;
 
 import club.ppmc.workflow.aop.LogOperation;
 import club.ppmc.workflow.domain.User;
+import club.ppmc.workflow.dto.UserPickerDto;
 import club.ppmc.workflow.exception.ResourceNotFoundException;
 import club.ppmc.workflow.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
+
+import java.util.Collections;
+import java.util.List;
+import java.util.stream.Collectors;
 
 /**
  * @author cc
@@ -64,4 +71,38 @@ public class UserService {
         user.setPasswordChangeRequired(true);
         userRepository.save(user);
     }
+
+
+    /**
+     * 【新增】为前端选择器搜索用户
+     *
+     * @param keyword 搜索关键词
+     * @return 匹配的用户列表 (UserPickerDto)
+     */
+    @Transactional(readOnly = true)
+    public List<UserPickerDto> searchUsersForPicker(String keyword) {
+        // 如果关键词为空，不返回任何结果，强制前端必须输入才能搜索
+        if (!StringUtils.hasText(keyword)) {
+            return Collections.emptyList();
+        }
+
+        // 限制最多返回20条结果，防止性能问题和信息过度暴露
+        PageRequest pageRequest = PageRequest.of(0, 20);
+        List<User> users = userRepository.findByIdContainingIgnoreCaseOrNameContainingIgnoreCaseOrderByNameAsc(keyword, keyword, pageRequest);
+
+        return users.stream()
+                .map(this::toUserPickerDto)
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * 将 User 实体转换为 UserPickerDto
+     */
+    private UserPickerDto toUserPickerDto(User user) {
+        UserPickerDto dto = new UserPickerDto();
+        dto.setId(user.getId());
+        dto.setName(user.getName());
+        return dto;
+    }
+
 }

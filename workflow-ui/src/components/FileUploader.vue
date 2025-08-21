@@ -21,27 +21,28 @@ import { message } from 'ant-design-vue';
 import { UploadOutlined } from '@ant-design/icons-vue';
 import { uploadFile } from '@/api';
 
+// 【核心修改】将 props 从 modelValue 改为 value
 const props = defineProps({
-  modelValue: {
+  value: {
     type: Array,
     default: () => [],
   },
 });
-const emit = defineEmits(['update:modelValue']);
-const { modelValue } = toRefs(props);
+// 【核心修改】将 emits 从 update:modelValue 改为 update:value
+const emit = defineEmits(['update:value']);
+const { value } = toRefs(props);
 
 const fileList = ref([]);
 
-// 将 modelValue (父组件的附件列表) 同步到内部的 fileList
-watch(modelValue, (newVal, oldVal) => {
-  // 【修改】增加深度比较，防止不必要的重复渲染，特别是在表单数据频繁更新时
+// 【核心修改】监听 value prop 的变化
+watch(value, (newVal) => {
   if (JSON.stringify(newVal) !== JSON.stringify(fileList.value.map(f => f.response))) {
     fileList.value = (newVal || []).map(file => ({
-      uid: file.id.toString(), // uid 必须是 string
+      uid: file.id.toString(),
       name: file.originalFilename,
       status: 'done',
-      response: file, // 存储完整的文件信息
-      url: `/api/files/${file.id}`, // 提供下载链接
+      response: file,
+      url: `/api/files/${file.id}`,
     }));
   }
 }, { immediate: true, deep: true });
@@ -58,13 +59,12 @@ const beforeUpload = (file) => {
 const handleUpload = async ({ file, onSuccess, onError }) => {
   try {
     const res = await uploadFile(file);
-    // 【修改】Ant Design Vue 4.x onSuccess 的第二个参数是文件对象
     onSuccess(res, file);
     message.success(`${file.name} 上传成功`);
 
-    // 更新父组件的值
-    const newAttachments = [...(modelValue.value || []), res];
-    emit('update:modelValue', newAttachments);
+    // 【核心修改】使用正确的 prop (value) 和 emit (update:value)
+    const newAttachments = [...(value.value || []), res];
+    emit('update:value', newAttachments);
 
   } catch (error) {
     onError(error);
@@ -75,10 +75,11 @@ const handleUpload = async ({ file, onSuccess, onError }) => {
 const handleRemove = (file) => {
   const fileIdToRemove = file.response?.id;
   if (fileIdToRemove) {
-    const currentAttachments = modelValue.value || [];
+    // 【核心修改】使用正确的 prop (value) 和 emit (update:value)
+    const currentAttachments = value.value || [];
     const newAttachments = currentAttachments.filter(att => att.id !== fileIdToRemove);
-    emit('update:modelValue', newAttachments);
+    emit('update:value', newAttachments);
   }
-  return true; // 允许移除
+  return true;
 };
 </script>

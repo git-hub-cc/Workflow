@@ -8,55 +8,205 @@
 
 // 1. 从 @ant-design/icons-vue 显式导入所有需要的图标
 import {
-    // 通用
-    HomeOutlined, SettingOutlined, AppstoreOutlined, ProfileOutlined, DashboardOutlined,
-    QuestionCircleOutlined, InfoCircleOutlined, ExclamationCircleOutlined, SmileOutlined,
-    SearchOutlined, PlusOutlined, DeleteOutlined, EditOutlined, SaveOutlined,
-    UploadOutlined, DownloadOutlined, CopyOutlined, EyeOutlined, SyncOutlined,
-    ArrowUpOutlined, ArrowDownOutlined, ArrowLeftOutlined, ArrowRightOutlined,
+    // ===================================================================
+    // 通用图标 (General)
+    // ===================================================================
+    AppstoreOutlined,
+    CheckCircleOutlined,
+    ClockCircleOutlined,
+    CloseCircleOutlined,
+    DashboardOutlined,
+    ExclamationCircleOutlined,
+    HomeOutlined,
+    InfoCircleOutlined,
+    ProfileOutlined,
+    QuestionCircleOutlined,
+    SettingOutlined,
+    SmileOutlined,
+    SyncOutlined,
+    WarningOutlined,
 
-    // 用户与权限
-    UserOutlined, TeamOutlined, UsergroupAddOutlined, CrownOutlined, IdcardOutlined,
-    SafetyCertificateOutlined, LockOutlined, UnlockOutlined,
+    // ===================================================================
+    // 方向图标 (Directional)
+    // ===================================================================
+    ArrowDownOutlined,
+    ArrowLeftOutlined,
+    ArrowRightOutlined,
+    ArrowUpOutlined,
+    DownOutlined,
+    LeftOutlined,
+    RightOutlined,
+    UpOutlined,
 
-    // 表单与文档
-    FormOutlined, FileTextOutlined, FilePdfOutlined, FileImageOutlined, FileDoneOutlined,
-    FolderOutlined, FolderOpenOutlined, SnippetsOutlined, SolutionOutlined,
+    // ===================================================================
+    // 操作图标 (Actions)
+    // ===================================================================
+    CopyOutlined,
+    DeleteOutlined,
+    DownloadOutlined,
+    DragOutlined,
+    EditOutlined,
+    EyeOutlined,
+    EyeInvisibleOutlined,
+    FilterOutlined,
+    FullscreenOutlined,
+    FullscreenExitOutlined,
+    PlusOutlined,
+    PlusCircleOutlined,
+    RedoOutlined,
+    ReloadOutlined,
+    SaveOutlined,
+    SearchOutlined,
+    UndoOutlined,
+    UploadOutlined,
+    ZoomInOutlined,
+    ZoomOutOutlined,
 
-    // 工作流与组织
-    ApartmentOutlined, BranchesOutlined, NodeIndexOutlined, DeploymentUnitOutlined,
-    CheckCircleOutlined, CloseCircleOutlined, ClockCircleOutlined, PlayCircleOutlined,
-    PauseCircleOutlined, StopOutlined,
-    // 【核心新增】
-    ForkOutlined, PlusCircleOutlined,
+    // ===================================================================
+    // 用户与安全 (User & Security)
+    // ===================================================================
+    CrownOutlined,
+    IdcardOutlined,
+    KeyOutlined,
+    LockOutlined,
+    SafetyCertificateOutlined,
+    TeamOutlined,
+    UnlockOutlined,
+    UserOutlined,
+    UsergroupAddOutlined,
 
-    // 消息与通知
-    MailOutlined, BellOutlined, MessageOutlined, CommentOutlined,
+    // ===================================================================
+    // 文档与文件 (Document & File)
+    // ===================================================================
+    FileDoneOutlined,
+    FileImageOutlined,
+    FilePdfOutlined,
+    FileSearchOutlined,
+    FileTextOutlined,
+    FolderOpenOutlined,
+    FolderOutlined,
+    SnippetsOutlined,
+    SolutionOutlined,
 
-    // 数据与图表
-    BankOutlined, AccountBookOutlined, CalculatorOutlined, BarChartOutlined, LineChartOutlined,
-    PieChartOutlined, AreaChartOutlined, DatabaseOutlined,
+    // ===================================================================
+    // 表单与编辑器 (Form & Editor)
+    // ===================================================================
+    AlignCenterOutlined,
+    AlignLeftOutlined,
+    AlignRightOutlined,
+    BoldOutlined,
+    FormOutlined,
+    ItalicOutlined,
+    LinkOutlined,
+    OrderedListOutlined,
+    PaperClipOutlined,
+    TableOutlined,
+    UnorderedListOutlined,
+
+    // ===================================================================
+    // 工作流与组织 (Workflow & Organization)
+    // ===================================================================
+    ApartmentOutlined,
+    BranchesOutlined,
+    BuildOutlined,
+    DeploymentUnitOutlined,
+    ForkOutlined,
+    GatewayOutlined,
+    NodeIndexOutlined,
+    PauseCircleOutlined,
+    PlayCircleOutlined,
+    StopOutlined,
+
+    // ===================================================================
+    // 消息与通知 (Message & Notification)
+    // ===================================================================
+    BellOutlined,
+    CommentOutlined,
+    MailOutlined,
+    MessageOutlined,
+    SendOutlined,
+
+    // ===================================================================
+    // 数据与图表 (Data & Chart)
+    // ===================================================================
+    AreaChartOutlined,
+    BarChartOutlined,
+    DatabaseOutlined,
+    DotChartOutlined,
+    LineChartOutlined,
+    PieChartOutlined,
+
+    // ===================================================================
+    // 商业与金融 (Business & Finance)
+    // ===================================================================
+    AccountBookOutlined,
+    BankOutlined,
+    CalculatorOutlined,
+    CreditCardOutlined,
+    GiftOutlined,
+    ShopOutlined,
+    ShoppingCartOutlined,
+    TagsOutlined,
+    WalletOutlined,
+
+    // ===================================================================
+    // 设备与硬件 (Device & Hardware)
+    // ===================================================================
+    CameraOutlined,
+    DesktopOutlined,
+    LaptopOutlined,
+    MobileOutlined,
+    PrinterOutlined,
 
 } from '@ant-design/icons-vue';
 
 // 2. 将所有图标组件放入一个对象/Map 中，方便按名称查找
 export const iconMap = {
-    HomeOutlined, SettingOutlined, AppstoreOutlined, ProfileOutlined, DashboardOutlined,
-    QuestionCircleOutlined, InfoCircleOutlined, ExclamationCircleOutlined, SmileOutlined,
-    SearchOutlined, PlusOutlined, DeleteOutlined, EditOutlined, SaveOutlined,
-    UploadOutlined, DownloadOutlined, CopyOutlined, EyeOutlined, SyncOutlined,
-    ArrowUpOutlined, ArrowDownOutlined, ArrowLeftOutlined, ArrowRightOutlined,
-    UserOutlined, TeamOutlined, UsergroupAddOutlined, CrownOutlined, IdcardOutlined,
-    SafetyCertificateOutlined, LockOutlined, UnlockOutlined,
-    FormOutlined, FileTextOutlined, FilePdfOutlined, FileImageOutlined, FileDoneOutlined,
-    FolderOutlined, FolderOpenOutlined, SnippetsOutlined, SolutionOutlined,
-    ApartmentOutlined, BranchesOutlined, NodeIndexOutlined, DeploymentUnitOutlined,
-    CheckCircleOutlined, CloseCircleOutlined, ClockCircleOutlined, PlayCircleOutlined,
-    PauseCircleOutlined, StopOutlined,
-    ForkOutlined, PlusCircleOutlined, // 【核心新增】
-    MailOutlined, BellOutlined, MessageOutlined, CommentOutlined,
-    BankOutlined, AccountBookOutlined, CalculatorOutlined, BarChartOutlined, LineChartOutlined,
-    PieChartOutlined, AreaChartOutlined, DatabaseOutlined,
+    // General
+    AppstoreOutlined, CheckCircleOutlined, ClockCircleOutlined, CloseCircleOutlined, DashboardOutlined,
+    ExclamationCircleOutlined, HomeOutlined, InfoCircleOutlined, ProfileOutlined, QuestionCircleOutlined,
+    SettingOutlined, SmileOutlined, SyncOutlined, WarningOutlined,
+
+    // Directional
+    ArrowDownOutlined, ArrowLeftOutlined, ArrowRightOutlined, ArrowUpOutlined, DownOutlined,
+    LeftOutlined, RightOutlined, UpOutlined,
+
+    // Actions
+    CopyOutlined, DeleteOutlined, DownloadOutlined, DragOutlined, EditOutlined, EyeOutlined,
+    EyeInvisibleOutlined, FilterOutlined, FullscreenOutlined, FullscreenExitOutlined, PlusOutlined,
+    PlusCircleOutlined, RedoOutlined, ReloadOutlined, SaveOutlined, SearchOutlined, UndoOutlined,
+    UploadOutlined, ZoomInOutlined, ZoomOutOutlined,
+
+    // User & Security
+    CrownOutlined, IdcardOutlined, KeyOutlined, LockOutlined, SafetyCertificateOutlined,
+    TeamOutlined, UnlockOutlined, UserOutlined, UsergroupAddOutlined,
+
+    // Document & File
+    FileDoneOutlined, FileImageOutlined, FilePdfOutlined, FileSearchOutlined, FileTextOutlined,
+    FolderOpenOutlined, FolderOutlined, SnippetsOutlined, SolutionOutlined,
+
+    // Form & Editor
+    AlignCenterOutlined, AlignLeftOutlined, AlignRightOutlined, BoldOutlined, FormOutlined,
+    ItalicOutlined, LinkOutlined, OrderedListOutlined, PaperClipOutlined, TableOutlined,
+    UnorderedListOutlined,
+
+    // Workflow & Organization
+    ApartmentOutlined, BranchesOutlined, BuildOutlined, DeploymentUnitOutlined, ForkOutlined,
+    GatewayOutlined, NodeIndexOutlined, PauseCircleOutlined, PlayCircleOutlined, StopOutlined,
+
+    // Message & Notification
+    BellOutlined, CommentOutlined, MailOutlined, MessageOutlined, SendOutlined,
+
+    // Data & Chart
+    AreaChartOutlined, BarChartOutlined, DatabaseOutlined, DotChartOutlined, LineChartOutlined,
+    PieChartOutlined,
+
+    // Business & Finance
+    AccountBookOutlined, BankOutlined, CalculatorOutlined, CreditCardOutlined, GiftOutlined,
+    ShopOutlined, ShoppingCartOutlined, TagsOutlined, WalletOutlined,
+
+    // Device & Hardware
+    CameraOutlined, DesktopOutlined, LaptopOutlined, MobileOutlined, PrinterOutlined,
 };
 
 // 3. 创建一个数组，用于在 IconPickerModal 中循环渲染

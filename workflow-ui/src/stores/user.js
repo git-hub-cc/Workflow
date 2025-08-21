@@ -19,6 +19,7 @@ export const useUserStore = defineStore('user', () => {
 // --- Getters ---
     const isAuthenticated = computed(() => !!token.value && !!currentUser.value);
     const isAdmin = computed(() => currentUser.value?.role === 'ADMIN');
+    // --- 【核心修改】直接从 currentUser 获取 passwordChangeRequired 状态 ---
     const passwordChangeRequired = computed(() => currentUser.value?.passwordChangeRequired || false);
 
 // --- Actions ---
@@ -31,23 +32,31 @@ export const useUserStore = defineStore('user', () => {
             localStorage.setItem('token', token.value);
             localStorage.setItem('user', JSON.stringify(currentUser.value));
 
-// ⭐ 核心修改: 先获取并设置菜单，再进行路由跳转
             await fetchAndSetMenus();
 
-// 登录后预加载基础数据
-// 【安全修复】调整预加载逻辑，只有管理员才加载特定数据
-            if (isAdmin.value) {
-                await fetchUsersForPicker();
-                await fetchUsersForManagement();
-                await fetchAllRoles();
-                await fetchAllGroups();
+            // --- 【核心修改】检查 passwordChangeRequired 标志 ---
+            if (currentUser.value.passwordChangeRequired) {
+                // 如果需要修改密码，提示并直接跳转到个人设置页面
+                message.warn('为了您的账户安全，请先修改初始密码。');
+                await router.push({ name: 'profile' });
+            } else {
+                // 否则，正常进入系统
+                message.success(`欢迎回来, ${currentUser.value.name}`);
+                await router.push('/');
             }
 
-// ⭐ 核心修改: 统一跳转到根路径，让导航守卫处理后续逻辑
-            await router.push('/');
-            message.success(`欢迎回来, ${currentUser.value.name}`);
+            // 预加载管理员数据（在后台进行，不影响用户体验）
+            if (isAdmin.value) {
+                fetchUsersForPicker();
+                fetchUsersForManagement();
+                fetchAllRoles();
+                fetchAllGroups();
+            }
 
-        } catch (error) { /* 错误由拦截器处理 */ } finally {
+        } catch (error) {
+            // 其他错误（如密码错误、用户不存在）仍由全局拦截器处理
+            console.error("Login failed:", error);
+        } finally {
             loading.value = false;
         }
     }

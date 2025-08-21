@@ -47,7 +47,7 @@ public class FormService {
     private final WorkflowTemplateRepository workflowTemplateRepository;
     private final ObjectMapper objectMapper;
 
-    @LogOperation(module = "表单管理", action = "创建表单定义", targetIdExpression = "#result.name")
+    @LogOperation(module = "表单提交", action = "提交申请", targetIdExpression = "#result?.id")
     public FormDefinitionResponse createFormDefinition(CreateFormDefinitionRequest request) {
         FormDefinition formDefinition = new FormDefinition();
         formDefinition.setName(request.getName());

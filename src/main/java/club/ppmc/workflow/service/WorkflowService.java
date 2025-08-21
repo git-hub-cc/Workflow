@@ -258,12 +258,11 @@ public class WorkflowService {
                     User submitter = userRepository.findById(submission.getSubmitterId())
                             .orElseThrow(() -> new IllegalStateException("数据异常：找不到提交人，ID: " + submission.getSubmitterId()));
 
-                    // --- 【核心修改】增加流程变量，用于搜索 ---
                     variables.put("submitterId", submission.getSubmitterId());
                     variables.put("submitterName", submitter.getName());
                     variables.put("formName", submission.getFormDefinition().getName());
-                    // ---
                     variables.put("formSubmissionId", submission.getId());
+                    variables.put("initiator", submitter.getId()); // Camunda specific variable
 
                     if (submitter.getManager() != null) {
                         String managerId = submitter.getManager().getId();
@@ -356,8 +355,15 @@ public class WorkflowService {
             taskService.setVariableLocal(camundaTaskId, "approvalComment", request.getApprovalComment());
         }
 
+        // --- 【核心修改】 ---
         Map<String, Object> variables = new HashMap<>();
-        variables.put("approved", request.getDecision().equals(CompleteTaskRequest.Decision.APPROVED));
+        boolean isApproved = request.getDecision().equals(CompleteTaskRequest.Decision.APPROVED);
+
+        // 设置所有可能的决策变量名，以实现最大兼容性
+        variables.put("approved", isApproved);
+        variables.put("passed", isApproved);
+        variables.put("qc_passed", isApproved); // 兼容旧的 goods_receipt_process
+        // --- 【修改结束】 ---
 
         taskService.complete(camundaTaskId, variables);
     }
@@ -367,17 +373,38 @@ public class WorkflowService {
      */
     @Transactional(readOnly = true)
     public Page<TaskDto> getPendingTasksForUser(String assigneeId, String keyword, Pageable pageable) {
-        TaskQuery query = taskService.createTaskQuery()
-                .taskAssignee(assigneeId)
-                .active();
+        // 1. 获取用户的组信息
+        User user = userRepository.findById(assigneeId)
+                .orElseThrow(() -> new ResourceNotFoundException("未找到用户: " + assigneeId));
+        List<String> userGroupIds = user.getUserGroups().stream()
+                .map(UserGroup::getName)
+                .collect(Collectors.toList());
 
-        if (StringUtils.hasText(keyword)) {
-            query.or()
-                    .processVariableValueLike("formName", "%" + keyword + "%")
-                    .processVariableValueLike("submitterName", "%" + keyword + "%")
-                    .endOr();
+        // 2. 构建基础查询
+        TaskQuery query = taskService.createTaskQuery().active();
+
+        // 3. 【核心修复】构建正确的OR查询逻辑
+        // 创建一个OR查询块，包含所有与用户相关的待办条件
+        TaskQuery orQuery = query.or()
+                .taskAssignee(assigneeId)
+                .taskCandidateUser(assigneeId);
+
+        // 如果用户属于任何组，则将候选组条件也加入OR查询块
+        if (!userGroupIds.isEmpty()) {
+            orQuery.taskCandidateGroupIn(userGroupIds);
         }
 
+        // 结束OR查询块，此时query的条件变为 (assignee=X OR candidateUser=X OR candidateGroup IN (G1, G2...))
+        query = orQuery.endOr();
+
+
+        // 4. 应用关键字过滤（作为AND条件）
+        if (StringUtils.hasText(keyword)) {
+            // Camunda API允许在OR查询块之外再添加AND条件
+            query.processVariableValueLike("formName", "%" + keyword + "%");
+        }
+
+        // 5. 获取总数并进行分页查询
         long total = query.count();
 
         List<Task> camundaTasks = query.orderByTaskCreateTime().desc()
@@ -412,7 +439,6 @@ public class WorkflowService {
             dto.setFormSubmissionId(((Number) formSubmissionIdObj).longValue());
         }
 
-        // 使用已存储的流程变量
         dto.setSubmitterName((String) variables.getOrDefault("submitterName", "未知"));
         dto.setFormName((String) variables.getOrDefault("formName", "未知表单"));
 
@@ -512,10 +538,44 @@ public class WorkflowService {
         return historyList;
     }
 
+    /**
+     * 【核心修复】检查用户是否有权处理指定任务。
+     * 这包括：是任务的直接办理人(assignee)、是候选人(candidate user)、或属于候选组(candidate group)。
+     *
+     * @param camundaTaskId 任务ID
+     * @param username      用户ID
+     * @return 如果用户有权处理则返回 true
+     */
     public boolean isTaskOwner(String camundaTaskId, String username) {
-        if (username == null) return false;
-        Task task = taskService.createTaskQuery().taskId(camundaTaskId).singleResult();
-        return task != null && username.equals(task.getAssignee());
+        if (!StringUtils.hasText(username)) {
+            return false;
+        }
+
+        // 1. 获取用户的组信息
+        Optional<User> userOpt = userRepository.findById(username);
+        List<String> userGroupIds = userOpt.map(user ->
+                user.getUserGroups().stream()
+                        .map(UserGroup::getName)
+                        .collect(Collectors.toList())
+        ).orElse(Collections.emptyList());
+
+        // 2. 构建一个完整的、健壮的链式查询
+        TaskQuery query = taskService.createTaskQuery()
+                .taskId(camundaTaskId)
+                .or() // 开始 OR 条件块
+                .taskAssignee(username)
+                .taskCandidateUser(username);
+
+        // 只有当用户属于某个组时，才将候选组条件加入 OR 块
+        if (!userGroupIds.isEmpty()) {
+            query.taskCandidateGroupIn(userGroupIds);
+        }
+
+        // 结束 OR 条件块并执行 count
+        long count = query.endOr().count();
+
+        // 5. 如果计数大于0，则用户有权限
+        return count > 0;
     }
 
     public boolean isSubmissionOwner(Long submissionId, String username) {
@@ -541,9 +601,37 @@ public class WorkflowService {
 
         String processInstanceId = processInstanceIdOpt.get();
 
+        // 1. 【核心修复】首先检查用户是否是当前流程实例中任何“活动任务”的参与者（包括候选组）
+        // 这是解决赵四作为候选人无法访问的关键
+        List<String> userGroupIds = userRepository.findById(username)
+                .map(user -> user.getUserGroups().stream()
+                        .map(UserGroup::getName)
+                        .collect(Collectors.toList()))
+                .orElse(Collections.emptyList());
+
+        TaskQuery activeQuery = taskService.createTaskQuery()
+                .processInstanceId(processInstanceId)
+                .active()
+                .or()
+                .taskAssignee(username)
+                .taskCandidateUser(username);
+
+        if (!userGroupIds.isEmpty()) {
+            activeQuery.taskCandidateGroupIn(userGroupIds);
+        }
+
+        if (activeQuery.endOr().count() > 0) {
+            log.debug("权限检查: 用户 '{}' 是申请单 #{} 的当前待办参与者。", username, submissionId);
+            return true;
+        }
+
+
+        // 2. 【核心修复】如果不是当前参与者，再检查他是否“曾经完成过”此流程中的任务
+        // HistoricTaskInstanceQuery 只支持按 taskAssignee 查询
         long historicTaskCount = historyService.createHistoricTaskInstanceQuery()
                 .processInstanceId(processInstanceId)
                 .taskAssignee(username)
+                .finished() // 确保是已完成的任务
                 .count();
 
         if (historicTaskCount > 0) {
@@ -551,18 +639,7 @@ public class WorkflowService {
             return true;
         }
 
-        long activeTaskCount = taskService.createTaskQuery()
-                .processInstanceId(processInstanceId)
-                .taskAssignee(username)
-                .active()
-                .count();
-
-        if (activeTaskCount > 0) {
-            log.debug("权限检查: 用户 '{}' 是申请单 #{} 的当前待办人。", username, submissionId);
-            return true;
-        }
-
-        log.debug("权限检查: 用户 '{}' 不是申请单 #{} 的任何阶段审批人。", username, submissionId);
+        log.debug("权限检查: 用户 '{}' 不是申请单 #{} 的任何阶段参与者。", username, submissionId);
         return false;
     }
 }
