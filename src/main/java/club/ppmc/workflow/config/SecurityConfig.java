@@ -32,12 +32,14 @@ public class SecurityConfig {
         http
                 .csrf(csrf -> csrf.disable())
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/api/auth/**", "/h2-console/**",  "/camunda/**").permitAll()
+                        // 公开访问的端点
+                        .requestMatchers("/api/auth/**", "/h2-console/**",  "/camunda/**", "/api/public/**").permitAll()
+                        // --- 【核心修改】允许对文件进行公开的GET请求（如图标、背景图），而其他操作（如POST上传）仍需认证 ---
+                        .requestMatchers(HttpMethod.GET, "/api/files/**").permitAll()
+                        // 需要认证的端点
                         .requestMatchers("/api/menus/my-menus").authenticated()
-                        .requestMatchers("/api/files/**").authenticated()
+                        .requestMatchers("/api/files/**").authenticated() // 此规则现在主要对非GET请求（如上传）生效
                         .requestMatchers(HttpMethod.POST, "/api/users/me/change-password").authenticated()
-                        // --- 【核心重构】明确API权限 ---
-                        // --- 【安全修复】将用户选择器API的权限收紧为仅限管理员 ---
                         // 流程设计器中的用户选择器，现在仅限管理员可用，防止普通用户获取全量用户列表
                         .requestMatchers("/api/workflows/users").hasRole("ADMIN")
                         .requestMatchers("/api/workflows/groups").authenticated()

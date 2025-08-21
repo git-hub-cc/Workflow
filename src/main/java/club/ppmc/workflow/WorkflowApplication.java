@@ -2,10 +2,13 @@ package club.ppmc.workflow;
 
 import club.ppmc.workflow.domain.Department;
 import club.ppmc.workflow.domain.Role;
+import club.ppmc.workflow.domain.SystemSetting;
 import club.ppmc.workflow.domain.User;
 import club.ppmc.workflow.repository.DepartmentRepository;
 import club.ppmc.workflow.repository.RoleRepository;
+import club.ppmc.workflow.repository.SystemSettingRepository;
 import club.ppmc.workflow.repository.UserRepository;
+import club.ppmc.workflow.service.SystemSettingService;
 import lombok.RequiredArgsConstructor;
 import org.camunda.bpm.spring.boot.starter.annotation.EnableProcessApplication;
 import org.springframework.boot.CommandLineRunner;
@@ -16,6 +19,7 @@ import org.springframework.scheduling.annotation.EnableAsync;
 import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 
 import java.util.List;
 import java.util.Map;
@@ -41,7 +45,13 @@ public class WorkflowApplication {
 
     @Bean
     @Transactional
-    public CommandLineRunner initData(UserRepository userRepository, RoleRepository roleRepository, DepartmentRepository departmentRepository) {
+    public CommandLineRunner initData(
+            UserRepository userRepository,
+            RoleRepository roleRepository,
+            DepartmentRepository departmentRepository,
+            // --- 【核心新增】注入 SystemSettingRepository ---
+            SystemSettingRepository systemSettingRepository
+    ) {
         return args -> {
             System.out.println("正在初始化演示用户及角色数据...");
 
@@ -113,8 +123,31 @@ public class WorkflowApplication {
             userRepository.save(user1);
 
             System.out.println("演示用户、角色和部门数据初始化完成！");
+
+            // --- 【核心新增】初始化系统设置默认值 ---
+            System.out.println("正在初始化系统设置默认值...");
+            initSystemSetting(systemSettingRepository, SystemSettingService.SettingKeys.SYSTEM_NAME, "表单工作流引擎", "系统在浏览器标签页和登录页显示的名称");
+            initSystemSetting(systemSettingRepository, SystemSettingService.SettingKeys.THEME_COLOR, "#1890ff", "Ant Design Vue 的主题色");
+            initSystemSetting(systemSettingRepository, SystemSettingService.SettingKeys.FOOTER_INFO, "© 2024 PPMC Workflow. All Rights Reserved.", "显示在页面底部的版权信息");
+            initSystemSetting(systemSettingRepository, SystemSettingService.SettingKeys.SYSTEM_ICON_ID, null, "系统图标的文件ID (来自文件附件表)");
+            initSystemSetting(systemSettingRepository, SystemSettingService.SettingKeys.LOGIN_BACKGROUND_ID, null, "登录页背景图的文件ID (来自文件附件表)");
+            System.out.println("系统设置默认值初始化完成！");
         };
     }
+
+    /**
+     * 【新增】一个辅助方法，用于在数据库中不存在某个设置项时创建它
+     */
+    private void initSystemSetting(SystemSettingRepository repository, String key, String value, String description) {
+        if (repository.findBySettingKey(key).isEmpty()) {
+            SystemSetting setting = new SystemSetting();
+            setting.setSettingKey(key);
+            setting.setSettingValue(value);
+            setting.setDescription(description);
+            repository.save(setting);
+        }
+    }
+
 
     /**
      * 【重要】这是一个数据迁移的示例。

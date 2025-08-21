@@ -32,8 +32,9 @@ const staticRoutes = [
             { path: 'admin/org-management', name: 'admin-org-management', component: () => import('../views/admin/OrganizationManagement.vue'), meta: { title: '组织架构管理', requiresAdmin: true } },
             { path: 'admin/logs/login', name: 'admin-login-log', component: () => import('../views/admin/LoginLog.vue'), meta: { title: '登录日志', requiresAdmin: true } },
             { path: 'admin/logs/operation', name: 'admin-operation-log', component: () => import('../views/admin/OperationLog.vue'), meta: { title: '操作日志', requiresAdmin: true } },
+            // --- 【核心新增】系统设置路由 ---
+            { path: 'admin/settings', name: 'admin-settings', component: () => import('../views/admin/SystemSettings.vue'), meta: { title: '系统设置', requiresAdmin: true } },
 
-            // 【核心修改】将表单设计器路由拆分为创建和编辑
             {
                 path: 'form/builder',
                 name: 'form-builder-create',
@@ -47,14 +48,12 @@ const staticRoutes = [
                 props: true,
                 meta: { title: '编辑表单', requiresAdmin: true }
             },
-
-            // 【核心修复】在这里为 FormViewer.vue 添加一个固定的、命名的路由
             {
-                path: 'form/viewer/:formId', // 定义一个清晰的路径，并接收 formId 参数
-                name: 'form-viewer',         // 这就是 DataListView.vue 中需要的路由名称
+                path: 'form/viewer/:formId',
+                name: 'form-viewer',
                 component: () => import('../views/FormViewer.vue'),
-                props: true,                 // 将路由参数 (formId) 作为 props 传递给组件
-                meta: { title: '填写申请' }    // 设置页面标题
+                props: true,
+                meta: { title: '填写申请' }
             },
 
             { path: 'forms/:formId/submissions', name: 'form-submissions', component: () => import('../views/Submissions.vue'), props: true, meta: { title: '提交记录' } },
@@ -65,22 +64,18 @@ const staticRoutes = [
             { path: 'my-submissions', name: 'my-submissions', component: () => import('../views/MySubmissions.vue'), meta: { title: '我的申请' } },
         ]
     },
-    // --- 【核心新增】通配符路由，用于捕获所有未匹配的路径 ---
-    // --- 必须放在所有路由规则的最后 ---
     {
         path: '/:pathMatch(.*)*',
         name: 'not-found',
-        redirect: { name: 'home' } // 重定向到首页
+        redirect: { name: 'home' }
     }
 ];
 
-// --- 2. 创建 Router 实例 (保持不变) ---
 let router = createRouter({
     history: createWebHistory(import.meta.env.BASE_URL),
     routes: staticRoutes
 });
 
-// --- 3. 动态添加路由的核心逻辑 (保持不变) ---
 const dynamicRouteModules = {
     'FORM_ENTRY': () => import('../views/FormViewer.vue'),
     'DATA_LIST': () => import('../views/DataListView.vue'),
@@ -117,7 +112,6 @@ export function addDynamicRoutes(menus) {
     processMenus(menus);
 }
 
-// --- 4. 重置路由的函数 (保持不变) ---
 export function resetRouter() {
     const newRouter = createRouter({
         history: createWebHistory(import.meta.env.BASE_URL),
@@ -126,7 +120,6 @@ export function resetRouter() {
     router.matcher = newRouter.matcher;
 }
 
-// --- 5. 全局导航守卫 (保持不变) ---
 router.beforeEach(async (to, from, next) => {
     document.title = to.meta.title || '表单工作流引擎';
     const userStore = useUserStore();

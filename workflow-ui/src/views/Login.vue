@@ -1,9 +1,10 @@
 <template>
-  <div class="login-container">
+  <div class="login-container" :style="backgroundStyle">
     <div class="login-box">
       <div class="logo-section">
-        <img src="/logo.svg" alt="logo" />
-        <h1>表单工作流引擎</h1>
+        <!-- [FIX] Bind src to the secure blob URL from the store -->
+        <img :src="systemStore.iconBlobUrl || '/logo.svg'" alt="logo" />
+        <h1>{{ systemStore.settings.SYSTEM_NAME || '表单工作流引擎' }}</h1>
       </div>
       <a-form
           :model="formState"
@@ -55,18 +56,36 @@
 </template>
 
 <script setup>
-import { reactive } from 'vue';
+import { reactive, computed } from 'vue';
 import { useUserStore } from '@/stores/user';
+import { useSystemStore } from '@/stores/system';
 import { UserOutlined, LockOutlined } from '@ant-design/icons-vue';
 
 const userStore = useUserStore();
+const systemStore = useSystemStore();
 const formState = reactive({
-  userId: 'admin', // Default for convenience
-  password: 'admin', // Default for convenience
+  userId: 'admin',
+  password: 'admin',
+});
+
+// [FIX] The 'systemIconUrl' computed property is no longer needed here.
+// The template now directly uses `systemStore.iconBlobUrl`.
+
+const backgroundStyle = computed(() => {
+  const bgId = systemStore.settings.LOGIN_BACKGROUND_ID;
+  if (bgId) {
+    return {
+      backgroundImage: `url(/api/files/${bgId})`,
+      backgroundSize: 'cover',
+      backgroundPosition: 'center',
+    };
+  }
+  return {
+    backgroundColor: '#f0f2f5',
+  };
 });
 
 const handleLogin = async () => {
-  // store action 现在会处理所有登录逻辑，包括强制密码修改的场景
   await userStore.login(formState);
 };
 </script>
@@ -82,9 +101,9 @@ const handleLogin = async () => {
 .login-box {
   width: 368px;
   padding: 36px;
-  background: #fff;
+  background: rgba(255, 255, 255, 0.9);
   border-radius: 8px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 .logo-section {
   text-align: center;
@@ -95,7 +114,7 @@ const handleLogin = async () => {
 }
 .logo-section h1 {
   font-size: 24px;
-  color: #1890ff;
+  color: #1677ff;
   margin-top: 16px;
 }
 .info-text {

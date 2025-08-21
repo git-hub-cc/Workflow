@@ -2,8 +2,9 @@
   <a-layout style="min-height: 100vh">
     <a-layout-sider v-model:collapsed="collapsed" collapsible>
       <div class="logo-sidebar" @click="$router.push('/')">
-        <img src="/logo.svg" alt="logo" />
-        <h1 v-if="!collapsed">工作流引擎</h1>
+        <!-- [FIX] Bind src to the secure blob URL from the store -->
+        <img :src="systemStore.iconBlobUrl || '/logo.svg'" alt="logo" />
+        <h1 v-if="!collapsed">{{ systemStore.settings.SYSTEM_NAME || '工作流引擎' }}</h1>
       </div>
       <a-menu
           v-model:selectedKeys="selectedKeys"
@@ -42,7 +43,6 @@
           </div>
           <div class="user-actions">
             <a-space>
-              <!-- 【核心修复】在这里添加 v-if，确保在 userStore.currentUser 存在时才渲染下拉菜单 -->
               <a-dropdown v-if="userStore.currentUser">
                 <a class="ant-dropdown-link" @click.prevent>
                   <a-avatar style="background-color: #1890ff; margin-right: 8px;">
@@ -64,13 +64,16 @@
       </a-layout-header>
 
       <a-layout-content :style="{ margin: '16px' }">
-        <div style="background: #fff; padding: 24px; min-height: calc(100vh - 64px - 32px - 53px); border-radius: 4px;">
+        <div style="background: #fff; padding: 24px; min-height: calc(100vh - 64px - 32px - 53px - 48px); border-radius: 4px;">
           <router-view v-slot="{ Component }">
             <transition name="fade" mode="out-in">
               <component :is="Component" />
             </transition>
           </router-view>
         </div>
+        <a-layout-footer style="text-align: center; padding: 12px 50px;">
+          {{ systemStore.settings.FOOTER_INFO || '© 2024 PPMC Workflow' }}
+        </a-layout-footer>
       </a-layout-content>
     </a-layout>
   </a-layout>
@@ -80,18 +83,20 @@
 import { onMounted, ref, watch, computed, h } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useUserStore } from '@/stores/user';
+import { useSystemStore } from '@/stores/system';
 import { getPendingTasks } from "@/api";
 import { Modal, Menu } from "ant-design-vue";
 import {
   DownOutlined, DashboardOutlined, TeamOutlined, SafetyCertificateOutlined, UsergroupAddOutlined,
   ApartmentOutlined, NodeIndexOutlined, FileSearchOutlined, UserOutlined, LogoutOutlined,
   SettingOutlined, MenuOutlined, TableOutlined,
-  CheckSquareOutlined, SendOutlined, ForkOutlined
+  CheckSquareOutlined, SendOutlined, ForkOutlined, BuildOutlined
 } from '@ant-design/icons-vue';
 import { iconMap } from '@/utils/iconLibrary.js';
 
 const { Item: MenuItem, SubMenu } = Menu;
 const userStore = useUserStore();
+const systemStore = useSystemStore();
 const router = useRouter();
 const route = useRoute();
 
@@ -99,6 +104,9 @@ const pendingTasksCount = ref(0);
 const collapsed = ref(false);
 const selectedKeys = ref([]);
 const openKeys = ref(['user-center']);
+
+// [FIX] The 'systemIconUrl' computed property is no longer needed here.
+// The template now directly uses `systemStore.iconBlobUrl`.
 
 const adminMenus = [
   {
@@ -130,6 +138,7 @@ const adminMenus = [
           { id: 'admin-operation-log', name: '操作日志', path: '/admin/logs/operation', type: 'DATA_LIST' },
         ]
       },
+      { id: 'admin-settings', name: '系统设置', path: '/admin/settings', icon: 'BuildOutlined', type: 'DATA_LIST' },
     ]
   }
 ];
@@ -153,8 +162,6 @@ const MenuRenderer = {
           return h(SubMenu, { key: menu.path || menu.id }, { icon: iconNode, title: () => menu.name, default: () => renderMenuItems(menu.children) });
         } else {
           const itemKey = menu.path || `item-${menu.id}`;
-          // 【核心修改】当菜单类型为'DIRECTORY'时，即使没有path也不禁用，允许其显示为可交互状态
-          // 只有当菜单不是'DIRECTORY'类型且没有path时，才将其禁用
           return h(MenuItem, { key: itemKey, disabled: !menu.path && menu.type !== 'DIRECTORY' }, { icon: iconNode, default: () => menu.name });
         }
       });

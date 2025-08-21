@@ -89,7 +89,7 @@ service.interceptors.response.use(
 export const getForms = () => service.get('/forms');
 export const getFormById = (id) => service.get(`/forms/${id}`);
 export const createForm = (data) => service.post('/forms', data);
-export const updateForm = (id, data) => service.put(`/forms/${id}`, data); // 【新增】更新表单API
+export const updateForm = (id, data) => service.put(`/forms/${id}`, data);
 export const deleteForm = (id) => service.delete(`/forms/${id}`);
 export const getSubmissions = (formId, params) => service.get(`/forms/${formId}/submissions`, { params });
 export const getSubmissionById = (submissionId) => service.get(`/forms/submissions/${submissionId}`);
@@ -184,5 +184,10 @@ export const getDashboardStats = () => service.get('/dashboard/stats');
 // --- 日志管理 API ---
 export const getLoginLogs = (params) => service.get('/admin/logs/login', { params });
 export const getOperationLogs = (params) => service.get('/admin/logs/operation', { params });
+
+// --- 【核心新增】系统设置 API ---
+export const getPublicSettings = () => service.get('/public/settings');
+export const getAdminSettings = () => service.get('/admin/settings');
+export const updateSettings = (settingsMap) => service.put('/admin/settings', settingsMap);
 
 export default service;
