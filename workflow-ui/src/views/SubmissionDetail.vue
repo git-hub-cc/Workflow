@@ -87,8 +87,11 @@ import { message } from 'ant-design-vue';
 import { PaperClipOutlined } from '@ant-design/icons-vue';
 import { flattenFields } from '@/utils/formUtils.js';
 import { iconMap } from '@/utils/iconLibrary.js';
+// 【核心修改】引入 system store 以获取主题色
+import { useSystemStore } from '@/stores/system';
 
 const props = defineProps({ submissionId: String });
+const systemStore = useSystemStore();
 
 const loading = ref(true);
 const submission = ref({});
@@ -188,7 +191,8 @@ const getTimelineColor = (item) => {
   if (item.activityType.endsWith('EndEvent')) {
     return item.decision === 'REJECTED' ? 'red' : 'green';
   }
-  if (item.endTime) return 'blue'; // 已完成的节点
+  // 【核心修改】已完成的节点使用主题色
+  if (item.endTime) return systemStore.settings.THEME_COLOR || 'blue'; // 已完成的节点
   return 'gray'; // 进行中或未开始的节点
 };
 
@@ -246,11 +250,13 @@ const formatDuration = (ms) => {
   padding: 4px 0;
 }
 .attachment-item a {
-  color: #1890ff;
+  /* 【核心修改】使用 CSS 变量来应用主题色 */
+  color: var(--ant-primary-color);
   transition: color 0.3s;
 }
 .attachment-item a:hover {
-  color: #40a9ff;
+  /* 【核心修改】使用 antd 提供的悬浮颜色变量 */
+  color: var(--ant-primary-color-hover);
 }
 .attachment-item .anticon {
   margin-right: 8px;

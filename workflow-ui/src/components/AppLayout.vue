@@ -45,7 +45,8 @@
             <a-space>
               <a-dropdown v-if="userStore.currentUser">
                 <a class="ant-dropdown-link" @click.prevent>
-                  <a-avatar style="background-color: #1890ff; margin-right: 8px;">
+                  <!-- 【核心修改】头像背景色使用动态主题色 -->
+                  <a-avatar :style="{ backgroundColor: systemStore.settings.THEME_COLOR, marginRight: '8px' }">
                     {{ userStore.currentUser.name.charAt(0) }}
                   </a-avatar>
                   {{ userStore.currentUser.name }}

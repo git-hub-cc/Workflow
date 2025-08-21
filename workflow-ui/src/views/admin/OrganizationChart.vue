@@ -25,23 +25,31 @@ import * as echarts from 'echarts/core';
 import { TreeChart } from 'echarts/charts';
 import { TooltipComponent, LegendComponent } from 'echarts/components';
 import { CanvasRenderer } from 'echarts/renderers';
+// 【核心修改】引入 system store 以获取主题色
+import { useSystemStore } from '@/stores/system';
 
 echarts.use([TreeChart, TooltipComponent, LegendComponent, CanvasRenderer]);
 
 const loading = ref(true);
 const chartRef = ref(null);
 let chartInstance = null;
+// 【核心修改】实例化 store
+const systemStore = useSystemStore();
 
 // 将后端返回的 DepartmentTreeNode 结构转换为 ECharts TreeChart 需要的格式
 const transformDataForEcharts = (data) => {
+  // 【核心修改】从 store 中获取主题色
+  const themeColor = systemStore.settings.THEME_COLOR || '#1890ff';
+
   return data.map(node => {
     const isDept = node.type === 'department';
     return {
       name: node.title.split(' (')[0], // 只显示名字
       value: node.value,
       itemStyle: {
-        color: isDept ? '#1890ff' : '#bae7ff',
-        borderColor: '#1890ff',
+        // 【核心修改】动态设置部门节点的颜色
+        color: isDept ? themeColor : '#bae7ff',
+        borderColor: themeColor,
       },
       label: {
         position: isDept ? 'top' : 'bottom',

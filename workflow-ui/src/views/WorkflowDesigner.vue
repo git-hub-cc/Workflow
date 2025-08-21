@@ -2,7 +2,7 @@
   <div class="page-container">
     <a-page-header title="流程设计器" @back="() => $router.push('/')">
       <template #subTitle>
-        为表单: <strong style="color: #1890ff">{{ formName }}</strong>
+        为表单: <strong class="form-name-highlight">{{ formName }}</strong>
       </template>
       <template #extra>
         <a-space>
@@ -369,7 +369,12 @@ const copyToClipboard = async (text) => {
 }
 .group-tag:hover {
   transform: translateY(-2px);
-  color: #1890ff;
-  border-color: #1890ff;
+  /* 【核心修改】使用 CSS 变量来应用主题色 */
+  color: var(--ant-primary-color);
+  border-color: var(--ant-primary-color);
+}
+.form-name-highlight {
+  /* 【核心修改】使用 CSS 变量来应用主题色 */
+  color: var(--ant-primary-color);
 }
 </style>

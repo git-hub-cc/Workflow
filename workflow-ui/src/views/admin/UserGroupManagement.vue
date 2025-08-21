@@ -18,7 +18,8 @@
       >
         <template #bodyCell="{ column, record }">
           <template v-if="column.key === 'name'">
-            <a-tag color="blue">{{ record.name }}</a-tag>
+            <!-- 【核心修改】使用 'processing' 颜色，它会自动映射到主题色 -->
+            <a-tag color="processing">{{ record.name }}</a-tag>
           </template>
           <template v-else-if="column.key === 'actions'">
             <a-space>

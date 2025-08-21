@@ -114,7 +114,8 @@ const handleLogin = async () => {
 }
 .logo-section h1 {
   font-size: 24px;
-  color: #1677ff;
+  /* 【核心修改】使用 CSS 变量来应用主题色 */
+  color: var(--ant-primary-color);
   margin-top: 16px;
 }
 .info-text {

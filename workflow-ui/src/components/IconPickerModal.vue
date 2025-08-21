@@ -81,8 +81,9 @@ const filterIcons = () => {
   transition: all 0.2s;
 }
 .icon-item:hover {
-  border-color: #1890ff;
-  color: #1890ff;
+  /* 【核心修改】使用 CSS 变量来应用主题色 */
+  border-color: var(--ant-primary-color);
+  color: var(--ant-primary-color);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
   transform: translateY(-2px);
 }
