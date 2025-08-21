@@ -23,7 +23,7 @@
               </a-col>
               <a-col :span="24">
                 <a-form-item label="页脚信息" name="FOOTER_INFO">
-                  <a-textarea v-model:value="formState.FOOTER_INFO" placeholder="例如：© 2024 PPMC Inc. All Rights Reserved." :rows="2" />
+                  <a-textarea v-model:value="formState.FOOTER_INFO" placeholder="例如：© 2025 PPMC Inc. All Rights Reserved." :rows="2" />
                 </a-form-item>
               </a-col>
             </a-row>
@@ -83,7 +83,14 @@ import { UploadOutlined, PlusOutlined } from '@ant-design/icons-vue';
 
 const systemStore = useSystemStore();
 const loading = ref(true);
-const formState = reactive({});
+const formState = reactive({
+  // 【修复】为 formState 提供初始默认值，
+  // 特别是为 THEME_COLOR 设置一个有效的十六进制颜色，
+  // 以防止在从API加载数据前，<input type="color"> 因绑定空值而报错。
+  SYSTEM_NAME: '',
+  THEME_COLOR: '#1890ff',
+  FOOTER_INFO: '',
+});
 
 const iconFileList = ref([]);
 const bgFileList = ref([]);

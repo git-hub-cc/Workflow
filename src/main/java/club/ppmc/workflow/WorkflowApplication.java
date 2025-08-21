@@ -128,7 +128,7 @@ public class WorkflowApplication {
             System.out.println("正在初始化系统设置默认值...");
             initSystemSetting(systemSettingRepository, SystemSettingService.SettingKeys.SYSTEM_NAME, "表单工作流引擎", "系统在浏览器标签页和登录页显示的名称");
             initSystemSetting(systemSettingRepository, SystemSettingService.SettingKeys.THEME_COLOR, "#1890ff", "Ant Design Vue 的主题色");
-            initSystemSetting(systemSettingRepository, SystemSettingService.SettingKeys.FOOTER_INFO, "© 2024 PPMC Workflow. All Rights Reserved.", "显示在页面底部的版权信息");
+            initSystemSetting(systemSettingRepository, SystemSettingService.SettingKeys.FOOTER_INFO, "© 2025 PPMC Workflow. All Rights Reserved.", "显示在页面底部的版权信息");
             initSystemSetting(systemSettingRepository, SystemSettingService.SettingKeys.SYSTEM_ICON_ID, null, "系统图标的文件ID (来自文件附件表)");
             initSystemSetting(systemSettingRepository, SystemSettingService.SettingKeys.LOGIN_BACKGROUND_ID, null, "登录页背景图的文件ID (来自文件附件表)");
             System.out.println("系统设置默认值初始化完成！");

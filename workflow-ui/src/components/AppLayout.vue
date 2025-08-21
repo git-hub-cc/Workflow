@@ -63,16 +63,18 @@
         </div>
       </a-layout-header>
 
-      <a-layout-content :style="{ margin: '16px' }">
-        <div style="background: #fff; padding: 24px; min-height: calc(100vh - 64px - 32px - 53px - 48px); border-radius: 4px;">
+      <!-- 【核心修改】将 a-layout-content 设置为 flex 容器，使其子元素可以弹性伸缩 -->
+      <a-layout-content :style="{ display: 'flex', flexDirection: 'column' }">
+        <!-- 【核心修改】移除 min-height，使用 flex: 1 让此 div 自动填充剩余空间 -->
+        <div style="background: #fff; border-radius: 4px; flex: 1 1 0; min-height: 0;">
           <router-view v-slot="{ Component }">
             <transition name="fade" mode="out-in">
               <component :is="Component" />
             </transition>
           </router-view>
         </div>
-        <a-layout-footer style="text-align: center; padding: 12px 50px;">
-          {{ systemStore.settings.FOOTER_INFO || '© 2024 PPMC Workflow' }}
+        <a-layout-footer style="text-align: center; padding: 12px 50px; flex-shrink: 0;">
+          {{ systemStore.settings.FOOTER_INFO || '© 2025 PPMC Workflow' }}
         </a-layout-footer>
       </a-layout-content>
     </a-layout>
