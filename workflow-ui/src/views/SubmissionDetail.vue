@@ -156,7 +156,22 @@ const getSubformColumns = (field) => field.props.columns.map(col => ({ title: co
 
 const formatDisplayValue = (field, value) => {
   if (value === null || value === undefined || value === '') return '(未填写)';
-  if (field.type === 'DatePicker' && value) { try { return new Date(value).toLocaleString(); } catch (e) { return value; } }
+  // 【核心修改】增强 DatePicker 的显示逻辑
+  if (field.type === 'DatePicker' && value) {
+    if (Array.isArray(value)) {
+      if (value.length === 2 && field.props.pickerMode === 'range') {
+        try {
+          const start = new Date(value[0]).toLocaleDateString();
+          const end = new Date(value[1]).toLocaleDateString();
+          return `${start} 至 ${end}`;
+        } catch (e) { return value.join(' 至 '); }
+      }
+      try {
+        return value.map(d => new Date(d).toLocaleDateString()).join(', ');
+      } catch (e) { return value.join(', '); }
+    }
+    try { return new Date(value).toLocaleString(); } catch (e) { return value; }
+  }
   if (typeof value === 'boolean') return value ? '是' : '否';
   if (Array.isArray(value)) return value.join(', ');
 

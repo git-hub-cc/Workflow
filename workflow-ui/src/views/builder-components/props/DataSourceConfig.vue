@@ -7,15 +7,26 @@
       <a-radio-group v-model:value="localField.dataSource.type" button-style="solid" size="small">
         <a-radio-button value="static">静态数据</a-radio-button>
         <a-radio-button value="api">API (列表)</a-radio-button>
-        <!-- 【新增】树形API选项 -->
         <a-radio-button v-if="localField.type === 'TreeSelect'" value="api-tree">API (树形)</a-radio-button>
-        <a-radio-button v-if="localField.type === 'UserPicker'" value="system-users" disabled>系统用户</a-radio-button>
+        <!-- 【核心修改】扩展 UserPicker 的数据源 -->
+        <a-radio-group v-if="localField.type === 'UserPicker'" v-model:value="localField.dataSource.type" button-style="solid" size="small">
+          <a-radio-button value="system-users-global">全局搜索</a-radio-button>
+          <a-radio-button value="system-users-dept">按部门</a-radio-button>
+          <a-radio-button value="system-users-role">按角色</a-radio-button>
+        </a-radio-group>
       </a-radio-group>
+    </a-form-item>
+
+    <!-- 【核心新增】UserPicker 按部门/角色配置 -->
+    <a-form-item v-if="localField.dataSource.type === 'system-users-dept'" label="选择部门">
+      <a-tree-select v-model:value="localField.dataSource.departmentId" :tree-data="departmentTree" placeholder="请选择部门" tree-default-expand-all />
+    </a-form-item>
+    <a-form-item v-if="localField.dataSource.type === 'system-users-role'" label="选择角色">
+      <a-select v-model:value="localField.dataSource.roleName" :options="userStore.allRoles.map(r => ({label: r.description, value: r.name}))" placeholder="请选择角色" />
     </a-form-item>
 
     <!-- 静态数据配置 -->
     <div v-if="localField.dataSource.type === 'static'">
-      <!-- 【修改】为树形选择器增加静态树数据配置 -->
       <template v-if="localField.type === 'TreeSelect'">
         <a-textarea v-model:value="staticTreeData" :rows="6" placeholder="请输入JSON格式的树形数据" @change="parseStaticTreeData" />
         <p style="font-size: 12px; color: #888; margin-top: 4px;">
@@ -47,9 +58,22 @@
       <a-form-item label="文本字段 (Label Key)">
         <a-input v-model:value="localField.dataSource.labelKey" placeholder="例如: name" />
       </a-form-item>
+
+      <!-- 【核心新增】级联配置 -->
+      <a-divider>级联配置 (可选)</a-divider>
+      <a-form-item label="监听字段">
+        <a-select v-model:value="localField.dataSource.listensTo" placeholder="选择一个父级字段" allow-clear>
+          <a-select-option v-for="f in parentFieldsForCascading" :key="f.id" :value="f.id">
+            {{ f.label }} ({{ f.id }})
+          </a-select-option>
+        </a-select>
+      </a-form-item>
+      <a-form-item label="请求参数名" help="父级字段的值将作为此参数发送请求">
+        <a-input v-model:value="localField.dataSource.paramName" placeholder="例如: parentId" />
+      </a-form-item>
     </div>
 
-    <!-- 【新增】API树形接口配置 -->
+    <!-- API树形接口配置 -->
     <div v-if="localField.dataSource.type === 'api-tree'">
       <a-form-item label="数据源标识 (Source)">
         <a-input v-model:value="localField.dataSource.source" placeholder="例如: departments" />
@@ -63,18 +87,48 @@
 </template>
 
 <script setup>
-import { ref, computed, watch } from 'vue';
+import { ref, computed, watch, onMounted } from 'vue';
 import { DeleteOutlined, PlusOutlined } from '@ant-design/icons-vue';
 import { message } from "ant-design-vue";
+import { useUserStore } from '@/stores/user';
+import { getDepartmentTree } from '@/api';
+import { flattenFields } from '@/utils/formUtils.js';
 
 const props = defineProps({
   field: { type: Object, required: true },
+  allFields: { type: Array, required: true },
 });
 const emit = defineEmits(['update:field']);
+
+const userStore = useUserStore();
+const departmentTree = ref([]);
 
 const localField = computed({
   get: () => props.field,
   set: (newField) => emit('update:field', newField),
+});
+
+onMounted(async () => {
+  if (userStore.allRoles.length === 0) userStore.fetchAllRoles();
+  try {
+    const data = await getDepartmentTree();
+    departmentTree.value = transformDeptTree(data);
+  } catch (e) {}
+});
+
+const transformDeptTree = (nodes) => {
+  return nodes.map(node => ({
+    title: node.name,
+    value: node.id,
+    children: node.children ? transformDeptTree(node.children) : []
+  }));
+};
+
+// 【核心新增】为级联提供可选的父字段
+const parentFieldsForCascading = computed(() => {
+  return flattenFields(props.allFields).filter(f =>
+      f.id !== props.field.id && ['Select', 'TreeSelect', 'RadioGroup'].includes(f.type)
+  );
 });
 
 // For TreeSelect static data
@@ -92,7 +146,6 @@ const parseStaticTreeData = () => {
     message.error('JSON格式不正确', 2);
   }
 };
-
 
 const addStaticOption = () => {
   if (!localField.value.dataSource.options) {

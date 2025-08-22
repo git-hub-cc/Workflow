@@ -1,10 +1,16 @@
 import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
+// 【核心新增】导入 vue-jsx 插件
+import vueJsx from '@vitejs/plugin-vue-jsx'
 import { fileURLToPath, URL } from 'node:url'
 
 // https://vitejs.dev/config/
 export default defineConfig({
-    plugins: [vue()],
+    // 【核心修改】在 plugins 数组中添加 vueJsx()
+    plugins: [
+        vue(),
+        vueJsx(),
+    ],
     resolve: {
         alias: {
             '@': fileURLToPath(new URL('./src', import.meta.url)),

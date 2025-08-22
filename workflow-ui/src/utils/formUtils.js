@@ -30,11 +30,18 @@ export function flattenFields(fields) {
  */
 export function initFormData(fields, formData) {
     flattenFields(fields).forEach(field => {
-        // 【修改】增加对新组件的类型判断
-        if (['GridRow', 'GridCol', 'Collapse', 'CollapsePanel', 'DescriptionList'].includes(field.type)) return;
+        // 【核心修改】增加对新组件的类型判断
+        if (['GridRow', 'GridCol', 'Collapse', 'CollapsePanel', 'DescriptionList', 'StaticText', 'Divider'].includes(field.type)) return;
 
+        // 【核心修改】根据组件类型设置不同的默认值
         if (['Subform', 'FileUpload', 'KeyValue'].includes(field.type)) {
             formData[field.id] = [];
+        } else if (field.type === 'Switch') {
+            formData[field.id] = false;
+        } else if (field.type === 'Slider' && field.props.range) {
+            formData[field.id] = [0, 0];
+        } else if (['InputNumber', 'Slider', 'Rate'].includes(field.type)) {
+            formData[field.id] = 0;
         } else {
             formData[field.id] = undefined;
         }

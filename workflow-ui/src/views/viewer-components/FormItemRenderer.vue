@@ -5,6 +5,12 @@
   <!-- 条件渲染：只有在满足显隐条件时才渲染组件 -->
   <div v-if="isVisible">
     <StaticTextRenderer v-if="field.type === 'StaticText'" :field="field" />
+    <!-- 【核心新增】分割线渲染 -->
+    <a-divider
+        v-else-if="field.type === 'Divider'"
+        :dashed="field.props.dashed"
+        :orientation="field.props.orientation"
+    >{{ field.props.text }}</a-divider>
 
     <template v-else-if="['GridRow', 'Collapse'].includes(field.type)">
       <a-row v-if="field.type === 'GridRow'" :gutter="field.props.gutter">
@@ -33,8 +39,22 @@
 
     <a-form-item v-else :label="field.label" :name="field.id" :rules="mode === 'edit' ? dynamicRules : []">
       <template v-if="mode === 'edit'">
+        <!-- 【核心修改】将 DatePicker 的渲染逻辑独立出来 -->
+        <a-range-picker
+            v-if="field.type === 'DatePicker' && field.props.pickerMode === 'range'"
+            v-model:value="localValue"
+            :placeholder="field.props.placeholder"
+            style="width: 100%;"
+        />
+        <a-date-picker
+            v-else-if="field.type === 'DatePicker' && field.props.pickerMode === 'multiple'"
+            v-model:value="localValue"
+            :multiple="true"
+            :placeholder="field.props.placeholder"
+            style="width: 100%;"
+        />
         <FileUploader
-            v-if="field.type === 'FileUpload'"
+            v-else-if="field.type === 'FileUpload'"
             v-model:value="localValue"
             :field="field"
             list-type="picture-card"
@@ -75,10 +95,36 @@
             </a-button>
           </template>
         </a-input>
-        <component v-else :is="getComponentByType(field.type)" v-model:value="localValue" v-model:checked="localValue" :placeholder="field.props.placeholder" />
+        <!-- 【核心新增】渲染新组件 -->
+        <a-switch
+            v-else-if="field.type === 'Switch'"
+            v-model:checked="localValue"
+            :checked-children="field.props.checkedChildren"
+            :un-checked-children="field.props.unCheckedChildren"
+        />
+        <a-radio-group
+            v-else-if="field.type === 'RadioGroup'"
+            v-model:value="localValue"
+            :options="dynamicOptions"
+        />
+        <a-slider
+            v-else-if="field.type === 'Slider'"
+            v-model:value="localValue"
+            :min="field.props.min"
+            :max="field.props.max"
+            :range="field.props.range"
+        />
+        <a-rate
+            v-else-if="field.type === 'Rate'"
+            v-model:value="localValue"
+            :count="field.props.count"
+            :allow-half="field.props.allowHalf"
+        />
+        <component v-else :is="getComponentByType(field.type)" v-model:value="localValue" v-model:checked="localValue" :placeholder="field.props.placeholder" style="width: 100%;" />
       </template>
 
       <template v-else>
+        <!-- 只读模式的显示 -->
         <span v-if="!['FileUpload', 'RichText', 'Subform', 'KeyValue', 'IconPicker'].includes(field.type)">{{ formattedValue }}</span>
         <div v-if="field.type === 'FileUpload' && localValue && localValue.length > 0">
           <p v-for="file in localValue" :key="file.id">
@@ -97,9 +143,9 @@
 </template>
 
 <script setup>
-import { computed, ref, onMounted, defineAsyncComponent } from 'vue';
+import { computed, ref, onMounted, defineAsyncComponent, watch } from 'vue';
 import { useUserStore } from '@/stores/user';
-import { downloadFile, fetchTableData, fetchTreeData, searchUsersForPicker } from '@/api';
+import { downloadFile, fetchTableData, fetchTreeData, searchUsersForPicker, getUsersForPicker } from '@/api';
 import { message } from 'ant-design-vue';
 import { PaperClipOutlined, SmileOutlined } from '@ant-design/icons-vue';
 import FileUploader from '@/components/FileUploader.vue';
@@ -146,7 +192,6 @@ const isVisible = computed(() => {
   return visibility.condition === 'AND' ? visibility.rules.every(checkRule) : visibility.rules.some(checkRule);
 });
 
-// 【核心修改】增强校验规则以支持合计校验
 const dynamicRules = computed(() => {
   if (!props.field.rules) return [];
 
@@ -171,11 +216,10 @@ const dynamicRules = computed(() => {
       };
       return { validator, trigger: 'blur' };
     }
-    // 合计校验
     if (ruleConfig.type === 'sum') {
       const validator = (rule, value) => {
         if (!Array.isArray(value) || value.length === 0) {
-          return Promise.resolve(); // 如果子表单为空，不进行校验
+          return Promise.resolve();
         }
         const sum = value.reduce((acc, row) => acc + (Number(row[ruleConfig.subformColumn]) || 0), 0);
         const mainValue = Number(props.formData[ruleConfig.mainFormField]) || 0;
@@ -221,7 +265,7 @@ const formattedValue = computed(() => {
   const value = localValue.value;
   if (value === null || value === undefined || value === '') return '(未填写)';
 
-  if (['Select', 'TreeSelect'].includes(props.field.type)) {
+  if (['Select', 'TreeSelect', 'RadioGroup'].includes(props.field.type)) {
     const findOptionLabel = (options, val) => {
       for (const opt of options) {
         if (opt.value === val) return opt.label || opt.title;
@@ -238,7 +282,21 @@ const formattedValue = computed(() => {
     const selectedUser = userOptions.value.find(u => u.value === value);
     return selectedUser ? selectedUser.label : value;
   }
-  if (props.field.type === 'DatePicker' && value) { try { return new Date(value).toLocaleString(); } catch(e) { return value; } }
+  if (props.field.type === 'DatePicker' && value) {
+    if (Array.isArray(value)) {
+      if (value.length === 2 && props.field.props.pickerMode === 'range') {
+        try {
+          const start = new Date(value[0]).toLocaleDateString();
+          const end = new Date(value[1]).toLocaleDateString();
+          return `${start} 至 ${end}`;
+        } catch (e) { return value.join(' 至 '); }
+      }
+      try {
+        return value.map(d => new Date(d).toLocaleDateString()).join(', ');
+      } catch (e) { return value.join(', '); }
+    }
+    try { return new Date(value).toLocaleString(); } catch(e) { return value; }
+  }
   if (props.field.type === 'DataPicker') {
     if (props.field.props.mappings && props.field.props.mappings.length > 0) {
       const displayFieldId = props.field.props.mappings[0].targetField;
@@ -248,45 +306,64 @@ const formattedValue = computed(() => {
     }
     return value;
   }
+  if (props.field.type === 'Slider' && props.field.props.range) {
+    return Array.isArray(value) ? value.join(' - ') : value;
+  }
   if (typeof value === 'boolean') return value ? '是' : '否';
   return value;
 });
 
-onMounted(async () => {
+const loadOptions = async (params = {}) => {
   const ds = props.field.dataSource;
-  if (!ds || !['Select', 'TreeSelect'].includes(props.field.type)) {
-    if (props.field.type === 'UserPicker' && localValue.value) {
-      loadingOptions.value = true;
-      try {
-        const results = await searchUsersForPicker(localValue.value);
-        if (results && results.length > 0) {
-          userOptions.value = results.map(u => ({ label: `${u.name} (${u.id})`, value: u.id }));
-        }
-      } catch (e) { /* ignore */ }
-      finally { loadingOptions.value = false; }
-    }
-    return;
-  }
+  if (!ds) return;
 
   loadingOptions.value = true;
   try {
     if (ds.type === 'static') {
       dynamicOptions.value = ds.options || [];
     } else if (ds.type === 'api' && ds.url) {
-      const data = await fetchTableData(ds.url);
-      dynamicOptions.value = data.map(item => ({ label: item[ds.labelKey || 'label'], value: item[ds.valueKey || 'value'] }));
+      const data = await fetchTableData(ds.url, params);
+      dynamicOptions.value = data.content.map(item => ({ label: item[ds.labelKey || 'label'], value: item[ds.valueKey || 'value'] }));
     } else if (ds.type === 'api-tree' && ds.source) {
       dynamicOptions.value = await fetchTreeData(ds.source);
+    } else if (ds.type.startsWith('system-users-')) {
+      const userParams = {};
+      if (ds.type === 'system-users-dept' && ds.departmentId) userParams.departmentId = ds.departmentId;
+      if (ds.type === 'system-users-role' && ds.roleName) userParams.roleName = ds.roleName;
+      const data = await getUsersForPicker(userParams);
+      userOptions.value = data.content.map(u => ({ label: `${u.name} (${u.id})`, value: u.id }));
     }
   } catch (error) {
     message.error(`加载字段 "${props.field.label}" 的选项失败`);
   } finally {
     loadingOptions.value = false;
   }
+};
+
+onMounted(() => {
+  const ds = props.field.dataSource;
+  if (ds && ds.listensTo) return;
+  loadOptions();
 });
+
+// 【核心新增】级联逻辑
+const parentFieldId = computed(() => props.field.dataSource?.listensTo);
+if (parentFieldId.value) {
+  watch(() => props.formData[parentFieldId.value], (newParentValue) => {
+    // 清空当前字段值和选项
+    localValue.value = undefined;
+    dynamicOptions.value = [];
+    if (newParentValue) {
+      const paramName = props.field.dataSource.paramName || 'parentId';
+      loadOptions({ [paramName]: newParentValue });
+    }
+  });
+}
 
 let searchTimeout;
 const handleUserSearch = (keyword) => {
+  const dsType = props.field.dataSource?.type;
+  if (dsType !== 'system-users-global') return; // 只对全局搜索模式生效
   clearTimeout(searchTimeout);
   if (!keyword) {
     userOptions.value = [];
@@ -302,11 +379,11 @@ const handleUserSearch = (keyword) => {
     } finally {
       loadingOptions.value = false;
     }
-  }, 300); // Debounce
+  }, 300);
 };
 
 const getComponentByType = (type) => {
-  const map = { Input: 'a-input', Textarea: 'a-textarea', Checkbox: 'a-checkbox', DatePicker: 'a-date-picker' };
+  const map = { Input: 'a-input', Textarea: 'a-textarea', Checkbox: 'a-checkbox', DatePicker: 'a-date-picker', InputNumber: 'a-input-number' };
   return map[type] || 'a-input';
 };
 const filterOption = (input, option) => option.label.toLowerCase().indexOf(input.toLowerCase()) >= 0;
@@ -327,9 +404,6 @@ const handleDownload = async (fileId, filename) => {
     document.body.appendChild(link); link.click(); document.body.removeChild(link);
     URL.revokeObjectURL(url);
   } catch (error) { message.error('文件下载失败'); }
-};
-const handleDataPickerUpdate = (id, val) => {
-  emit('update:form-data', id, val);
 };
 </script>
 

@@ -1,111 +1,180 @@
 <template>
   <div class="page-container">
-    <a-page-header title="流程实例管理" sub-title="监控并管理所有正在运行的流程实例" />
+    <a-page-header title="流程实例管理" sub-title="监控、诊断并干预所有流程实例" />
 
-    <div style="padding: 0 24px;">
-      <a-table
-          :columns="columns"
-          :data-source="instances"
-          :loading="loading"
-          row-key="processInstanceId"
-      >
-        <template #bodyCell="{ column, record }">
-          <template v-if="column.key === 'businessKey'">
-            <router-link :to="{ name: 'submission-detail', params: { submissionId: record.businessKey } }">
-              {{ record.businessKey }}
-            </router-link>
+    <div style="padding: 24px;">
+      <!-- 筛选区域 -->
+      <a-card :bordered="false" style="margin-bottom: 24px;">
+        <a-form :model="filterState" layout="inline">
+          <a-form-item label="业务ID">
+            <a-input v-model:value="filterState.businessKey" placeholder="输入表单提交ID" allow-clear />
+          </a-form-item>
+          <a-form-item label="发起人">
+            <a-input v-model:value="filterState.startUser" placeholder="输入发起人ID" allow-clear />
+          </a-form-item>
+          <a-form-item label="实例状态">
+            <a-select v-model:value="filterState.state" placeholder="选择状态" style="width: 150px" allow-clear>
+              <a-select-option value="RUNNING">运行中</a-select-option>
+              <a-select-option value="COMPLETED">已完成</a-select-option>
+              <a-select-option value="TERMINATED">已终止</a-select-option>
+            </a-select>
+          </a-form-item>
+          <a-form-item>
+            <a-space>
+              <a-button type="primary" @click="handleSearch">
+                <template #icon><SearchOutlined /></template>
+                查询
+              </a-button>
+              <a-button @click="handleReset">
+                <template #icon><ReloadOutlined /></template>
+                重置
+              </a-button>
+            </a-space>
+          </a-form-item>
+        </a-form>
+      </a-card>
+
+      <!-- 批量操作与表格 -->
+      <a-card :bordered="false">
+        <div style="margin-bottom: 16px;">
+          <a-space>
+            <a-button :disabled="!hasSelected" @click="handleBatchSuspend">批量挂起</a-button>
+            <a-button :disabled="!hasSelected" @click="handleBatchActivate">批量激活</a-button>
+            <a-button :disabled="!hasSelected" danger @click="handleBatchTerminate">批量终止</a-button>
+          </a-space>
+          <span v-if="hasSelected" style="margin-left: 8px;">
+            已选择 {{ selectedRowKeys.length }} 项
+          </span>
+        </div>
+
+        <a-table
+            :columns="columns"
+            :data-source="dataSource"
+            :loading="loading"
+            :pagination="pagination"
+            :row-selection="{ selectedRowKeys: selectedRowKeys, onChange: onSelectChange }"
+            row-key="processInstanceId"
+            @change="handleTableChange"
+        >
+          <template #bodyCell="{ column, record }">
+            <template v-if="column.key === 'businessKey'">
+              <router-link :to="{ name: 'submission-detail', params: { submissionId: record.businessKey } }">
+                {{ record.businessKey }}
+              </router-link>
+            </template>
+            <template v-else-if="column.key === 'startTime'">
+              {{ new Date(record.startTime).toLocaleString() }}
+            </template>
+            <template v-else-if="column.key === 'processDefinitionName'">
+              {{ record.processDefinitionName }} (v{{ record.version }})
+            </template>
+            <template v-else-if="column.key === 'state'">
+              <a-tooltip v-if="record.hasIncident" title="流程存在技术异常，请检查日志或联系开发人员">
+                <a-tag color="error">
+                  <template #icon><ExclamationCircleOutlined /></template>
+                  异常
+                </a-tag>
+              </a-tooltip>
+              <a-tag v-else :color="getStateColor(record.state, record.suspended)">
+                {{ getStateText(record.state, record.suspended) }}
+              </a-tag>
+            </template>
+            <template v-else-if="column.key === 'duration'">
+              {{ record.durationInMillis ? formatDuration(record.durationInMillis) : '-' }}
+            </template>
+            <template v-else-if="column.key === 'actions'">
+              <a-dropdown>
+                <a class="ant-dropdown-link" @click.prevent>
+                  操作 <DownOutlined />
+                </a>
+                <template #overlay>
+                  <a-menu @click="({ key }) => handleMenuClick(key, record)">
+                    <a-menu-item key="variables"><PartitionOutlined /> 管理变量</a-menu-item>
+                    <a-menu-item key="diagram"><ApartmentOutlined /> 查看图表</a-menu-item>
+                    <a-menu-divider />
+                    <a-menu-item key="suspend" v-if="!record.suspended && record.state === 'RUNNING'"><PauseCircleOutlined /> 挂起</a-menu-item>
+                    <a-menu-item key="activate" v-if="record.suspended && record.state === 'RUNNING'"><PlayCircleOutlined /> 激活</a-menu-item>
+                    <a-menu-item key="terminate" danger v-if="record.state === 'RUNNING'"><StopOutlined /> 终止</a-menu-item>
+                  </a-menu>
+                </template>
+              </a-dropdown>
+            </template>
           </template>
-          <template v-else-if="column.key === 'startTime'">
-            {{ new Date(record.startTime).toLocaleString() }}
-          </template>
-          <template v-else-if="column.key === 'processDefinitionName'">
-            {{ record.processDefinitionName }} (v{{ record.version }})
-          </template>
-          <template v-else-if="column.key === 'suspended'">
-            <a-tag :color="record.suspended ? 'orange' : 'green'">
-              {{ record.suspended ? '已挂起' : '运行中' }}
-            </a-tag>
-          </template>
-          <template v-else-if="column.key === 'actions'">
-            <a-dropdown>
-              <a class="ant-dropdown-link" @click.prevent>
-                操作 <DownOutlined />
-              </a>
-              <template #overlay>
-                <a-menu @click="({ key }) => handleMenuClick(key, record)">
-                  <!-- 【核心新增】管理变量菜单项 -->
-                  <a-menu-item key="variables">管理变量</a-menu-item>
-                  <a-menu-divider />
-                  <a-menu-item v-if="!record.suspended" key="suspend">挂起</a-menu-item>
-                  <a-menu-item v-if="record.suspended" key="activate">激活</a-menu-item>
-                  <a-menu-item key="terminate" danger>终止</a-menu-item>
-                </a-menu>
-              </template>
-            </a-dropdown>
-          </template>
-        </template>
-      </a-table>
+        </a-table>
+      </a-card>
     </div>
 
-    <!-- 【核心新增】流程变量管理弹窗 -->
+    <!-- 流程变量管理弹窗 -->
     <ProcessVariablesModal
         v-if="variablesModalVisible"
         v-model:open="variablesModalVisible"
         :instance-id="currentInstanceId"
     />
+    <!-- 流程图弹窗 (待实现) -->
+    <!-- ReassignTaskModal (待实现) -->
+
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted, h } from 'vue';
-import { getActiveInstances, terminateInstance, suspendInstance, activateInstance } from '@/api';
+import { ref, onMounted, h, computed } from 'vue';
+import { getProcessInstances, terminateInstance, suspendInstance, activateInstance, batchSuspendInstances, batchActivateInstances, batchTerminateInstances } from '@/api';
+import { usePaginatedFetch } from '@/composables/usePaginatedFetch';
 import { message, Modal, Input } from 'ant-design-vue';
-import { DownOutlined } from '@ant-design/icons-vue';
-// 【核心新增】引入新组件
+import {
+  DownOutlined, SearchOutlined, ReloadOutlined, ExclamationCircleOutlined,
+  PauseCircleOutlined, PlayCircleOutlined, StopOutlined, PartitionOutlined, ApartmentOutlined
+} from '@ant-design/icons-vue';
 import ProcessVariablesModal from './components/ProcessVariablesModal.vue';
+// 稍后将引入其他模态框
+// import ProcessDiagramModal from './components/ProcessDiagramModal.vue';
 
-const loading = ref(true);
-const instances = ref([]);
+const {
+  loading, dataSource, pagination, filterState,
+  handleTableChange, handleSearch, handleReset, fetchData
+} = usePaginatedFetch(getProcessInstances, { state: 'RUNNING', businessKey: '', startUser: '' });
 
-// 【核心新增】弹窗状态
+// 弹窗状态
 const variablesModalVisible = ref(false);
 const currentInstanceId = ref(null);
 
-const columns = [
-  { title: '实例ID', dataIndex: 'processInstanceId', key: 'processInstanceId', ellipsis: true },
-  { title: '业务ID (申请)', dataIndex: 'businessKey', key: 'businessKey', align: 'center' },
-  { title: '流程定义', dataIndex: 'processDefinitionName', key: 'processDefinitionName' },
-  { title: '状态', dataIndex: 'suspended', key: 'suspended', align: 'center' },
-  { title: '发起人', dataIndex: 'startUserName', key: 'startUserName' },
-  { title: '开始时间', dataIndex: 'startTime', key: 'startTime' },
-  { title: '当前节点', dataIndex: 'currentActivityName', key: 'currentActivityName' },
-  { title: '操作', key: 'actions', align: 'center' },
-];
-
-const fetchInstances = async () => {
-  loading.value = true;
-  try {
-    instances.value = await getActiveInstances();
-  } catch (error) {
-    // 错误已在 api/index.js 中全局处理
-  } finally {
-    loading.value = false;
-  }
+// 批量操作状态
+const selectedRowKeys = ref([]);
+const hasSelected = computed(() => selectedRowKeys.value.length > 0);
+const onSelectChange = keys => {
+  selectedRowKeys.value = keys;
 };
 
-onMounted(fetchInstances);
+const columns = [
+  { title: '实例ID', dataIndex: 'processInstanceId', key: 'processInstanceId', ellipsis: true, width: 150 },
+  { title: '业务ID (申请)', dataIndex: 'businessKey', key: 'businessKey', align: 'center', width: 120 },
+  { title: '流程定义', dataIndex: 'processDefinitionName', key: 'processDefinitionName' },
+  { title: '状态', dataIndex: 'state', key: 'state', align: 'center', width: 100 },
+  { title: '发起人', dataIndex: 'startUserName', key: 'startUserName', width: 120 },
+  { title: '开始时间', dataIndex: 'startTime', key: 'startTime', width: 180 },
+  { title: '当前节点', dataIndex: 'currentActivityName', key: 'currentActivityName', ellipsis: true },
+  { title: '持续时间', key: 'duration', align: 'center', width: 150 },
+  { title: '操作', key: 'actions', align: 'center', width: 100 },
+];
 
+onMounted(fetchData);
+
+// --- 菜单和按钮处理 ---
 const handleMenuClick = async (key, record) => {
+  currentInstanceId.value = record.processInstanceId;
   switch (key) {
-    case 'variables': // 【核心新增】处理点击事件
-      currentInstanceId.value = record.processInstanceId;
+    case 'variables':
       variablesModalVisible.value = true;
       break;
+    case 'diagram':
+      // TODO: 打开流程图弹窗
+      message.info('查看图表功能待实现');
+      break;
     case 'suspend':
-      await handleSuspend(record.processInstanceId);
+      await handleSingleAction(suspendInstance, record.processInstanceId, '挂起');
       break;
     case 'activate':
-      await handleActivate(record.processInstanceId);
+      await handleSingleAction(activateInstance, record.processInstanceId, '激活');
       break;
     case 'terminate':
       handleTerminate(record);
@@ -113,20 +182,12 @@ const handleMenuClick = async (key, record) => {
   }
 };
 
-const handleSuspend = async (instanceId) => {
+const handleSingleAction = async (apiFunc, instanceId, actionName) => {
   try {
-    await suspendInstance(instanceId);
-    message.success('流程实例已挂起');
-    await fetchInstances();
-  } catch (err) { /* Global handler */ }
-};
-
-const handleActivate = async (instanceId) => {
-  try {
-    await activateInstance(instanceId);
-    message.success('流程实例已激活');
-    await fetchInstances();
-  } catch (err) { /* Global handler */ }
+    await apiFunc(instanceId);
+    message.success(`流程实例已${actionName}`);
+    await fetchData();
+  } catch (err) { /* 全局处理器已处理 */ }
 };
 
 const handleTerminate = (record) => {
@@ -135,27 +196,92 @@ const handleTerminate = (record) => {
     title: '请输入终止原因',
     content: h(Input, {
       placeholder: '请输入终止原因 (必填)',
-      onChange: (e) => {
-        reason = e.target.value;
-      },
+      onChange: (e) => { reason = e.target.value; },
     }),
     okText: '确认',
     cancelText: '取消',
     onOk: async () => {
       if (!reason.trim()) {
         message.error('终止原因不能为空！');
-        return Promise.reject(new Error('终止原因不能为空')); // 阻止弹窗关闭
+        return Promise.reject(new Error('终止原因不能为空'));
       }
-      try {
-        await terminateInstance(record.processInstanceId, reason);
-        message.success(`流程实例 ${record.processInstanceId} 已成功终止。`);
-        await fetchInstances(); // 刷新列表
-      } catch (error) {
-        // 错误已全局处理
-      }
+      await handleSingleAction(id => terminateInstance(id, reason), record.processInstanceId, '终止');
     },
   });
 };
+
+// --- 批量操作 ---
+const handleBatchSuspend = async () => {
+  await batchSuspendInstances(selectedRowKeys.value);
+  message.success('批量挂起成功');
+  selectedRowKeys.value = [];
+  await fetchData();
+};
+const handleBatchActivate = async () => {
+  await batchActivateInstances(selectedRowKeys.value);
+  message.success('批量激活成功');
+  selectedRowKeys.value = [];
+  await fetchData();
+};
+const handleBatchTerminate = () => {
+  let reason = '';
+  Modal.confirm({
+    title: `确认终止 ${selectedRowKeys.value.length} 个实例?`,
+    content: h(Input, {
+      placeholder: '请输入终止原因 (必填)',
+      onChange: (e) => { reason = e.target.value; },
+    }),
+    onOk: async () => {
+      if (!reason.trim()) {
+        message.error('终止原因不能为空！');
+        return Promise.reject(new Error('终止原因不能为空'));
+      }
+      await batchTerminateInstances(selectedRowKeys.value, reason);
+      message.success('批量终止成功');
+      selectedRowKeys.value = [];
+      await fetchData();
+    },
+  });
+};
+
+// --- 辅助函数 ---
+const getStateColor = (state, suspended) => {
+  if (suspended) return 'orange';
+  switch (state) {
+    case 'RUNNING': return 'processing';
+    case 'COMPLETED': return 'success';
+    case 'TERMINATED': return 'error';
+    default: return 'default';
+  }
+};
+
+const getStateText = (state, suspended) => {
+  if (suspended) return '已挂起';
+  switch (state) {
+    case 'RUNNING': return '运行中';
+    case 'COMPLETED': return '已完成';
+    case 'TERMINATED': return '已终止';
+    default: return state;
+  }
+};
+
+const formatDuration = (ms) => {
+  if (!ms) return '-';
+  let seconds = Math.floor(ms / 1000);
+  let minutes = Math.floor(seconds / 60);
+  let hours = Math.floor(minutes / 60);
+  let days = Math.floor(hours / 24);
+  seconds %= 60;
+  minutes %= 60;
+  hours %= 24;
+  let result = '';
+  if (days > 0) result += `${days}天`;
+  if (hours > 0) result += `${hours}时`;
+  if (minutes > 0) result += `${minutes}分`;
+  if (seconds > 0) result += `${seconds}秒`;
+  return result || '0秒';
+};
+
 </script>
 
 <style scoped>

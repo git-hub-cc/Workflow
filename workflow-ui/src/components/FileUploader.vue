@@ -28,7 +28,6 @@
 <script setup>
 import { ref, watch, toRefs } from 'vue';
 import { message } from 'ant-design-vue';
-// 【核心修改】引入 PlusOutlined
 import { UploadOutlined, PlusOutlined } from '@ant-design/icons-vue';
 import { uploadFile } from '@/api';
 
@@ -37,12 +36,10 @@ const props = defineProps({
     type: Array,
     default: () => [],
   },
-  // 【核心新增】接收 listType prop
   listType: {
     type: String,
-    default: 'text', // 默认为文本列表
+    default: 'text',
   },
-  // 【核心新增】接收 field prop 以获取 maxCount 等配置
   field: {
     type: Object,
     default: () => ({ props: {} }),
@@ -60,20 +57,49 @@ watch(value, (newVal) => {
       name: file.originalFilename,
       status: 'done',
       response: file,
-      // 【核心修改】为已有文件生成预览URL，这是显示缩略图的关键
       url: `/api/files/${file.id}`,
-      thumbUrl: `/api/files/${file.id}`, // thumbUrl 同样重要
+      thumbUrl: `/api/files/${file.id}`,
     }));
   }
 }, { immediate: true, deep: true });
 
 
 const beforeUpload = (file) => {
-  const isLt10M = file.size / 1024 / 1024 < 10;
-  if (!isLt10M) {
-    message.error('文件大小不能超过 10MB!');
+  // 【核心修改】增加文件大小和类型校验
+  const { maxSize, allowedTypes } = props.field.props;
+
+  // 1. 校验文件大小
+  if (maxSize) {
+    const isLtSize = file.size / 1024 / 1024 < maxSize;
+    if (!isLtSize) {
+      message.error(`文件大小不能超过 ${maxSize}MB!`);
+      return false;
+    }
   }
-  return isLt10M;
+
+  // 2. 校验文件类型
+  if (allowedTypes) {
+    const typesArray = allowedTypes.split(',').map(t => t.trim().toLowerCase());
+    const fileExtension = `.${file.name.split('.').pop()?.toLowerCase()}`;
+    const mimeType = file.type.toLowerCase();
+
+    const isValidType = typesArray.some(type => {
+      if (type.startsWith('.')) { // e.g., .jpg
+        return fileExtension === type;
+      }
+      if (type.includes('/')) { // e.g., image/jpeg
+        return mimeType === type;
+      }
+      return false;
+    });
+
+    if (!isValidType) {
+      message.error(`不支持的文件类型。只允许上传: ${allowedTypes}`);
+      return false;
+    }
+  }
+
+  return true;
 };
 
 const handleUpload = async ({ file, onSuccess, onError }) => {

@@ -10,13 +10,26 @@
        @drop.prevent.stop="handleDropOnItem($event)"
   >
     <a-form-item :label="field.label" :required="isRequired">
+      <!-- 【核心修改】为 DatePicker 增加特殊预览 -->
+      <a-range-picker
+          v-if="field.type === 'DatePicker' && field.props.pickerMode === 'range'"
+          :placeholder="field.props.placeholder"
+          disabled style="pointer-events: none; width: 100%;"
+      />
+      <a-date-picker
+          v-else-if="field.type === 'DatePicker' && field.props.pickerMode === 'multiple'"
+          :multiple="true"
+          :placeholder="field.props.placeholder"
+          disabled style="pointer-events: none; width: 100%;"
+      />
       <component
+          v-else
           :is="getComponentByType(field.type)"
           :placeholder="field.props.placeholder"
           :options="getOptionsForField(field)"
           :tree-data="getOptionsForField(field)"
           disabled
-          style="pointer-events: none;"
+          style="pointer-events: none; width: 100%;"
       >
         <!-- 特殊组件的静态预览 -->
         <template v-if="field.type === 'DataPicker'">
@@ -80,6 +93,15 @@
       </a-descriptions-item>
     </a-descriptions>
 
+    <!-- 【核心新增】分割线预览 -->
+    <a-divider
+        v-if="field.type === 'Divider'"
+        :dashed="field.props.dashed"
+        :orientation="field.props.orientation"
+    >
+      {{ field.props.text }}
+    </a-divider>
+
     <div class="field-actions">
       <a-button type="text" size="small" @click.stop="deleteField(index, fields)" danger>删除</a-button>
     </div>
@@ -88,10 +110,8 @@
 
 <script setup>
 import { computed, defineAsyncComponent } from 'vue';
-import { useUserStore } from '@/stores/user';
 import { SmileOutlined } from "@ant-design/icons-vue";
 
-const userStore = useUserStore();
 const props = defineProps(['field', 'index', 'fields', 'selectedFieldId']);
 const emit = defineEmits(['select', 'delete', 'component-dropped']);
 
@@ -100,9 +120,9 @@ const DraggableItem = defineAsyncComponent(() => import('./DraggableItem.vue'));
 const alwaysOpenKey = computed(() => (props.field.type === 'Collapse') ? props.field.panels.map(p => p.id) : []);
 const isRequired = computed(() => props.field.rules?.some(rule => rule.required));
 
-const isLayoutComponent = (type) => ['GridRow', 'Collapse', 'DescriptionList'].includes(type);
+const isLayoutComponent = (type) => ['GridRow', 'Collapse', 'DescriptionList', 'Divider'].includes(type);
 const getLayoutComponentClass = (type) => {
-  const map = { GridRow: 'grid-row-container', Collapse: 'collapse-container', DescriptionList: 'desc-list-container' };
+  const map = { GridRow: 'grid-row-container', Collapse: 'collapse-container', DescriptionList: 'desc-list-container', Divider: 'divider-container' };
   return map[type] || '';
 };
 
@@ -110,7 +130,9 @@ const getComponentByType = (type) => {
   const map = {
     Input: 'a-input', Textarea: 'a-textarea', Select: 'a-select', Checkbox: 'a-checkbox',
     DatePicker: 'a-date-picker', UserPicker: 'a-select', FileUpload: 'a-upload',
-    RichText: 'div', Subform: 'a-table', TreeSelect: 'a-tree-select', StaticText: 'div'
+    RichText: 'div', Subform: 'a-table', TreeSelect: 'a-tree-select', StaticText: 'div',
+    InputNumber: 'a-input-number', RadioGroup: 'a-radio-group', Switch: 'a-switch',
+    Slider: 'a-slider', Rate: 'a-rate'
   };
   return map[type] || 'a-input';
 };
@@ -118,7 +140,7 @@ const getComponentByType = (type) => {
 const getOptionsForField = (field) => {
   if (field.dataSource?.type === 'static') return field.dataSource.options;
   if (field.dataSource?.type === 'system-users') {
-    return userStore.usersForPicker.map(u => ({ label: `${u.name} (${u.id})`, value: u.id }));
+    return [];
   }
   return undefined;
 };
@@ -157,6 +179,7 @@ const handleDropInContainer = (event, targetContainerFields) => {
 .grid-row-container { background-color: #f6f7f9; padding: 16px 8px; }
 .collapse-container { background-color: #f9f9f9; padding: 8px; }
 .desc-list-container { background-color: #fafafa; }
+.divider-container { padding: 0; border-style: solid; }
 
 .layout-dropzone { min-height: 100px; border: 1px dashed #cccccc; padding: 8px; background-color: white; height: 100%; }
 .layout-dropzone.selected { border-color: #1890ff; background-color: #e6f7ff; }

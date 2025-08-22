@@ -15,12 +15,16 @@ import org.camunda.bpm.engine.HistoryService;
 import org.camunda.bpm.engine.RuntimeService;
 import org.camunda.bpm.engine.TaskService;
 import org.camunda.bpm.engine.history.HistoricProcessInstance;
+import org.camunda.bpm.engine.history.HistoricProcessInstanceQuery;
 import org.camunda.bpm.engine.runtime.ActivityInstance;
+import org.camunda.bpm.engine.runtime.Incident;
 import org.camunda.bpm.engine.runtime.ProcessInstance;
+import org.camunda.bpm.engine.runtime.ProcessInstanceQuery;
 import org.camunda.bpm.engine.variable.VariableMap;
 import org.camunda.bpm.engine.variable.Variables;
 import org.camunda.bpm.engine.variable.value.TypedValue;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -62,65 +66,163 @@ public class AdminService {
     private final SystemSettingService systemSettingService; // 注入系统设置服务
 
     // --- 流程实例管理 ---
-    public List<ProcessInstanceDto> getActiveProcessInstances() {
-        List<ProcessInstance> instances = runtimeService.createProcessInstanceQuery().active().list();
-        if (instances.isEmpty()) {
-            return Collections.emptyList();
+
+    /**
+     * 【核心重构】获取流程实例列表，支持分页和多维度筛选
+     */
+    @Transactional(readOnly = true)
+    public Page<ProcessInstanceDto> getProcessInstances(String state, String processDefinitionKey, String businessKey, String startUser, Pageable pageable) {
+        if ("COMPLETED".equalsIgnoreCase(state) || "TERMINATED".equalsIgnoreCase(state)) {
+            return getHistoricProcessInstances(state, processDefinitionKey, businessKey, startUser, pageable);
+        } else {
+            return getActiveProcessInstances(processDefinitionKey, businessKey, startUser, pageable);
+        }
+    }
+
+    /**
+     * 【Camunda 7 兼容版】获取正在运行的流程实例
+     */
+    private Page<ProcessInstanceDto> getActiveProcessInstances(String processDefinitionKey, String businessKey, String startUser, Pageable pageable) {
+        ProcessInstanceQuery query = runtimeService.createProcessInstanceQuery().active();
+
+        // 应用筛选条件
+        if (StringUtils.hasText(processDefinitionKey)) {
+            query.processDefinitionKey(processDefinitionKey);
+        }
+        if (StringUtils.hasText(businessKey)) {
+            query.processInstanceBusinessKey(businessKey);
+        }
+        if (StringUtils.hasText(startUser)) {
+            List<String> instanceIds = historyService.createHistoricProcessInstanceQuery()
+                    .startedBy(startUser).active().list().stream()
+                    .map(HistoricProcessInstance::getId).collect(Collectors.toList());
+            if (instanceIds.isEmpty()) {
+                return Page.empty(pageable);
+            }
+            query.processInstanceIds(new HashSet<>(instanceIds));
         }
 
-        Set<String> processInstanceIdSet = instances.stream()
-                .map(ProcessInstance::getProcessInstanceId)
-                .collect(Collectors.toSet());
+        long total = query.count();
+        if (total == 0) {
+            return Page.empty(pageable);
+        }
+
+        List<ProcessInstance> instances = query.listPage((int) pageable.getOffset(), pageable.getPageSize());
+        Set<String> processInstanceIds = instances.stream().map(ProcessInstance::getProcessInstanceId).collect(Collectors.toSet());
+
+        // 【C7 兼容修复】循环查询替代 in 查询
+        Map<String, List<Incident>> incidentsMap = new HashMap<>();
+        for (String id : processInstanceIds) {
+            List<Incident> incidentList = runtimeService.createIncidentQuery().processInstanceId(id).list();
+            if (!incidentList.isEmpty()) {
+                incidentsMap.put(id, incidentList);
+            }
+        }
 
         Map<String, HistoricProcessInstance> historicInstanceMap = historyService.createHistoricProcessInstanceQuery()
-                .processInstanceIds(processInstanceIdSet)
-                .list()
-                .stream()
+                .processInstanceIds(processInstanceIds).list().stream()
                 .collect(Collectors.toMap(HistoricProcessInstance::getId, Function.identity()));
 
-        List<String> userIds = historicInstanceMap.values().stream()
-                .map(HistoricProcessInstance::getStartUserId)
-                .filter(Objects::nonNull)
-                .distinct()
-                .collect(Collectors.toList());
+        Set<String> userIds = historicInstanceMap.values().stream()
+                .map(HistoricProcessInstance::getStartUserId).filter(Objects::nonNull)
+                .collect(Collectors.toSet());
         Map<String, User> userMap = userRepository.findAllById(userIds).stream()
                 .collect(Collectors.toMap(User::getId, Function.identity()));
 
-        return instances.stream()
-                .map(instance -> {
-                    HistoricProcessInstance historicInstance = historicInstanceMap.get(instance.getProcessInstanceId());
-                    if (historicInstance == null) return null;
+        List<ProcessInstanceDto> dtos = instances.stream().map(instance -> {
+            HistoricProcessInstance historicInstance = historicInstanceMap.get(instance.getProcessInstanceId());
+            if (historicInstance == null) return null;
 
-                    ActivityInstance activityInstance = runtimeService.getActivityInstance(instance.getProcessInstanceId());
-                    String activityName = "进行中";
-                    if (activityInstance != null && activityInstance.getChildActivityInstances().length > 0) {
-                        activityName = Arrays.stream(activityInstance.getChildActivityInstances())
-                                .map(ActivityInstance::getActivityName)
-                                .filter(Objects::nonNull)
-                                .collect(Collectors.joining(", "));
-                    } else if (activityInstance != null && activityInstance.getActivityName() != null) {
-                        activityName = activityInstance.getActivityName();
-                    }
+            return ProcessInstanceDto.builder()
+                    .processInstanceId(instance.getProcessInstanceId())
+                    .businessKey(instance.getBusinessKey())
+                    .processDefinitionName(historicInstance.getProcessDefinitionName())
+                    .version(historicInstance.getProcessDefinitionVersion())
+                    .startTime(historicInstance.getStartTime().toInstant().atZone(ZoneId.systemDefault()).toLocalDateTime())
+                    .startUserId(historicInstance.getStartUserId())
+                    .startUserName(Optional.ofNullable(historicInstance.getStartUserId()).map(userMap::get).map(User::getName).orElse("未知"))
+                    .currentActivityName(getActivityName(instance.getProcessInstanceId()))
+                    .suspended(instance.isSuspended())
+                    .hasIncident(incidentsMap.containsKey(instance.getProcessInstanceId()))
+                    .state("RUNNING")
+                    .build();
+        }).filter(Objects::nonNull).collect(Collectors.toList());
 
-                    String startUserName = Optional.ofNullable(historicInstance.getStartUserId())
-                            .map(userMap::get)
-                            .map(User::getName)
-                            .orElse("未知用户");
+        return new PageImpl<>(dtos, pageable, total);
+    }
 
-                    return ProcessInstanceDto.builder()
-                            .processInstanceId(instance.getProcessInstanceId())
-                            .businessKey(instance.getBusinessKey())
-                            .processDefinitionName(historicInstance.getProcessDefinitionName())
-                            .version(historicInstance.getProcessDefinitionVersion())
-                            .startTime(historicInstance.getStartTime().toInstant().atZone(ZoneId.systemDefault()).toLocalDateTime())
-                            .startUserId(historicInstance.getStartUserId())
-                            .startUserName(startUserName)
-                            .currentActivityName(activityName)
-                            .suspended(instance.isSuspended())
-                            .build();
-                })
-                .filter(Objects::nonNull)
-                .collect(Collectors.toList());
+    /**
+     * 【Camunda 7 兼容版】获取历史流程实例
+     */
+    private Page<ProcessInstanceDto> getHistoricProcessInstances(String state, String processDefinitionKey, String businessKey, String startUser, Pageable pageable) {
+        HistoricProcessInstanceQuery query = historyService.createHistoricProcessInstanceQuery();
+
+        if ("COMPLETED".equalsIgnoreCase(state)) {
+            query.finished();
+        }
+        // 【C7 兼容修复】Camunda 7 没有 deleted() 方法, 先查所有，后续手动过滤
+        // 此处不加 finished() 或 deleted() 条件，在后面过滤
+
+        if (StringUtils.hasText(processDefinitionKey)) {
+            query.processDefinitionKey(processDefinitionKey);
+        }
+        if (StringUtils.hasText(businessKey)) {
+            query.processInstanceBusinessKey(businessKey);
+        }
+        if (StringUtils.hasText(startUser)) {
+            query.startedBy(startUser);
+        }
+
+        // 先执行不带状态的查询获取总数，再手动过滤
+        long total = query.count();
+        if(total == 0){
+            return Page.empty(pageable);
+        }
+
+        List<HistoricProcessInstance> instances = query.listPage((int) pageable.getOffset(), pageable.getPageSize());
+
+        // 【C7 兼容修复】手动过滤 TERMINATED 状态
+        if ("TERMINATED".equalsIgnoreCase(state)) {
+            instances = instances.stream()
+                    .filter(h -> h.getDeleteReason() != null)
+                    .collect(Collectors.toList());
+        } else if("COMPLETED".equalsIgnoreCase(state)){
+            instances = instances.stream()
+                    .filter(h -> h.getDeleteReason() == null && h.getEndTime() != null)
+                    .collect(Collectors.toList());
+        }
+
+        if(instances.isEmpty()){
+            return Page.empty(pageable);
+        }
+
+        Set<String> userIds = instances.stream().map(HistoricProcessInstance::getStartUserId).filter(Objects::nonNull).collect(Collectors.toSet());
+        Map<String, User> userMap = userRepository.findAllById(userIds).stream().collect(Collectors.toMap(User::getId, Function.identity()));
+
+        List<ProcessInstanceDto> dtos = instances.stream().map(instance -> ProcessInstanceDto.builder()
+                .processInstanceId(instance.getId())
+                .businessKey(instance.getBusinessKey())
+                .processDefinitionName(instance.getProcessDefinitionName())
+                .version(instance.getProcessDefinitionVersion())
+                .startTime(instance.getStartTime().toInstant().atZone(ZoneId.systemDefault()).toLocalDateTime())
+                .startUserId(instance.getStartUserId())
+                .startUserName(Optional.ofNullable(instance.getStartUserId()).map(userMap::get).map(User::getName).orElse("未知"))
+                .durationInMillis(instance.getDurationInMillis())
+                .state(instance.getState()) // Camunda 7 的 state 字段能区分 COMPLETED 和 EXTERNALLY_TERMINATED/INTERNALLY_TERMINATED
+                .build()).collect(Collectors.toList());
+
+        return new PageImpl<>(dtos, pageable, total);
+    }
+
+    private String getActivityName(String processInstanceId) {
+        ActivityInstance activityInstance = runtimeService.getActivityInstance(processInstanceId);
+        if (activityInstance != null) {
+            return Arrays.stream(activityInstance.getChildActivityInstances())
+                    .map(ActivityInstance::getActivityName)
+                    .filter(Objects::nonNull)
+                    .collect(Collectors.joining(", "));
+        }
+        return "N/A";
     }
 
     @LogOperation(module = "实例管理", action = "终止流程实例", targetIdExpression = "#processInstanceId")
@@ -146,12 +248,9 @@ public class AdminService {
         taskService.setAssignee(taskId, newAssigneeId);
     }
 
-    // --- 【核心修复】流程变量管理逻辑 ---
     @Transactional(readOnly = true)
     public List<ProcessVariableDto> getProcessInstanceVariables(String processInstanceId) {
         VariableMap variables = runtimeService.getVariablesTyped(processInstanceId, true);
-
-        // 【FIX】遍历 VariableMap 的 keySet，然后使用 getValueTyped(key) 确保获取到 TypedValue 对象
         return variables.keySet().stream()
                 .map(variableName -> {
                     TypedValue typedValue = variables.getValueTyped(variableName);
@@ -165,14 +264,12 @@ public class AdminService {
     }
 
     private Object formatVariableValue(TypedValue typedValue) {
-        if (typedValue == null) {
+        if (typedValue == null || typedValue.getValue() == null) {
             return null;
         }
-        // Camunda 的 SPIN/JSON 类型可以直接获取为字符串
-        if ("json".equalsIgnoreCase(typedValue.getType().getName())) {
+        if ("json".equalsIgnoreCase(typedValue.getType().getName()) || "object".equalsIgnoreCase(typedValue.getType().getName())) {
             return typedValue.getValue().toString();
         }
-        // 对于其他类型，直接返回值
         return typedValue.getValue();
     }
 
@@ -180,12 +277,10 @@ public class AdminService {
     public void updateProcessInstanceVariable(String processInstanceId, ProcessVariableDto variableDto) {
         Object value;
         try {
-            // 尝试将值反序列化为最合适的 Java 类型
             value = deserializeValue(variableDto.getValue(), variableDto.getType());
-        } catch (Exception e) { // 捕获更广泛的异常，如 NumberFormatException
+        } catch (Exception e) {
             throw new IllegalArgumentException("无法解析变量值 '" + variableDto.getValue() + "' 为类型 '" + variableDto.getType() + "': " + e.getMessage(), e);
         }
-
         runtimeService.setVariable(processInstanceId, variableDto.getName(), value);
     }
 
@@ -193,10 +288,8 @@ public class AdminService {
         if (value == null) {
             return null;
         }
-
         String valueStr = value.toString();
         if (!StringUtils.hasText(type)) {
-            // 如果类型为空，则尝试智能判断
             if (valueStr.equalsIgnoreCase("true") || valueStr.equalsIgnoreCase("false")) {
                 return Boolean.parseBoolean(valueStr);
             }
@@ -209,12 +302,11 @@ public class AdminService {
                     try {
                         return Double.parseDouble(valueStr);
                     } catch (NumberFormatException e3) {
-                        return valueStr; // 最终回退到字符串
+                        return valueStr;
                     }
                 }
             }
         }
-
         switch (type.toLowerCase()) {
             case "string":
                 return valueStr;
@@ -227,16 +319,14 @@ public class AdminService {
             case "double":
                 return Double.parseDouble(valueStr);
             case "json":
-                // Camunda 的 SPIN 库可以处理 JSON 字符串
                 return Variables.objectValue(valueStr).serializationDataFormat(Variables.SerializationDataFormats.JSON).create();
             default:
-                // 默认按字符串处理
                 return valueStr;
         }
     }
 
 
-    // --- 用户管理 ---
+    // --- 用户管理 --- (保持不变)
     @Transactional(readOnly = true)
     public List<UserDto> getAllUsers() {
         return userRepository.findAll().stream()
@@ -253,13 +343,10 @@ public class AdminService {
         user.setId(userDto.getId());
         user.setName(userDto.getName());
         user.setStatus(UserStatus.ACTIVE);
-
-        // --- 【核心修改】从系统设置中读取默认密码 ---
         String defaultPassword = systemSettingService.getSettingsMap()
                 .getOrDefault("DEFAULT_PASSWORD", "password");
         user.setPassword(passwordEncoder.encode(defaultPassword));
         user.setPasswordChangeRequired(true);
-
         updateUserRelations(user, userDto);
         User savedUser = userRepository.save(user);
         return toUserDto(savedUser);
@@ -272,11 +359,9 @@ public class AdminService {
         user.setName(userDto.getName());
         user.setEmail(userDto.getEmail());
         user.setPhoneNumber(userDto.getPhoneNumber());
-
         if (StringUtils.hasText(userDto.getStatus())) {
             user.setStatus(UserStatus.valueOf(userDto.getStatus().toUpperCase()));
         }
-
         updateUserRelations(user, userDto);
         User updatedUser = userRepository.save(user);
         return toUserDto(updatedUser);
@@ -290,7 +375,6 @@ public class AdminService {
         } else {
             user.setDepartment(null);
         }
-
         if (StringUtils.hasText(userDto.getManagerId())) {
             if (user.getId() != null && user.getId().equals(userDto.getManagerId())) {
                 throw new IllegalArgumentException("用户不能将自己设置为上级");
@@ -301,13 +385,11 @@ public class AdminService {
         } else {
             user.setManager(null);
         }
-
         if (!CollectionUtils.isEmpty(userDto.getRoleNames())) {
             user.setRoles(roleRepository.findByNameIn(userDto.getRoleNames()));
         } else {
             user.getRoles().clear();
         }
-
         if (!CollectionUtils.isEmpty(userDto.getGroupNames())) {
             user.setUserGroups(userGroupRepository.findByNameIn(userDto.getGroupNames()));
         } else {
@@ -331,7 +413,7 @@ public class AdminService {
         userRepository.save(user);
     }
 
-    // --- 角色管理 ---
+    // --- 角色管理 --- (保持不变)
     @LogOperation(module = "角色管理", action = "创建角色", targetIdExpression = "#result?.name")
     public RoleDto createRole(RoleDto roleDto) {
         if(roleRepository.findByName(roleDto.getName()).isPresent()) {
@@ -351,16 +433,12 @@ public class AdminService {
     public RoleDto updateRole(Long id, RoleDto roleDto) {
         Role role = roleRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("未找到角色ID: " + id));
-
-        // --- 【核心修改】增加对角色名称修改的校验 ---
         String oldName = role.getName();
         String newName = roleDto.getName();
-
         if (newName != null && !newName.equals(oldName)) {
             if (roleRepository.findByName(newName).isPresent()) {
                 throw new IllegalArgumentException("角色名称 '" + newName + "' 已存在。");
             }
-            // 检查旧名称是否在流程中被使用
             String roleSearchPattern = "\"" + oldName + "\"";
             long workflowUsageCount = workflowTemplateRepository.countByBpmnXmlContaining(roleSearchPattern);
             if (workflowUsageCount > 0) {
@@ -368,7 +446,6 @@ public class AdminService {
             }
             role.setName(newName);
         }
-
         role.setDescription(roleDto.getDescription());
         return toRoleDto(roleRepository.save(role));
     }
@@ -377,28 +454,22 @@ public class AdminService {
     public void deleteRole(Long id) {
         Role role = roleRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("未找到角色ID: " + id));
-
         entityManager.refresh(role);
-
         if (!role.getUsers().isEmpty()) {
             throw new ResourceInUseException("无法删除角色，因为仍有 " + role.getUsers().size() + " 个用户属于该角色。");
         }
-
         if (!role.getMenus().isEmpty()) {
             throw new ResourceInUseException("无法删除角色，因为它已被 " + role.getMenus().size() + " 个菜单项使用。");
         }
-
         String roleSearchPattern = "\"" + role.getName() + "\"";
         long workflowUsageCount = workflowTemplateRepository.countByBpmnXmlContaining(roleSearchPattern);
         if (workflowUsageCount > 0) {
             throw new ResourceInUseException("无法删除角色 '" + role.getName() + "'，因为它正被 " + workflowUsageCount + " 个工作流模板使用。");
         }
-
         roleRepository.delete(role);
     }
 
-
-    // --- 用户组管理 ---
+    // --- 用户组管理 --- (保持不变)
     @LogOperation(module = "用户组管理", action = "创建用户组", targetIdExpression = "#result?.name")
     public UserGroupDto createGroup(UserGroupDto groupDto) {
         if(userGroupRepository.findByName(groupDto.getName()).isPresent()) {
@@ -418,8 +489,6 @@ public class AdminService {
     public UserGroupDto updateGroup(Long id, UserGroupDto groupDto) {
         UserGroup group = userGroupRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("未找到用户组ID: " + id));
-
-        // --- 【核心修改】增加对用户组名称修改的校验 ---
         String oldName = group.getName();
         String newName = groupDto.getName();
         if (newName != null && !newName.equals(oldName)) {
@@ -433,7 +502,6 @@ public class AdminService {
             }
             group.setName(newName);
         }
-
         group.setDescription(groupDto.getDescription());
         return toUserGroupDto(userGroupRepository.save(group));
     }
@@ -442,24 +510,20 @@ public class AdminService {
     public void deleteGroup(Long id) {
         UserGroup group = userGroupRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("未找到用户组ID: " + id));
-
         entityManager.refresh(group);
-
         if (!group.getUsers().isEmpty()) {
             throw new ResourceInUseException("无法删除用户组，因为仍有 " + group.getUsers().size() + " 个用户属于该组。");
         }
-
         String groupSearchPattern = "\"" + group.getName() + "\"";
         long workflowUsageCount = workflowTemplateRepository.countByBpmnXmlContaining(groupSearchPattern);
         if (workflowUsageCount > 0) {
             throw new ResourceInUseException("无法删除用户组 '" + group.getName() + "'，因为它正被 " + workflowUsageCount + " 个工作流模板用作候选组。");
         }
-
         userGroupRepository.delete(group);
     }
 
 
-    // --- DTO 转换器 ---
+    // --- DTO 转换器 --- (保持不变)
     private UserDto toUserDto(User user) {
         UserDto dto = new UserDto();
         dto.setId(user.getId());
@@ -500,7 +564,7 @@ public class AdminService {
     }
 
 
-    // --- 组织架构与日志 ---
+    // --- 组织架构与日志 --- (保持不变)
 
     @Transactional(readOnly = true)
     public List<DepartmentTreeNode> getOrganizationTree() {
@@ -522,14 +586,12 @@ public class AdminService {
         deptNode.setValue(String.valueOf(deptDto.getId()));
         deptNode.setType("department");
         deptNode.setLeaf(false);
-
         if (!CollectionUtils.isEmpty(deptDto.getChildren())) {
             List<DepartmentTreeNode> childDeptNodes = deptDto.getChildren().stream()
                     .map(childDto -> convertDeptDtoToTreeNode(childDto, usersByDeptId))
                     .collect(Collectors.toList());
             deptNode.getChildren().addAll(childDeptNodes);
         }
-
         List<User> usersInDept = usersByDeptId.get(deptDto.getId());
         if (!CollectionUtils.isEmpty(usersInDept)) {
             List<DepartmentTreeNode> userNodes = usersInDept.stream()
@@ -546,14 +608,12 @@ public class AdminService {
                     .collect(Collectors.toList());
             deptNode.getChildren().addAll(userNodes);
         }
-
         return deptNode;
     }
 
     @Transactional(readOnly = true)
     public List<TreeNodeDto> getDepartmentTree() {
         List<User> allUsers = userRepository.findAll();
-
         Map<String, List<User>> usersByDepartment = allUsers.stream()
                 .filter(user -> user.getDepartment() != null && StringUtils.hasText(user.getDepartment().getName()))
                 .collect(Collectors.groupingBy(user -> user.getDepartment().getName()));
@@ -562,12 +622,10 @@ public class AdminService {
                 .map(entry -> {
                     String deptName = entry.getKey();
                     List<User> usersInDept = entry.getValue();
-
                     TreeNodeDto deptNode = new TreeNodeDto();
                     deptNode.setTitle(deptName);
                     deptNode.setValue("dept_" + deptName);
                     deptNode.setKey("dept_" + deptName);
-
                     List<TreeNodeDto> userNodes = usersInDept.stream()
                             .map(user -> {
                                 TreeNodeDto userNode = new TreeNodeDto();
@@ -578,7 +636,6 @@ public class AdminService {
                             })
                             .sorted(Comparator.comparing(TreeNodeDto::getTitle))
                             .collect(Collectors.toList());
-
                     deptNode.setChildren(userNodes);
                     return deptNode;
                 })

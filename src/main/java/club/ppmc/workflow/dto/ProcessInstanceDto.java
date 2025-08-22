@@ -19,6 +19,23 @@ public class ProcessInstanceDto {
     private String startUserId;
     private String startUserName;
     private String currentActivityName;
-    // --- 【新增】 ---
     private boolean suspended; // 是否挂起
+
+    // --- 【核心新增】 ---
+
+    /**
+     * 流程持续时间（毫秒），仅对已结束的实例有效
+     */
+    private Long durationInMillis;
+
+    /**
+     * 流程实例当前是否存在技术异常 (Incident)
+     */
+    private boolean hasIncident;
+
+    /**
+     * 实例的最终状态 (RUNNING, COMPLETED, TERMINATED)
+     */
+    private String state;
+
 }

@@ -164,22 +164,24 @@ const importingWord = ref(false);
 // --- 【核心修改】组件面板定义 ---
 const paletteItems = {
   layout: [
-    { type: 'GridRow', label: '栅格布局', options: { spans: [12, 12] } }, // 统一为一个栅格布局组件
+    { type: 'GridRow', label: '栅格布局', options: { spans: [12, 12] } },
     { type: 'Collapse', label: '折叠面板' },
     { type: 'DescriptionList', label: '描述列表' },
     { type: 'StaticText', label: '静态文本' },
+    { type: 'Divider', label: '分割线' },
   ],
   basic: [
     { type: 'Input', label: '单行文本' }, { type: 'Textarea', label: '多行文本' },
-    { type: 'Select', label: '下拉选择' }, { type: 'Checkbox', label: '复选框' },
-    { type: 'DatePicker', label: '日期选择' }, { type: 'UserPicker', label: '人员选择器' },
-    { type: 'TreeSelect', label: '树形选择器' },
+    { type: 'InputNumber', label: '数字输入框' }, { type: 'DatePicker', label: '日期选择' },
+    { type: 'Select', label: '下拉选择' }, { type: 'RadioGroup', label: '单选框组' },
+    { type: 'Checkbox', label: '复选框' }, { type: 'Switch', label: '开关' },
+    { type: 'UserPicker', label: '人员选择器' }, { type: 'TreeSelect', label: '树形选择器' },
   ],
   advanced: [
     { type: 'FileUpload', label: '文件上传' }, { type: 'RichText', label: '富文本编辑器' },
     { type: 'DataPicker', label: '数据选择器' }, { type: 'Subform', label: '子表单/明细' },
-    { type: 'KeyValue', label: '键值对' },
-    { type: 'IconPicker', label: '图标选择器' },
+    { type: 'KeyValue', label: '键值对' }, { type: 'IconPicker', label: '图标选择器' },
+    { type: 'Slider', label: '滑块' }, { type: 'Rate', label: '评分' },
   ]
 };
 
@@ -238,7 +240,7 @@ const handleDrop = (event, targetList, index) => {
   }
 };
 
-// --- 创建新字段的初始化逻辑 (保持不变) ---
+// --- 【核心修改】创建新字段的初始化逻辑 ---
 const createNewField = (item) => {
   const { type, label, options = {} } = item;
   const fieldId = type.toLowerCase() + '_' + uuidv4().substring(0, 4);
@@ -262,12 +264,30 @@ const createNewField = (item) => {
     case 'StaticText':
       baseField.label = ''; baseField.props.content = '这是一段静态文本'; baseField.props.tag = 'p'; baseField.rules = []; baseField.visibility = undefined;
       break;
-    case 'Select': case 'TreeSelect':
+    case 'Divider':
+      baseField.label = ''; baseField.props.dashed = false; baseField.props.orientation = 'center'; baseField.props.text = '分割线'; baseField.rules = []; baseField.visibility = undefined;
+      break;
+    case 'Select': case 'TreeSelect': case 'RadioGroup':
       baseField.dataSource = { type: 'static', options: [{ label: '选项1', value: '1' }, { label: '选项2', value: '2' }] };
       if (type === 'TreeSelect') { baseField.dataSource.options = [{ title: '父节点1', value: 'p1', children: [{ title: '子节点1-1', value: 'c1-1' }] }]; }
       break;
     case 'UserPicker':
-      baseField.id = 'nextAssignee'; baseField.label = '下一步审批人'; baseField.rules[0].required = true; baseField.dataSource = { type: 'system-users' };
+      baseField.id = 'nextAssignee'; baseField.label = '人员选择'; baseField.rules[0].required = true; baseField.dataSource = { type: 'system-users' };
+      break;
+    case 'InputNumber':
+      baseField.props.min = 0; baseField.props.max = 100;
+      break;
+    case 'DatePicker':
+      baseField.props.pickerMode = 'single';
+      break;
+    case 'Switch':
+      baseField.props.checkedChildren = '是'; baseField.props.unCheckedChildren = '否';
+      break;
+    case 'Slider':
+      baseField.props.min = 0; baseField.props.max = 100; baseField.props.range = false;
+      break;
+    case 'Rate':
+      baseField.props.count = 5; baseField.props.allowHalf = false;
       break;
     case 'DataPicker':
       baseField.props.modalTitle = '选择数据'; baseField.props.dataUrl = '/workflows/users';
@@ -275,10 +295,11 @@ const createNewField = (item) => {
       baseField.props.mappings = [{ sourceField: 'id', targetField: '' }, { sourceField: 'name', targetField: '' }];
       break;
     case 'FileUpload':
-      baseField.props.multiple = true; baseField.props.maxCount = 5;
+      baseField.props.multiple = true; baseField.props.maxCount = 5; baseField.props.maxSize = 10; baseField.props.allowedTypes = '';
       break;
     case 'Subform':
       baseField.props.columns = [{ id: `col_${uuidv4().substring(0, 4)}`, label: '列1', type: 'Input' }];
+      baseField.props.summary = { enabled: false, items: [] };
       break;
     case 'KeyValue':
       baseField.props.keyPlaceholder = 'Key'; baseField.props.valuePlaceholder = 'Value';

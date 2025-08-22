@@ -36,6 +36,10 @@ public class SecurityConfig {
                         .requestMatchers("/api/auth/**", "/h2-console/**",  "/camunda/**", "/api/public/**").permitAll()
                         // 允许对文件进行公开的GET请求（如图标、背景图），而其他操作（如POST上传）仍需认证
                         .requestMatchers(HttpMethod.GET, "/api/files/**").permitAll()
+
+                        // 【核心修复】新增：允许匿名访问静态资源。这对于加载前端页面（如HTML, CSS, JS, 图片）至关重要。
+                        .requestMatchers("/", "/index.html", "/favicon.ico", "/*.css", "/*.js", "/*.svg", "/static/**", "/assets/**", "/images/**").permitAll()
+
                         // 需要认证的端点
                         .requestMatchers("/api/menus/my-menus").authenticated()
                         .requestMatchers("/api/files/**").authenticated() // 此规则现在主要对非GET请求（如上传）生效

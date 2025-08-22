@@ -30,14 +30,29 @@ public class AdminController {
 
     private final AdminService adminService;
     private final UserService userService;
-    // --- 【核心新增】 ---
     private final DepartmentService departmentService;
 
 
     // --- 流程实例管理 ---
+
+    /**
+     * 【核心修改】获取流程实例列表，支持分页和多维度筛选
+     * @param state 实例状态 (RUNNING, COMPLETED, TERMINATED)
+     * @param processDefinitionKey 流程定义Key
+     * @param businessKey 业务ID (表单提交ID)
+     * @param startUser 发起人ID
+     * @param pageable 分页参数
+     * @return 流程实例分页数据
+     */
     @GetMapping("/instances")
-    public ResponseEntity<List<ProcessInstanceDto>> getActiveProcessInstances() {
-        return ResponseEntity.ok(adminService.getActiveProcessInstances());
+    public ResponseEntity<Page<ProcessInstanceDto>> getProcessInstances(
+            @RequestParam(required = false) String state,
+            @RequestParam(required = false) String processDefinitionKey,
+            @RequestParam(required = false) String businessKey,
+            @RequestParam(required = false) String startUser,
+            Pageable pageable
+    ) {
+        return ResponseEntity.ok(adminService.getProcessInstances(state, processDefinitionKey, businessKey, startUser, pageable));
     }
 
     @DeleteMapping("/instances/{processInstanceId}")
@@ -165,7 +180,7 @@ public class AdminController {
     }
 
 
-    // --- 【核心新增】部门管理 API ---
+    // --- 部门管理 API ---
     @PostMapping("/departments")
     public ResponseEntity<DepartmentDto> createDepartment(@RequestBody DepartmentDto departmentDto) {
         DepartmentDto createdDept = departmentService.createDepartment(departmentDto);
@@ -188,7 +203,6 @@ public class AdminController {
     public ResponseEntity<List<DepartmentDto>> getDepartmentTree() {
         return ResponseEntity.ok(departmentService.getDepartmentTree());
     }
-    // --- 【新增结束】 ---
 
 
     // --- 组织架构与数据源 ---

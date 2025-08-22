@@ -7,11 +7,55 @@
     <a-form-item label="标题 (Label)">
       <a-input v-model:value="field.label" />
     </a-form-item>
+
+    <!-- 【核心新增】日期选择器模式配置 -->
+    <template v-if="field.type === 'DatePicker'">
+      <a-form-item label="选择模式">
+        <a-radio-group v-model:value="field.props.pickerMode" button-style="solid" size="small" @change="handlePickerModeChange">
+          <a-radio-button value="single">单日</a-radio-button>
+          <a-radio-button value="range">范围</a-radio-button>
+          <a-radio-button value="multiple">多日</a-radio-button>
+        </a-radio-group>
+      </a-form-item>
+    </template>
+
     <a-form-item v-if="field.props && 'placeholder' in field.props" label="占位提示 (Placeholder)">
-      <a-input v-model:value="field.props.placeholder" />
+      <!-- 【核心修改】为范围选择器提供专门的占位符输入 -->
+      <a-space v-if="field.type === 'DatePicker' && field.props.pickerMode === 'range'">
+        <a-input v-model:value="field.props.placeholder[0]" placeholder="开始日期提示" />
+        <a-input v-model:value="field.props.placeholder[1]" placeholder="结束日期提示" />
+      </a-space>
+      <a-input v-else v-model:value="field.props.placeholder" />
     </a-form-item>
 
-    <!-- 【新增】列表页配置 -->
+    <!-- 【核心新增】新组件的特有属性 -->
+    <template v-if="field.type === 'InputNumber'">
+      <a-row :gutter="16">
+        <a-col :span="12"><a-form-item label="最小值"><a-input-number v-model:value="field.props.min" style="width: 100%;" /></a-form-item></a-col>
+        <a-col :span="12"><a-form-item label="最大值"><a-input-number v-model:value="field.props.max" style="width: 100%;" /></a-form-item></a-col>
+      </a-row>
+    </template>
+    <template v-if="field.type === 'Switch'">
+      <a-row :gutter="16">
+        <a-col :span="12"><a-form-item label="开启时文字"><a-input v-model:value="field.props.checkedChildren" /></a-form-item></a-col>
+        <a-col :span="12"><a-form-item label="关闭时文字"><a-input v-model:value="field.props.unCheckedChildren" /></a-form-item></a-col>
+      </a-row>
+    </template>
+    <template v-if="field.type === 'Slider'">
+      <a-row :gutter="16">
+        <a-col :span="12"><a-form-item label="最小值"><a-input-number v-model:value="field.props.min" style="width: 100%;" /></a-form-item></a-col>
+        <a-col :span="12"><a-form-item label="最大值"><a-input-number v-model:value="field.props.max" style="width: 100%;" /></a-form-item></a-col>
+      </a-row>
+      <a-form-item label="范围选择"><a-switch v-model:checked="field.props.range" /></a-form-item>
+    </template>
+    <template v-if="field.type === 'Rate'">
+      <a-row :gutter="16">
+        <a-col :span="12"><a-form-item label="总星数"><a-input-number v-model:value="field.props.count" :min="1" style="width: 100%;" /></a-form-item></a-col>
+        <a-col :span="12"><a-form-item label="允许半选"><a-switch v-model:checked="field.props.allowHalf" /></a-form-item></a-col>
+      </a-row>
+    </template>
+
+    <!-- 列表页配置 -->
     <a-form-item label="用作列表筛选条件" help="在数据列表页面，此字段将作为一个筛选查询条件。">
       <a-switch v-model:checked="field.isFilterable" />
     </a-form-item>
@@ -24,6 +68,7 @@
     <DataSourceConfig
         v-if="field.dataSource"
         :field="field"
+        :all-fields="allFields"
         @update:field="$emit('update:field', $event)"
     />
 
@@ -71,15 +116,34 @@
 </template>
 
 <script setup>
-import { computed, defineEmits } from 'vue';
+import { computed, watchEffect } from 'vue';
 import { DeleteOutlined, PlusOutlined } from '@ant-design/icons-vue';
-// --- 【路径已修改】 ---
 import { flattenFields } from '@/utils/formUtils.js';
 import DataSourceConfig from './DataSourceConfig.vue';
 import ValidationRulesConfig from './ValidationRulesConfig.vue';
 
 const props = defineProps(['field', 'allFields']);
 const emit = defineEmits(['update:field']);
+
+watchEffect(() => {
+  if (props.field.type === 'DatePicker' && !props.field.props.pickerMode) {
+    props.field.props.pickerMode = 'single';
+  }
+});
+
+const handlePickerModeChange = (e) => {
+  const mode = e.target.value;
+  const placeholder = props.field.props.placeholder;
+  if (mode === 'range') {
+    if (!Array.isArray(placeholder)) {
+      props.field.props.placeholder = [placeholder || '开始日期', '结束日期'];
+    }
+  } else {
+    if (Array.isArray(placeholder)) {
+      props.field.props.placeholder = placeholder[0] || '';
+    }
+  }
+};
 
 const availableFieldsForCondition = computed(() => {
   if (!props.field) return [];

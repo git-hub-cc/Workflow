@@ -20,13 +20,9 @@ const emit = defineEmits(['update:field']);
 const localField = ref(null);
 let debounceTimer = null;
 
-// 【核心修复】修改 watch 逻辑
 watch(() => props.selectedField, (newField) => {
-  // 只有当选择的字段ID发生变化时 (即用户点击了另一个组件)，才重置 localField
-  // 使用 ?. 可选链操作符，安全地访问可能为 null 的 localField.value
   if (newField?.id !== localField.value?.id) {
     if (newField) {
-      // 使用深拷贝创建一个可编辑的本地副本
       localField.value = JSON.parse(JSON.stringify(newField));
     } else {
       localField.value = null;
@@ -35,14 +31,12 @@ watch(() => props.selectedField, (newField) => {
 }, { deep: true, immediate: true });
 
 
-// 这个 watch 保持不变，它负责将本地的修改同步到父组件
 watch(localField, (newVal, oldVal) => {
-  // 仅当 newVal 存在且与 oldVal 的 ID 相同（表示是编辑而非切换组件）时才触发更新
   if (newVal && oldVal && newVal.id === oldVal.id) {
     clearTimeout(debounceTimer);
     debounceTimer = setTimeout(() => {
       emit('update:field', newVal);
-    }, 100); // 使用防抖减少事件触发频率
+    }, 100);
   }
 }, { deep: true });
 
@@ -52,7 +46,6 @@ const propertiesComponent = computed(() => {
   const type = localField.value.type;
   switch (type) {
     case 'GridRow':
-      // 【核心修改】将 GridRow 指向统一的布局属性配置面板
       return defineAsyncComponent(() => import('./props/LayoutProps.vue'));
     case 'GridCol':
       return defineAsyncComponent(() => import('./props/GridColProps.vue'));
@@ -73,11 +66,15 @@ const propertiesComponent = computed(() => {
     case 'IconPicker':
       return defineAsyncComponent(() => import('./props/IconPickerProps.vue'));
     case 'TreeSelect':
+    case 'RadioGroup': // 【核心新增】
       return defineAsyncComponent(() => import('./props/GenericProps.vue'));
     case 'StaticText':
       return defineAsyncComponent(() => import('./props/StaticTextProps.vue'));
     case 'RichText':
       return defineAsyncComponent(() => import('./props/RichTextProps.vue'));
+      // 【核心新增】
+    case 'Divider':
+      return defineAsyncComponent(() => import('./props/DividerProps.vue'));
     default:
       return defineAsyncComponent(() => import('./props/GenericProps.vue'));
   }
