@@ -55,17 +55,26 @@ service.interceptors.response.use(
                 message.error(`操作失败: ${errorMessage}`);
                 break;
             case 401: // Unauthorized: Token 无效或过期
-                message.error('认证已过期，请重新登录。');
-                try {
-                    const userStore = useUserStore();
-                    // 只有当用户当前是登录状态时才执行登出，避免在登录页重复跳转
-                    if (userStore.isAuthenticated) {
-                        userStore.logout();
+                // --- 【核心修复】区分登录失败和Token过期 ---
+                if (error.config.url.endsWith('/auth/login')) {
+                    // 1. 如果是登录接口返回的401，说明是用户名或密码错误。
+                    //    此时应该显示后端返回的具体错误信息 (errorMessage)。
+                    message.error(`登录失败: ${errorMessage}`);
+                } else {
+                    // 2. 如果是其他接口返回的401，说明是Token过期或无效。
+                    //    此时才应该提示用户重新登录并执行登出操作。
+                    message.error('认证已过期，请重新登录。');
+                    try {
+                        const userStore = useUserStore();
+                        // 只有当用户当前是登录状态时才执行登出，避免在登录页重复跳转
+                        if (userStore.isAuthenticated) {
+                            userStore.logout();
+                        }
+                    } catch (storeError) {
+                        // 如果 store 初始化失败或出现其他问题，强制跳转
+                        console.error("登出时 UserStore 发生错误:", storeError);
+                        window.location.href = '/login';
                     }
-                } catch (storeError) {
-                    // 如果 store 初始化失败或出现其他问题，强制跳转
-                    console.error("登出时 UserStore 发生错误:", storeError);
-                    window.location.href = '/login';
                 }
                 break;
             case 403: // Forbidden: 用户已认证，但无权访问该资源
@@ -123,7 +132,8 @@ export const getWorkflowTemplate = (formId) => service.get(`/workflows/templates
 export const getWorkflowHistory = (submissionId) => service.get(`/workflows/history/${submissionId}`);
 export const updateWorkflowTemplate = (formId, data) => service.put(`/workflows/templates/${formId}`, data);
 export const getGroupsForWorkflow = () => service.get('/workflows/groups');
-export const getUsersForPicker = () => service.get('/workflows/users');
+// 【核心修改】修改 getUsersForPicker API 调用方式以支持分页和搜索
+export const getUsersForPicker = (params) => service.get('/workflows/users', { params });
 export const getMySubmissions = (params) => service.get('/workflows/my-submissions', { params });
 
 // --- 任务 API ---
@@ -133,8 +143,10 @@ export const completeTask = (taskId, data) => service.post(`/tasks/${taskId}/com
 
 // --- 用户和管理 API ---
 export const changePassword = (data) => service.post('/users/me/change-password', data);
+// 【新增】个人中心资料相关API
+export const getMyProfile = () => service.get('/users/me/profile');
+export const updateMyProfile = (data) => service.put('/users/me/profile', data);
 export const getOrganizationTree = () => service.get('/admin/organization-tree');
-// 【新增】安全的用户搜索接口
 export const searchUsersForPicker = (keyword) => service.get('/users/search-for-picker', { params: { keyword } });
 
 
@@ -170,13 +182,17 @@ export const getMenuTree = () => service.get('/admin/menus/tree');
 export const createMenu = (data) => service.post('/admin/menus', data);
 export const updateMenu = (id, data) => service.put(`/admin/menus/${id}`, data);
 export const deleteMenu = (id) => service.delete(`/admin/menus/${id}`);
+export const updateMenuTree = (treeData) => service.put('/admin/menus/update-tree', treeData);
 
-// Admin Instance Management
+// --- Admin Instance Management ---
 export const getActiveInstances = () => service.get('/admin/instances');
 export const terminateInstance = (instanceId, reason) => service.delete(`/admin/instances/${instanceId}?reason=${reason}`);
 export const suspendInstance = (instanceId) => service.post(`/admin/instances/${instanceId}/suspend`);
 export const activateInstance = (instanceId) => service.post(`/admin/instances/${instanceId}/activate`);
 export const reassignTask = (taskId, newAssigneeId) => service.post(`/admin/tasks/${taskId}/reassign`, { newAssigneeId });
+export const getProcessVariables = (instanceId) => service.get(`/admin/instances/${instanceId}/variables`);
+export const updateProcessVariable = (instanceId, data) => service.put(`/admin/instances/${instanceId}/variables`, data);
+
 
 // Admin Dashboard
 export const getDashboardStats = () => service.get('/dashboard/stats');
@@ -185,13 +201,22 @@ export const getDashboardStats = () => service.get('/dashboard/stats');
 export const getLoginLogs = (params) => service.get('/admin/logs/login', { params });
 export const getOperationLogs = (params) => service.get('/admin/logs/operation', { params });
 
-// --- 【核心新增】系统设置 API ---
+// --- 系统设置 API ---
 export const getPublicSettings = () => service.get('/public/settings');
 export const getAdminSettings = () => service.get('/admin/settings');
 export const updateSettings = (settingsMap) => service.put('/admin/settings', settingsMap);
 
-// --- 【核心修改】外部系统 API (模拟) ---
+// --- 外部系统 API (模拟) ---
 export const getExternalSuppliers = () => service.get('/external/suppliers');
+
+// --- 【新增】报表 API ---
+export const getReportData = (reportKey) => service.get(`/reports/${reportKey}`);
+
+// --- 【新增】通知 API ---
+export const getNotifications = (params) => service.get('/notifications', { params });
+export const getUnreadNotificationCount = () => service.get('/notifications/unread-count');
+export const markAllNotificationsAsRead = () => service.post('/notifications/mark-all-as-read');
+export const markNotificationsAsRead = (ids) => service.post('/notifications/mark-as-read', ids);
 
 
 export default service;

@@ -141,6 +141,35 @@ public class MenuService {
     }
 
     /**
+     * 【新增】通过拖拽更新菜单树的顺序和层级
+     * @param menuTree 包含新结构和顺序的菜单 DTO 列表
+     */
+    public void updateMenuTree(List<MenuDto> menuTree) {
+        List<Menu> allMenus = menuRepository.findAll();
+        Map<Long, Menu> menuMap = allMenus.stream().collect(Collectors.toMap(Menu::getId, Function.identity()));
+
+        // 递归更新函数
+        updateMenusRecursively(menuTree, null, menuMap);
+
+        menuRepository.saveAll(menuMap.values());
+    }
+
+    private void updateMenusRecursively(List<MenuDto> dtoList, Long parentId, Map<Long, Menu> menuMap) {
+        if (dtoList == null) {
+            return;
+        }
+        for (int i = 0; i < dtoList.size(); i++) {
+            MenuDto dto = dtoList.get(i);
+            Menu menu = menuMap.get(dto.getId());
+            if (menu != null) {
+                menu.setParentId(parentId);
+                menu.setOrderNum(i); // 使用列表索引作为排序号
+                updateMenusRecursively(dto.getChildren(), menu.getId(), menuMap);
+            }
+        }
+    }
+
+    /**
      * 删除一个菜单
      *
      * @param id 菜单ID

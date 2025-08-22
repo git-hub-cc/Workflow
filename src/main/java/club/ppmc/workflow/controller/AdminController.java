@@ -68,6 +68,19 @@ public class AdminController {
         return ResponseEntity.ok().build();
     }
 
+    // --- 【核心新增】流程变量管理 API ---
+    @GetMapping("/instances/{processInstanceId}/variables")
+    public ResponseEntity<List<ProcessVariableDto>> getProcessInstanceVariables(@PathVariable String processInstanceId) {
+        return ResponseEntity.ok(adminService.getProcessInstanceVariables(processInstanceId));
+    }
+
+    @PutMapping("/instances/{processInstanceId}/variables")
+    public ResponseEntity<Void> updateProcessInstanceVariable(@PathVariable String processInstanceId, @RequestBody ProcessVariableDto variableDto) {
+        adminService.updateProcessInstanceVariable(processInstanceId, variableDto);
+        return ResponseEntity.ok().build();
+    }
+    // --- 【新增结束】 ---
+
 
     // --- 用户管理 ---
     @GetMapping("/users")

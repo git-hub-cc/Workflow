@@ -59,15 +59,18 @@ public class WorkflowController {
     // --- 【核心重构】流程设计器所需的数据源 ---
 
     /**
-     * API: 获取用户列表 (专门用于前端选择器，如审批人选择)
-     * 权限: 【安全修复】已将权限从 isAuthenticated() 收紧为 hasRole('ADMIN')，防止信息泄露
+     * 【核心修改】API: 获取用户列表 (专门用于前端选择器，如审批人选择)
+     * - 权限: 【安全修复】已将权限从 isAuthenticated() 收紧为 hasRole('ADMIN')
+     * - 功能: 【优化】支持分页和按关键词搜索，避免一次性加载大量用户数据
      */
     @GetMapping("/users")
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<List<UserPickerDto>> getUsersForPicker() {
-        List<User> users = userRepository.findAll();
-        List<UserPickerDto> userDtos = users.stream().map(this::toUserPickerDto).collect(Collectors.toList());
-        return ResponseEntity.ok(userDtos);
+    public ResponseEntity<Page<UserPickerDto>> getUsersForPicker(
+            @RequestParam(required = false) String keyword,
+            Pageable pageable) {
+        Page<User> userPage = userRepository.findByIdContainingIgnoreCaseOrNameContainingIgnoreCaseOrderByNameAsc(keyword, keyword, pageable);
+        Page<UserPickerDto> dtoPage = userPage.map(this::toUserPickerDto);
+        return ResponseEntity.ok(dtoPage);
     }
 
     /**

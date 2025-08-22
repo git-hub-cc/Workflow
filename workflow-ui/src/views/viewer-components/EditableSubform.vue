@@ -15,12 +15,18 @@
               :rules="[{ required: true, message: '此项必填' }]"
               class="editable-cell-form-item"
           >
+            <!-- 【核心修改】动态渲染不同的组件类型 -->
             <component
                 :is="getComponentByType(column.type)"
                 v-model:value="record[column.key]"
                 size="small"
                 placeholder="请输入"
                 style="width: 100%;"
+                show-search
+                :options="column.type === 'UserPicker' ? userOptions[index]?.[column.key] : undefined"
+                :filter-option="false"
+                :not-found-content="userSearchLoading ? undefined : null"
+                @search="keyword => handleUserSearch(keyword, index, column.key)"
             />
           </a-form-item>
         </template>
@@ -38,9 +44,10 @@
 </template>
 
 <script setup>
-import { computed } from 'vue';
+import { computed, ref, onMounted } from 'vue';
 import { v4 as uuidv4 } from 'uuid';
 import { PlusOutlined } from '@ant-design/icons-vue';
+import { searchUsersForPicker } from '@/api';
 
 const props = defineProps({
   value: { type: Array, default: () => [] },
@@ -48,19 +55,17 @@ const props = defineProps({
 });
 const emit = defineEmits(['update:value']);
 
-// 使用 v-model 语法糖
 const localValue = computed({
   get: () => props.value,
   set: (val) => emit('update:value', val),
 });
 
-// 动态生成表格列定义
 const tableColumns = computed(() => {
   const columns = props.field.props.columns.map(col => ({
     title: col.label,
     dataIndex: col.id,
     key: col.id,
-    type: col.type, // 传递组件类型
+    type: col.type,
   }));
   columns.push({
     title: '操作',
@@ -73,20 +78,68 @@ const tableColumns = computed(() => {
 
 const isEditableColumn = (key) => key !== 'actions';
 
-// 根据列配置获取对应的 Ant Design 组件
 const getComponentByType = (type) => {
   const map = {
     Input: 'a-input',
     DatePicker: 'a-date-picker',
-    Select: 'a-select',
+    UserPicker: 'a-select',
+    DataPicker: 'a-input', // 在子表单中 DataPicker 简化为输入框
   };
   return map[type] || 'a-input';
 };
 
+// --- 【新增】人员选择器相关逻辑 ---
+const userOptions = ref([]);
+const userSearchLoading = ref(false);
+let searchTimeout;
+
+onMounted(() => {
+  // 初始化时，为已有的 UserPicker 字段填充显示名称
+  if (localValue.value && localValue.value.length > 0) {
+    localValue.value.forEach((row, index) => {
+      props.field.props.columns.forEach(async col => {
+        if (col.type === 'UserPicker' && row[col.id]) {
+          const results = await searchUsersForPicker(row[col.id]);
+          if (results && results.length > 0) {
+            updateUserOptions(index, col.id, results.map(u => ({ label: `${u.name} (${u.id})`, value: u.id })));
+          }
+        }
+      });
+    });
+  }
+});
+
+const updateUserOptions = (rowIndex, colId, options) => {
+  if (!userOptions.value[rowIndex]) {
+    userOptions.value[rowIndex] = {};
+  }
+  userOptions.value[rowIndex][colId] = options;
+};
+
+const handleUserSearch = (keyword, rowIndex, colId) => {
+  clearTimeout(searchTimeout);
+  if (!keyword) {
+    updateUserOptions(rowIndex, colId, []);
+    return;
+  }
+  userSearchLoading.value = true;
+  searchTimeout = setTimeout(async () => {
+    try {
+      const results = await searchUsersForPicker(keyword);
+      updateUserOptions(rowIndex, colId, results.map(u => ({ label: `${u.name} (${u.id})`, value: u.id })));
+    } catch (error) {
+      updateUserOptions(rowIndex, colId, []);
+    } finally {
+      userSearchLoading.value = false;
+    }
+  }, 300);
+};
+
+
 const handleAdd = () => {
-  const newRow = { __id: uuidv4() }; // 使用唯一ID作为row-key
+  const newRow = { __id: uuidv4() };
   props.field.props.columns.forEach(col => {
-    newRow[col.id] = undefined; // 初始化所有字段
+    newRow[col.id] = undefined;
   });
   localValue.value = [...(localValue.value || []), newRow];
 };
@@ -100,6 +153,6 @@ const handleDelete = (index) => {
 
 <style scoped>
 .editable-cell-form-item {
-  margin-bottom: 0; /* 关键样式，移除表格单元格内表单项的下边距 */
+  margin-bottom: 0;
 }
 </style>

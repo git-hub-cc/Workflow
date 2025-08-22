@@ -3,9 +3,11 @@ package club.ppmc.workflow.service;
 import club.ppmc.workflow.aop.LogOperation;
 import club.ppmc.workflow.domain.User;
 import club.ppmc.workflow.dto.UserPickerDto;
+import club.ppmc.workflow.dto.UserProfileDto;
 import club.ppmc.workflow.exception.ResourceNotFoundException;
 import club.ppmc.workflow.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -27,6 +29,7 @@ public class UserService {
 
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
+    private final SystemSettingService systemSettingService; // 注入系统设置服务
 
     /**
      * 修改用户密码
@@ -66,10 +69,52 @@ public class UserService {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("未找到用户: " + userId));
 
-        // 重置为默认密码 'password'，并设置强制修改标志
-        user.setPassword(passwordEncoder.encode("password"));
+        // --- 【核心修改】从系统设置中读取默认密码，如果未设置则使用硬编码的 "password" ---
+        String defaultPassword = systemSettingService.getSettingsMap()
+                .getOrDefault("DEFAULT_PASSWORD", "password");
+
+        user.setPassword(passwordEncoder.encode(defaultPassword));
         user.setPasswordChangeRequired(true);
         userRepository.save(user);
+    }
+
+    /**
+     * 【新增】获取用户个人资料
+     * @param userId 用户ID
+     * @return UserProfileDto
+     */
+    @Transactional(readOnly = true)
+    public UserProfileDto getUserProfile(String userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("未找到用户: " + userId));
+        UserProfileDto dto = new UserProfileDto();
+        dto.setName(user.getName());
+        dto.setEmail(user.getEmail());
+        dto.setPhoneNumber(user.getPhoneNumber());
+        return dto;
+    }
+
+    /**
+     * 【新增】更新用户个人资料
+     * @param userId 用户ID
+     * @param profileDto 包含新资料的 DTO
+     */
+    @LogOperation(module = "个人中心", action = "更新个人资料", targetIdExpression = "#userId")
+    public UserProfileDto updateUserProfile(String userId, UserProfileDto profileDto) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("未找到用户: " + userId));
+
+        user.setName(profileDto.getName());
+        user.setEmail(profileDto.getEmail());
+        user.setPhoneNumber(profileDto.getPhoneNumber());
+
+        User savedUser = userRepository.save(user);
+
+        UserProfileDto responseDto = new UserProfileDto();
+        responseDto.setName(savedUser.getName());
+        responseDto.setEmail(savedUser.getEmail());
+        responseDto.setPhoneNumber(savedUser.getPhoneNumber());
+        return responseDto;
     }
 
 
@@ -88,7 +133,10 @@ public class UserService {
 
         // 限制最多返回20条结果，防止性能问题和信息过度暴露
         PageRequest pageRequest = PageRequest.of(0, 20);
-        List<User> users = userRepository.findByIdContainingIgnoreCaseOrNameContainingIgnoreCaseOrderByNameAsc(keyword, keyword, pageRequest);
+        // 【FIX】从 Page<User> 对象中获取内容列表
+        Page<User> userPage = userRepository.findByIdContainingIgnoreCaseOrNameContainingIgnoreCaseOrderByNameAsc(keyword, keyword, pageRequest);
+        List<User> users = userPage.getContent();
+
 
         return users.stream()
                 .map(this::toUserPickerDto)

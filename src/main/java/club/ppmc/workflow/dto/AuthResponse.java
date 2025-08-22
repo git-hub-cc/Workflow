@@ -25,8 +25,11 @@ public class AuthResponse {
     public static class UserAuthInfo {
         private String id;
         private String name;
+        // --- 【新增】返回更多用户信息 ---
+        private String email;
+        private String departmentName;
+        // --- 【新增结束】 ---
         private String role; // 仍然保留一个主角色，用于前端快速判断权限
-        // --- 【核心新增】 ---
         private boolean passwordChangeRequired;
     }
 }

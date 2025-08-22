@@ -19,6 +19,11 @@ public class UserDto {
     private String departmentName;
     // --- 【修改结束】 ---
 
+    // --- 【新增】可编辑字段 ---
+    private String email;
+    private String phoneNumber;
+    // --- 【新增结束】 ---
+
     private String status;
     private List<String> roleNames;
     private List<String> groupNames;

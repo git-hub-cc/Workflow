@@ -18,6 +18,7 @@
           row-key="id"
           :pagination="false"
           :default-expand-all-rows="true"
+          :custom-row="customRow"
       >
         <template #bodyCell="{ column, record }">
           <template v-if="column.key === 'name'">
@@ -58,6 +59,8 @@
                 <a-select-option value="DIRECTORY">目录</a-select-option>
                 <a-select-option value="FORM_ENTRY">表单入口</a-select-option>
                 <a-select-option value="DATA_LIST">数据列表</a-select-option>
+                <a-select-option value="REPORT">报表页面</a-select-option>
+                <a-select-option value="EXTERNAL_LINK">外部链接</a-select-option>
               </a-select>
             </a-form-item>
           </a-col>
@@ -75,16 +78,17 @@
           </a-col>
           <template v-if="formState.type !== 'DIRECTORY'">
             <a-col :span="12">
-              <a-form-item label="路由路径" name="path" help="例如：/wms/inbound"><a-input v-model:value="formState.path" /></a-form-item>
+              <a-form-item :label="formState.type === 'EXTERNAL_LINK' ? '链接地址' : '路由路径'" name="path" :help="formState.type === 'EXTERNAL_LINK' ? '例如: https://www.google.com' : '例如: /wms/inbound'">
+                <a-input v-model:value="formState.path" />
+              </a-form-item>
             </a-col>
-            <a-col :span="12">
+            <a-col :span="12" v-if="['FORM_ENTRY', 'DATA_LIST'].includes(formState.type)">
               <a-form-item label="关联表单" name="formDefinitionId">
                 <a-select v-model:value="formState.formDefinitionId" :options="allForms" :field-names="{label: 'name', value: 'id'}" show-search option-filter-prop="name" />
               </a-form-item>
             </a-col>
           </template>
 
-          <!-- 【核心新增】数据范围配置 -->
           <a-col v-if="formState.type === 'DATA_LIST'" :span="24">
             <a-form-item label="数据范围" name="dataScope" help="定义通过此菜单能看到的数据权限范围">
               <a-select v-model:value="formState.dataScope">
@@ -116,17 +120,19 @@
 
 <script setup>
 import { ref, onMounted, reactive, computed } from 'vue';
-import { getMenuTree, createMenu, updateMenu, deleteMenu, getForms } from '@/api';
+import { getMenuTree, createMenu, updateMenu, deleteMenu, getForms, updateMenuTree } from '@/api';
 import { useUserStore } from '@/stores/user';
 import { message } from 'ant-design-vue';
 import { PlusOutlined, AppstoreOutlined } from '@ant-design/icons-vue';
 import { iconMap } from '@/utils/iconLibrary.js';
 import IconPickerModal from '@/components/IconPickerModal.vue';
+import { cloneDeep } from 'lodash-es';
 
 const userStore = useUserStore();
 const loading = ref(true);
 const menuTree = ref([]);
 const allForms = ref([]);
+let draggedNode = null;
 
 const columns = [
   { title: '菜单名称', key: 'name', dataIndex: 'name' },
@@ -158,6 +164,67 @@ onMounted(() => {
   if (userStore.allRoles.length === 0) userStore.fetchAllRoles();
 });
 
+// --- 【新增】拖拽排序逻辑 ---
+const findNodeAndParent = (key, tree, parent = null) => {
+  for (let i = 0; i < tree.length; i++) {
+    const node = tree[i];
+    if (node.id === key) return { node, parent, index: i };
+    if (node.children) {
+      const found = findNodeAndParent(key, node.children, node);
+      if (found) return found;
+    }
+  }
+  return null;
+};
+
+const customRow = (record) => ({
+  draggable: true,
+  ondragstart: (e) => {
+    e.stopPropagation();
+    draggedNode = record;
+  },
+  ondragover: (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+  },
+  ondrop: async (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!draggedNode || draggedNode.id === record.id) return;
+
+    loading.value = true;
+    const newTree = cloneDeep(menuTree.value);
+
+    // 1. Remove dragged node from its original position
+    const sourceInfo = findNodeAndParent(draggedNode.id, newTree);
+    if (!sourceInfo) { loading.value = false; return; }
+    const sourceList = sourceInfo.parent ? sourceInfo.parent.children : newTree;
+    sourceList.splice(sourceInfo.index, 1);
+
+    // 2. Insert dragged node at the new position
+    const targetInfo = findNodeAndParent(record.id, newTree);
+    if (!targetInfo) { loading.value = false; return; }
+    const targetList = targetInfo.parent ? targetInfo.parent.children : newTree;
+    // Insert before the target node
+    targetList.splice(targetInfo.index, 0, draggedNode);
+
+    // 3. Update parentId for the moved node
+    draggedNode.parentId = targetInfo.parent ? targetInfo.parent.id : null;
+
+    try {
+      await updateMenuTree(newTree);
+      message.success('菜单顺序已更新！');
+      await fetchMenus(); // Refresh from backend to get correct orderNum
+    } catch(err) {
+      // global handler
+    } finally {
+      loading.value = false;
+      draggedNode = null;
+    }
+  },
+});
+
+
 // Modal state
 const modalVisible = ref(false);
 const confirmLoading = ref(false);
@@ -166,7 +233,7 @@ const formRef = ref();
 const formState = reactive({
   id: null, parentId: null, type: 'FORM_ENTRY', name: '', icon: 'AppstoreOutlined',
   path: '', formDefinitionId: null, orderNum: 0, visible: true, roleNames: [],
-  dataScope: 'ALL', // 【新增】默认值
+  dataScope: 'ALL',
 });
 const showIconPicker = ref(false);
 
@@ -174,7 +241,7 @@ const modalTitle = computed(() => isEditing.value ? '编辑菜单' : '新增菜�
 const rules = {
   type: [{ required: true, message: '请选择菜单类型' }],
   name: [{ required: true, message: '请输入菜单名称' }],
-  path: [{ required: true, message: '请输入路由路径' }],
+  path: [{ required: true, message: '请输入路径或链接' }],
   formDefinitionId: [{ required: true, message: '请关联一个表单' }],
   dataScope: [{ required: true, message: '请选择数据范围' }],
 };
@@ -200,7 +267,7 @@ const showModal = (menu, parentId = null) => {
     Object.assign(formState, {
       id: null, parentId: parentId, type: 'FORM_ENTRY', name: '', icon: 'AppstoreOutlined',
       path: '', formDefinitionId: null, orderNum: 0, visible: true, roleNames: [],
-      dataScope: 'ALL', // 【新增】重置时也设置默认值
+      dataScope: 'ALL',
     });
   }
   modalVisible.value = true;
@@ -214,7 +281,6 @@ const onMenuTypeChange = (type) => {
   } else if (type === 'FORM_ENTRY') {
     formState.dataScope = undefined;
   } else {
-    // 默认 DATA_LIST 的数据范围为 ALL
     formState.dataScope = 'ALL';
   }
 };
@@ -248,6 +314,6 @@ const handleDelete = async (id) => {
 };
 
 // Helper functions
-const getMenuTypeText = (type) => ({ 'DIRECTORY': '目录', 'FORM_ENTRY': '表单入口', 'DATA_LIST': '数据列表' }[type] || '未知');
-const getMenuTypeTagColor = (type) => ({ 'DIRECTORY': 'blue', 'FORM_ENTRY': 'green', 'DATA_LIST': 'purple' }[type] || 'default');
+const getMenuTypeText = (type) => ({ 'DIRECTORY': '目录', 'FORM_ENTRY': '表单入口', 'DATA_LIST': '数据列表', 'REPORT': '报表', 'EXTERNAL_LINK': '外链' }[type] || '未知');
+const getMenuTypeTagColor = (type) => ({ 'DIRECTORY': 'blue', 'FORM_ENTRY': 'green', 'DATA_LIST': 'purple', 'REPORT': 'orange', 'EXTERNAL_LINK': 'cyan' }[type] || 'default');
 </script>

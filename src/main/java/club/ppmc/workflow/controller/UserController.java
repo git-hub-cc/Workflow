@@ -2,6 +2,7 @@ package club.ppmc.workflow.controller;
 
 import club.ppmc.workflow.dto.ChangePasswordRequest;
 import club.ppmc.workflow.dto.UserPickerDto;
+import club.ppmc.workflow.dto.UserProfileDto;
 import club.ppmc.workflow.service.UserService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -35,6 +36,27 @@ public class UserController {
         String userId = principal.getName();
         userService.changePassword(userId, request.getOldPassword(), request.getNewPassword());
         return ResponseEntity.ok().build();
+    }
+
+    /**
+     * 【新增】API: 获取当前用户的个人资料
+     */
+    @GetMapping("/me/profile")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<UserProfileDto> getMyProfile(Principal principal) {
+        String userId = principal.getName();
+        return ResponseEntity.ok(userService.getUserProfile(userId));
+    }
+
+    /**
+     * 【新增】API: 更新当前用户的个人资料
+     */
+    @PutMapping("/me/profile")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<UserProfileDto> updateMyProfile(@RequestBody UserProfileDto profileDto, Principal principal) {
+        String userId = principal.getName();
+        UserProfileDto updatedProfile = userService.updateUserProfile(userId, profileDto);
+        return ResponseEntity.ok(updatedProfile);
     }
 
 

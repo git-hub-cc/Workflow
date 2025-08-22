@@ -24,7 +24,6 @@ import java.time.LocalDateTime;
 public class ArchiveProcessDelegate implements JavaDelegate {
 
     private final WorkflowInstanceRepository instanceRepository;
-    // --- 【核心修改】注入 ErpService 接口 ---
     private final ErpService erpService;
 
     @Override
@@ -48,14 +47,18 @@ public class ArchiveProcessDelegate implements JavaDelegate {
             log.info("流程实例 {} 的状态已成功更新为 APPROVED。", instance.getId());
 
 
-            // --- 【核心修改】调用ERP服务进行库存扣减 ---
-            // 在实际项目中，SKU和数量应从流程变量中获取
-            // 例如: String sku = (String) execution.getVariable("productSku");
-            //       Integer quantity = (Integer) execution.getVariable("quantity");
-            // 这里为了演示，我们使用固定值
-            String skuFromProcess = "SKU12345";
-            int quantityToDeduct = 10;
-            erpService.deductInventory(new InventoryDeductionRequest(skuFromProcess, quantityToDeduct));
+            // --- 【核心修改】从流程变量中动态获取数据并调用ERP服务 ---
+            // 假设表单中有一个ID为 "materialSku" 的字段和一个ID为 "quantity" 的字段
+            String skuFromProcess = (String) execution.getVariable("materialSku");
+            Object quantityObj = execution.getVariable("quantity");
+
+            if (skuFromProcess != null && quantityObj instanceof Number) {
+                int quantityToDeduct = ((Number) quantityObj).intValue();
+                log.info("准备调用ERP接口扣减库存: SKU = {}, 数量 = {}", skuFromProcess, quantityToDeduct);
+                erpService.deductInventory(new InventoryDeductionRequest(skuFromProcess, quantityToDeduct));
+            } else {
+                log.warn("流程实例 {} 缺少 'materialSku' 或 'quantity' 变量，跳过ERP库存扣减。", processInstanceId);
+            }
             // --- 【修改结束】 ---
 
 

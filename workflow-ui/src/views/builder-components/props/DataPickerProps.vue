@@ -9,16 +9,18 @@
       <a-input v-model:value="field.props.modalTitle" />
     </a-form-item>
 
-    <!-- 【核心修改】API URL 从输入框变为选择器 -->
-    <a-form-item label="数据接口" help="从预定义的API列表中选择，src/utils/apiLibrary.js">
-      <a-select v-model:value="field.props.dataUrl" @change="onApiChange">
-        <a-select-option v-for="api in predefinedApis" :key="api.url" :value="api.url">
-          {{ api.name }}
-        </a-select-option>
-      </a-select>
+    <!-- 【核心修改】允许用户输入自定义API或从预设中选择 -->
+    <a-form-item label="数据接口" help="可从列表选择或手动输入自定义API地址">
+      <a-auto-complete
+          v-model:value="field.props.dataUrl"
+          :options="predefinedApisForSelect"
+          placeholder="/api/custom/endpoint"
+          @select="onApiChange"
+          @change="onApiChange"
+      />
     </a-form-item>
 
-    <!-- 【核心新增】API 测试按钮 -->
+
     <a-form-item>
       <a-button @click="testApi" :loading="testingApi" :disabled="!field.props.dataUrl">
         <template #icon><ApiOutlined /></template>
@@ -65,7 +67,6 @@ import { computed, ref } from 'vue';
 import { DeleteOutlined, PlusOutlined, ApiOutlined } from '@ant-design/icons-vue';
 import { flattenFields } from '@/utils/formUtils.js';
 import GenericProps from './GenericProps.vue';
-// --- 【核心新增】引入预定义 API 列表和通用请求方法 ---
 import { predefinedApis } from '@/utils/apiLibrary.js';
 import { fetchTableData } from '@/api';
 import { message } from 'ant-design-vue';
@@ -73,29 +74,34 @@ import { message } from 'ant-design-vue';
 const props = defineProps(['field', 'allFields']);
 const testingApi = ref(false);
 
+const predefinedApisForSelect = computed(() =>
+    predefinedApis.map(api => ({ value: api.url, label: api.name }))
+);
+
 const availableTargetFields = computed(() => {
   return flattenFields(props.allFields).filter(f => !['GridRow', 'GridCol', 'DataPicker', 'Subform'].includes(f.type));
 });
 
-// 【核心修复】当API选择变化时，自动调用测试接口的逻辑
-const onApiChange = async () => {
-  await testApi();
+let debounceTimer = null;
+const onApiChange = () => {
+  clearTimeout(debounceTimer);
+  debounceTimer = setTimeout(() => {
+    testApi();
+  }, 1000); // 延迟1秒自动测试
 };
 
 const testApi = async () => {
   if (!props.field.props.dataUrl) {
-    message.warn("请先选择一个数据接口");
+    message.warn("请先选择或输入一个数据接口");
     return;
   }
   testingApi.value = true;
   try {
-    // 只获取第一条数据用于分析结构
     const response = await fetchTableData(props.field.props.dataUrl, { page: 0, size: 1 });
     const dataList = Array.isArray(response) ? response : response.content;
 
     if (!dataList || dataList.length === 0) {
       message.warn('接口返回数据为空，无法自动填充配置。');
-      // 清空旧配置以避免混淆
       props.field.props.columns = [];
       props.field.props.mappings = [];
       return;
@@ -104,9 +110,7 @@ const testApi = async () => {
     const firstItem = dataList[0];
     const keys = Object.keys(firstItem);
 
-    // 自动填充表格列
     props.field.props.columns = keys.map(key => ({ title: key, dataIndex: key }));
-    // 自动填充字段映射（默认为空，让用户选择）
     props.field.props.mappings = keys.map(key => ({ sourceField: key, targetField: '' }));
 
     message.success('接口测试成功，已自动填充列和映射配置！');

@@ -56,7 +56,11 @@ export function usePaginatedFetch(apiFunc, initialFilters = {}, options = {}) {
             dataSource.value = response.content;
             pagination.total = response.totalElements;
         } catch (error) {
-            message.error(`加载数据失败: ${error.message || '未知错误'}`);
+            // 【核心优化】
+            // 全局拦截器已经处理了错误消息的显示，这里不再重复提示。
+            // 同时清空数据源，防止在加载失败时页面上仍显示旧数据。
+            dataSource.value = [];
+            pagination.total = 0;
         } finally {
             loading.value = false;
         }

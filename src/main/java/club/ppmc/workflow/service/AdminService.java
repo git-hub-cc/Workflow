@@ -6,6 +6,8 @@ import club.ppmc.workflow.dto.*;
 import club.ppmc.workflow.exception.ResourceInUseException;
 import club.ppmc.workflow.exception.ResourceNotFoundException;
 import club.ppmc.workflow.repository.*;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.criteria.Predicate;
 import lombok.RequiredArgsConstructor;
@@ -15,6 +17,9 @@ import org.camunda.bpm.engine.TaskService;
 import org.camunda.bpm.engine.history.HistoricProcessInstance;
 import org.camunda.bpm.engine.runtime.ActivityInstance;
 import org.camunda.bpm.engine.runtime.ProcessInstance;
+import org.camunda.bpm.engine.variable.VariableMap;
+import org.camunda.bpm.engine.variable.Variables;
+import org.camunda.bpm.engine.variable.value.TypedValue;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
@@ -53,6 +58,8 @@ public class AdminService {
     private final WorkflowTemplateRepository workflowTemplateRepository;
     private final DepartmentRepository departmentRepository;
     private final DepartmentService departmentService;
+    private final ObjectMapper objectMapper;
+    private final SystemSettingService systemSettingService; // 注入系统设置服务
 
     // --- 流程实例管理 ---
     public List<ProcessInstanceDto> getActiveProcessInstances() {
@@ -139,6 +146,95 @@ public class AdminService {
         taskService.setAssignee(taskId, newAssigneeId);
     }
 
+    // --- 【核心修复】流程变量管理逻辑 ---
+    @Transactional(readOnly = true)
+    public List<ProcessVariableDto> getProcessInstanceVariables(String processInstanceId) {
+        VariableMap variables = runtimeService.getVariablesTyped(processInstanceId, true);
+
+        // 【FIX】遍历 VariableMap 的 keySet，然后使用 getValueTyped(key) 确保获取到 TypedValue 对象
+        return variables.keySet().stream()
+                .map(variableName -> {
+                    TypedValue typedValue = variables.getValueTyped(variableName);
+                    return ProcessVariableDto.builder()
+                            .name(variableName)
+                            .type(typedValue.getType().getName())
+                            .value(formatVariableValue(typedValue))
+                            .build();
+                })
+                .collect(Collectors.toList());
+    }
+
+    private Object formatVariableValue(TypedValue typedValue) {
+        if (typedValue == null) {
+            return null;
+        }
+        // Camunda 的 SPIN/JSON 类型可以直接获取为字符串
+        if ("json".equalsIgnoreCase(typedValue.getType().getName())) {
+            return typedValue.getValue().toString();
+        }
+        // 对于其他类型，直接返回值
+        return typedValue.getValue();
+    }
+
+    @LogOperation(module = "实例管理", action = "修改流程变量", targetIdExpression = "#processInstanceId")
+    public void updateProcessInstanceVariable(String processInstanceId, ProcessVariableDto variableDto) {
+        Object value;
+        try {
+            // 尝试将值反序列化为最合适的 Java 类型
+            value = deserializeValue(variableDto.getValue(), variableDto.getType());
+        } catch (Exception e) { // 捕获更广泛的异常，如 NumberFormatException
+            throw new IllegalArgumentException("无法解析变量值 '" + variableDto.getValue() + "' 为类型 '" + variableDto.getType() + "': " + e.getMessage(), e);
+        }
+
+        runtimeService.setVariable(processInstanceId, variableDto.getName(), value);
+    }
+
+    private Object deserializeValue(Object value, String type) throws JsonProcessingException {
+        if (value == null) {
+            return null;
+        }
+
+        String valueStr = value.toString();
+        if (!StringUtils.hasText(type)) {
+            // 如果类型为空，则尝试智能判断
+            if (valueStr.equalsIgnoreCase("true") || valueStr.equalsIgnoreCase("false")) {
+                return Boolean.parseBoolean(valueStr);
+            }
+            try {
+                return Integer.parseInt(valueStr);
+            } catch (NumberFormatException e1) {
+                try {
+                    return Long.parseLong(valueStr);
+                } catch (NumberFormatException e2) {
+                    try {
+                        return Double.parseDouble(valueStr);
+                    } catch (NumberFormatException e3) {
+                        return valueStr; // 最终回退到字符串
+                    }
+                }
+            }
+        }
+
+        switch (type.toLowerCase()) {
+            case "string":
+                return valueStr;
+            case "boolean":
+                return Boolean.parseBoolean(valueStr);
+            case "integer":
+                return Integer.parseInt(valueStr);
+            case "long":
+                return Long.parseLong(valueStr);
+            case "double":
+                return Double.parseDouble(valueStr);
+            case "json":
+                // Camunda 的 SPIN 库可以处理 JSON 字符串
+                return Variables.objectValue(valueStr).serializationDataFormat(Variables.SerializationDataFormats.JSON).create();
+            default:
+                // 默认按字符串处理
+                return valueStr;
+        }
+    }
+
 
     // --- 用户管理 ---
     @Transactional(readOnly = true)
@@ -158,7 +254,10 @@ public class AdminService {
         user.setName(userDto.getName());
         user.setStatus(UserStatus.ACTIVE);
 
-        user.setPassword(passwordEncoder.encode("password"));
+        // --- 【核心修改】从系统设置中读取默认密码 ---
+        String defaultPassword = systemSettingService.getSettingsMap()
+                .getOrDefault("DEFAULT_PASSWORD", "password");
+        user.setPassword(passwordEncoder.encode(defaultPassword));
         user.setPasswordChangeRequired(true);
 
         updateUserRelations(user, userDto);
@@ -171,6 +270,9 @@ public class AdminService {
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("未找到用户: " + id));
         user.setName(userDto.getName());
+        user.setEmail(userDto.getEmail());
+        user.setPhoneNumber(userDto.getPhoneNumber());
+
         if (StringUtils.hasText(userDto.getStatus())) {
             user.setStatus(UserStatus.valueOf(userDto.getStatus().toUpperCase()));
         }
@@ -249,6 +351,24 @@ public class AdminService {
     public RoleDto updateRole(Long id, RoleDto roleDto) {
         Role role = roleRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("未找到角色ID: " + id));
+
+        // --- 【核心修改】增加对角色名称修改的校验 ---
+        String oldName = role.getName();
+        String newName = roleDto.getName();
+
+        if (newName != null && !newName.equals(oldName)) {
+            if (roleRepository.findByName(newName).isPresent()) {
+                throw new IllegalArgumentException("角色名称 '" + newName + "' 已存在。");
+            }
+            // 检查旧名称是否在流程中被使用
+            String roleSearchPattern = "\"" + oldName + "\"";
+            long workflowUsageCount = workflowTemplateRepository.countByBpmnXmlContaining(roleSearchPattern);
+            if (workflowUsageCount > 0) {
+                throw new ResourceInUseException("无法修改角色名称 '" + oldName + "'，因为它正被 " + workflowUsageCount + " 个工作流模板使用。请先在流程设计器中修改。");
+            }
+            role.setName(newName);
+        }
+
         role.setDescription(roleDto.getDescription());
         return toRoleDto(roleRepository.save(role));
     }
@@ -261,20 +381,17 @@ public class AdminService {
         entityManager.refresh(role);
 
         if (!role.getUsers().isEmpty()) {
-            // 【核心修改】抛出更具体的异常
             throw new ResourceInUseException("无法删除角色，因为仍有 " + role.getUsers().size() + " 个用户属于该角色。");
         }
 
-        // 检查菜单关联
         if (!role.getMenus().isEmpty()) {
             throw new ResourceInUseException("无法删除角色，因为它已被 " + role.getMenus().size() + " 个菜单项使用。");
         }
 
-        String roleSearchPattern = "camunda:candidateGroups=\"" + role.getName() + "\"";
+        String roleSearchPattern = "\"" + role.getName() + "\"";
         long workflowUsageCount = workflowTemplateRepository.countByBpmnXmlContaining(roleSearchPattern);
         if (workflowUsageCount > 0) {
-            // 【核心修改】抛出更具体的异常
-            throw new ResourceInUseException("无法删除角色 '" + role.getName() + "'，因为它正被 " + workflowUsageCount + " 个工作流模板用作候选组。");
+            throw new ResourceInUseException("无法删除角色 '" + role.getName() + "'，因为它正被 " + workflowUsageCount + " 个工作流模板使用。");
         }
 
         roleRepository.delete(role);
@@ -301,7 +418,22 @@ public class AdminService {
     public UserGroupDto updateGroup(Long id, UserGroupDto groupDto) {
         UserGroup group = userGroupRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("未找到用户组ID: " + id));
-        group.setName(groupDto.getName());
+
+        // --- 【核心修改】增加对用户组名称修改的校验 ---
+        String oldName = group.getName();
+        String newName = groupDto.getName();
+        if (newName != null && !newName.equals(oldName)) {
+            if (userGroupRepository.findByName(newName).isPresent()) {
+                throw new IllegalArgumentException("用户组名称 '" + newName + "' 已存在。");
+            }
+            String groupSearchPattern = "\"" + oldName + "\"";
+            long workflowUsageCount = workflowTemplateRepository.countByBpmnXmlContaining(groupSearchPattern);
+            if (workflowUsageCount > 0) {
+                throw new ResourceInUseException("无法修改用户组名称 '" + oldName + "'，因为它正被 " + workflowUsageCount + " 个工作流模板使用。请先在流程设计器中修改。");
+            }
+            group.setName(newName);
+        }
+
         group.setDescription(groupDto.getDescription());
         return toUserGroupDto(userGroupRepository.save(group));
     }
@@ -314,14 +446,12 @@ public class AdminService {
         entityManager.refresh(group);
 
         if (!group.getUsers().isEmpty()) {
-            // 【核心修改】抛出更具体的异常
             throw new ResourceInUseException("无法删除用户组，因为仍有 " + group.getUsers().size() + " 个用户属于该组。");
         }
 
-        String groupSearchPattern = "camunda:candidateGroups=\"" + group.getName() + "\"";
+        String groupSearchPattern = "\"" + group.getName() + "\"";
         long workflowUsageCount = workflowTemplateRepository.countByBpmnXmlContaining(groupSearchPattern);
         if (workflowUsageCount > 0) {
-            // 【核心修改】抛出更具体的异常
             throw new ResourceInUseException("无法删除用户组 '" + group.getName() + "'，因为它正被 " + workflowUsageCount + " 个工作流模板用作候选组。");
         }
 
@@ -334,6 +464,8 @@ public class AdminService {
         UserDto dto = new UserDto();
         dto.setId(user.getId());
         dto.setName(user.getName());
+        dto.setEmail(user.getEmail());
+        dto.setPhoneNumber(user.getPhoneNumber());
         dto.setStatus(user.getStatus().name());
         if (user.getManager() != null) {
             dto.setManagerId(user.getManager().getId());

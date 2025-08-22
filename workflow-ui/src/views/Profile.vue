@@ -1,55 +1,90 @@
 <template>
   <div class="page-container">
     <a-page-header title="个人设置" />
-    <div style="padding: 24px; max-width: 600px; margin: auto;">
-      <a-alert
-          v-if="userStore.passwordChangeRequired"
-          message="强制密码修改"
-          description="您的密码为初始密码或已被管理员重置，为了账户安全，请立即修改密码后再进行其他操作。"
-          type="warning"
-          show-icon
-          style="margin-bottom: 24px;"
-      />
-      <a-card title="修改密码">
-        <a-form
-            :model="formState"
-            :rules="rules"
-            ref="formRef"
-            layout="vertical"
-            @finish="handleChangePassword"
-        >
-          <a-form-item label="旧密码" name="oldPassword">
-            <a-input-password v-model:value="formState.oldPassword" placeholder="请输入当前密码" />
-          </a-form-item>
-          <a-form-item label="新密码" name="newPassword">
-            <a-input-password v-model:value="formState.newPassword" placeholder="请输入至少6位的新密码" />
-          </a-form-item>
-          <a-form-item label="确认新密码" name="confirmPassword">
-            <a-input-password v-model:value="formState.confirmPassword" placeholder="请再次输入新密码" />
-          </a-form-item>
-          <a-form-item>
-            <a-button type="primary" html-type="submit" :loading="loading">
-              确认修改
-            </a-button>
-          </a-form-item>
-        </a-form>
-      </a-card>
+    <div style="padding: 24px;">
+      <a-tabs v-model:activeKey="activeTab" centered>
+        <!-- 个人资料 Tab -->
+        <a-tab-pane key="profile" tab="个人资料">
+          <div class="tab-content">
+            <a-spin :spinning="profileLoading">
+              <a-form :model="profileState" layout="vertical" ref="profileFormRef" @finish="handleUpdateProfile">
+                <a-form-item label="用户ID">
+                  <a-input :value="userStore.currentUser.id" disabled />
+                </a-form-item>
+                <a-form-item label="姓名" name="name" :rules="[{ required: true, message: '请输入姓名' }]">
+                  <a-input v-model:value="profileState.name" />
+                </a-form-item>
+                <a-form-item label="邮箱" name="email" :rules="[{ type: 'email', message: '请输入有效的邮箱地址' }]">
+                  <a-input v-model:value="profileState.email" />
+                </a-form-item>
+                <a-form-item label="手机号" name="phoneNumber">
+                  <a-input v-model:value="profileState.phoneNumber" />
+                </a-form-item>
+                <a-form-item>
+                  <a-button type="primary" html-type="submit">保存资料</a-button>
+                </a-form-item>
+              </a-form>
+            </a-spin>
+          </div>
+        </a-tab-pane>
+
+        <!-- 修改密码 Tab -->
+        <a-tab-pane key="password" tab="修改密码">
+          <div class="tab-content">
+            <a-alert
+                v-if="userStore.passwordChangeRequired"
+                message="强制密码修改"
+                description="您的密码为初始密码或已被管理员重置，为了账户安全，请立即修改密码后再进行其他操作。"
+                type="warning"
+                show-icon
+                style="margin-bottom: 24px;"
+            />
+            <a-form :model="passwordState" :rules="passwordRules" ref="passwordFormRef" layout="vertical" @finish="handleChangePassword">
+              <a-form-item label="旧密码" name="oldPassword">
+                <a-input-password v-model:value="passwordState.oldPassword" placeholder="请输入当前密码" />
+              </a-form-item>
+              <a-form-item label="新密码" name="newPassword">
+                <a-input-password v-model:value="passwordState.newPassword" placeholder="请输入至少6位的新密码" />
+              </a-form-item>
+              <a-form-item label="确认新密码" name="confirmPassword">
+                <a-input-password v-model:value="passwordState.confirmPassword" placeholder="请再次输入新密码" />
+              </a-form-item>
+              <a-form-item>
+                <a-button type="primary" html-type="submit" :loading="passwordLoading">确认修改</a-button>
+              </a-form-item>
+            </a-form>
+          </div>
+        </a-tab-pane>
+      </a-tabs>
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref, reactive } from 'vue';
+import { ref, reactive, onMounted } from 'vue';
 import { useUserStore } from '@/stores/user';
-import { changePassword } from '@/api';
+import { changePassword, getMyProfile, updateMyProfile } from '@/api';
 import { message } from 'ant-design-vue';
 import { useRouter } from "vue-router";
 
 const userStore = useUserStore();
 const router = useRouter();
-const loading = ref(false);
-const formRef = ref();
-const formState = reactive({
+
+const activeTab = ref('profile');
+
+// --- 个人资料状态 ---
+const profileLoading = ref(true);
+const profileFormRef = ref();
+const profileState = reactive({
+  name: '',
+  email: '',
+  phoneNumber: '',
+});
+
+// --- 修改密码状态 ---
+const passwordLoading = ref(false);
+const passwordFormRef = ref();
+const passwordState = reactive({
   oldPassword: '',
   newPassword: '',
   confirmPassword: '',
@@ -58,26 +93,58 @@ const formState = reactive({
 const validateConfirmPassword = (rule, value) => {
   if (value === '') {
     return Promise.reject('请再次输入新密码');
-  } else if (value !== formState.newPassword) {
+  } else if (value !== passwordState.newPassword) {
     return Promise.reject("两次输入的密码不一致!");
   } else {
     return Promise.resolve();
   }
 };
 
-const rules = {
+const passwordRules = {
   oldPassword: [{ required: true, message: '请输入旧密码' }],
   newPassword: [{ required: true, message: '请输入新密码' }, { min: 6, message: '密码长度不能少于6位' }],
   confirmPassword: [{ required: true, validator: validateConfirmPassword }],
 };
 
+onMounted(async () => {
+  // 如果需要强制修改密码，则默认打开密码修改页
+  if (userStore.passwordChangeRequired) {
+    activeTab.value = 'password';
+  }
+
+  // 加载个人资料
+  try {
+    const profileData = await getMyProfile();
+    Object.assign(profileState, profileData);
+  } catch (error) {
+    message.error("加载个人资料失败");
+  } finally {
+    profileLoading.value = false;
+  }
+});
+
+const handleUpdateProfile = async () => {
+  try {
+    await profileFormRef.value.validate();
+    profileLoading.value = true;
+    const updatedProfile = await updateMyProfile(profileState);
+    // 【核心修改】调用 store action 来更新全局用户信息
+    userStore.updateCurrentUser(updatedProfile);
+    message.success('个人资料更新成功！');
+  } catch (error) {
+    // API 错误已在拦截器中处理
+  } finally {
+    profileLoading.value = false;
+  }
+};
+
 const handleChangePassword = async () => {
   try {
-    await formRef.value.validate();
-    loading.value = true;
+    await passwordFormRef.value.validate();
+    passwordLoading.value = true;
     await changePassword({
-      oldPassword: formState.oldPassword,
-      newPassword: formState.newPassword,
+      oldPassword: passwordState.oldPassword,
+      newPassword: passwordState.newPassword,
     });
     message.success('密码修改成功，请重新登录！');
     // 修改密码成功后强制登出
@@ -86,7 +153,7 @@ const handleChangePassword = async () => {
     // API 错误已在拦截器中处理
     console.error('Password change failed:', error);
   } finally {
-    loading.value = false;
+    passwordLoading.value = false;
   }
 };
 </script>
@@ -94,5 +161,12 @@ const handleChangePassword = async () => {
 <style scoped>
 .page-container {
   background-color: #fff;
+}
+.tab-content {
+  max-width: 600px;
+  margin: 24px auto;
+}
+:deep(.ant-tabs-nav) {
+  margin-bottom: 32px !important;
 }
 </style>

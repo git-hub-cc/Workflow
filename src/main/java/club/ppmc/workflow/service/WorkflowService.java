@@ -55,6 +55,7 @@ public class WorkflowService {
     private final FormSubmissionRepository formSubmissionRepository;
     private final UserRepository userRepository;
     private final FileAttachmentRepository fileAttachmentRepository;
+    private final RoleRepository roleRepository; // 【核心新增】
 
     private final ObjectMapper objectMapper;
 
@@ -271,6 +272,11 @@ public class WorkflowService {
                     } else {
                         throw new IllegalStateException("提交者 '" + submitter.getName() + "' 没有设置上级经理，无法启动需要上级审批的流程。");
                     }
+
+                    // --- 【核心新增】注入角色变量，以供流程定义使用 ---
+                    roleRepository.findByName("FINANCE_APPROVER").ifPresent(role ->
+                            variables.put("financeRole", role.getName())
+                    );
 
                     ProcessInstance camundaInstance = runtimeService.startProcessInstanceByKey(
                             template.getProcessDefinitionKey(),

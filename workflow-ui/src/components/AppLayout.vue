@@ -2,7 +2,6 @@
   <a-layout style="min-height: 100vh">
     <a-layout-sider v-model:collapsed="collapsed" collapsible>
       <div class="logo-sidebar" @click="$router.push('/')">
-        <!-- [FIX] Bind src to the secure blob URL from the store -->
         <img :src="systemStore.iconBlobUrl || '/logo.svg'" alt="logo" />
         <h1 v-if="!collapsed">{{ systemStore.settings.SYSTEM_NAME || '工作流引擎' }}</h1>
       </div>
@@ -43,9 +42,20 @@
           </div>
           <div class="user-actions">
             <a-space>
+              <!-- 【新增】通知中心入口 -->
+              <a-popover v-model:open="notificationVisible" placement="bottomRight" trigger="click">
+                <template #content>
+                  <NotificationPanel @close="notificationVisible = false" />
+                </template>
+                <a-badge :count="unreadCount" :overflow-count="99">
+                  <a-button type="text" shape="circle" @click="notificationVisible = !notificationVisible">
+                    <template #icon><BellOutlined /></template>
+                  </a-button>
+                </a-badge>
+              </a-popover>
+
               <a-dropdown v-if="userStore.currentUser">
                 <a class="ant-dropdown-link" @click.prevent>
-                  <!-- 【核心修改】头像背景色使用动态主题色 -->
                   <a-avatar :style="{ backgroundColor: systemStore.settings.THEME_COLOR, marginRight: '8px' }">
                     {{ userStore.currentUser.name.charAt(0) }}
                   </a-avatar>
@@ -64,9 +74,7 @@
         </div>
       </a-layout-header>
 
-      <!-- 【核心修改】将 a-layout-content 设置为 flex 容器，使其子元素可以弹性伸缩 -->
       <a-layout-content :style="{ display: 'flex', flexDirection: 'column' }">
-        <!-- 【核心修改】移除 min-height，使用 flex: 1 让此 div 自动填充剩余空间 -->
         <div style="background: #fff; border-radius: 4px; flex: 1 1 0; min-height: 0;">
           <router-view v-slot="{ Component }">
             <transition name="fade" mode="out-in">
@@ -87,19 +95,25 @@ import { onMounted, ref, watch, computed, h } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useUserStore } from '@/stores/user';
 import { useSystemStore } from '@/stores/system';
+import { useNotificationStore } from '@/stores/notification';
 import { getPendingTasks } from "@/api";
 import { Modal, Menu } from "ant-design-vue";
 import {
   DownOutlined, DashboardOutlined, TeamOutlined, SafetyCertificateOutlined, UsergroupAddOutlined,
   ApartmentOutlined, NodeIndexOutlined, FileSearchOutlined, UserOutlined, LogoutOutlined,
   SettingOutlined, MenuOutlined, TableOutlined,
-  CheckSquareOutlined, SendOutlined, ForkOutlined, BuildOutlined
+  CheckSquareOutlined, SendOutlined, ForkOutlined, BuildOutlined, BellOutlined
 } from '@ant-design/icons-vue';
 import { iconMap } from '@/utils/iconLibrary.js';
+import NotificationPanel from '@/views/notifications/NotificationPanel.vue';
+// --- 【核心优化】从路由文件导入静态菜单 ---
+import { adminMenus } from '@/router';
+
 
 const { Item: MenuItem, SubMenu } = Menu;
 const userStore = useUserStore();
 const systemStore = useSystemStore();
+const notificationStore = useNotificationStore();
 const router = useRouter();
 const route = useRoute();
 
@@ -108,47 +122,15 @@ const collapsed = ref(false);
 const selectedKeys = ref([]);
 const openKeys = ref(['user-center']);
 
-// [FIX] The 'systemIconUrl' computed property is no longer needed here.
-// The template now directly uses `systemStore.iconBlobUrl`.
+const notificationVisible = ref(false);
+const unreadCount = computed(() => notificationStore.unreadCount);
 
-const adminMenus = [
-  {
-    id: 'admin-root', name: '系统管理', icon: 'SettingOutlined', type: 'DIRECTORY',
-    children: [
-      { id: 'admin-dashboard', name: '仪表盘', path: '/admin/dashboard', icon: 'DashboardOutlined', type: 'DATA_LIST' },
-      { id: 'admin-forms', name: '表单管理', path: '/admin/forms', icon: 'FormOutlined', type: 'DATA_LIST' },
-      { id: 'admin-menus', name: '菜单管理', path: '/admin/menus', icon: 'AppstoreOutlined', type: 'DATA_LIST' },
-      {
-        id: 'admin-permissions', name: '用户权限', icon: 'TeamOutlined', type: 'DIRECTORY',
-        children: [
-          { id: 'admin-users', name: '用户管理', path: '/admin/users', icon: 'UserOutlined', type: 'DATA_LIST' },
-          { id: 'admin-roles', name: '角色管理', path: '/admin/roles', icon: 'SafetyCertificateOutlined', type: 'DATA_LIST' },
-          { id: 'admin-groups', name: '用户组管理', path: '/admin/groups', icon: 'UsergroupAddOutlined', type: 'DATA_LIST' },
-        ]
-      },
-      {
-        id: 'admin-org', name: '组织架构', icon: 'ApartmentOutlined', type: 'DIRECTORY',
-        children: [
-          { id: 'admin-org-chart', name: '组织架构图', path: '/admin/org-chart', icon: 'ApartmentOutlined', type: 'DATA_LIST' },
-          { id: 'admin-org-management', name: '架构管理', path: '/admin/org-management', icon: 'ForkOutlined', type: 'DATA_LIST' }
-        ]
-      },
-      { id: 'admin-instances', name: '实例管理', path: '/admin/instances', icon: 'NodeIndexOutlined', type: 'DATA_LIST' },
-      {
-        id: 'admin-logs', name: '日志管理', icon: 'FileSearchOutlined', type: 'DIRECTORY',
-        children: [
-          // 【核心修改】为子菜单添加图标
-          { id: 'admin-login-log', name: '登录日志', path: '/admin/logs/login', icon: 'TableOutlined', type: 'DATA_LIST' },
-          { id: 'admin-operation-log', name: '操作日志', path: '/admin/logs/operation', icon: 'ProfileOutlined', type: 'DATA_LIST' },
-        ]
-      },
-      { id: 'admin-settings', name: '系统设置', path: '/admin/settings', icon: 'BuildOutlined', type: 'DATA_LIST' },
-    ]
-  }
-];
+
+// --- 【核心优化】移除此处的静态菜单定义 ---
 
 const displayMenus = computed(() => {
   if (userStore.isAdmin) {
+    // --- 直接使用从 router/index.js 导入的 adminMenus ---
     return [...adminMenus, ...userStore.menus];
   }
   return userStore.menus;
@@ -162,6 +144,14 @@ const MenuRenderer = {
       return menuItems.map(menu => {
         const iconComponent = menu.icon ? (iconMap[menu.icon] || null) : null;
         const iconNode = iconComponent ? () => h(iconComponent) : null;
+
+        if (menu.type === 'EXTERNAL_LINK') {
+          return h(MenuItem, { key: `ext-${menu.id}` }, {
+            icon: iconNode,
+            default: () => h('a', { href: menu.path, target: '_blank', rel: 'noopener noreferrer' }, menu.name)
+          });
+        }
+
         if (menu.children && menu.children.length > 0) {
           return h(SubMenu, { key: menu.path || menu.id }, { icon: iconNode, title: () => menu.name, default: () => renderMenuItems(menu.children) });
         } else {
@@ -219,14 +209,15 @@ const handleMenuClick = ({ key }) => {
 const checkTasks = async () => {
   if (!userStore.isAuthenticated) return;
   try {
-    const tasks = await getPendingTasks();
-    pendingTasksCount.value = tasks.length;
+    const response = await getPendingTasks({ page: 0, size: 1 });
+    pendingTasksCount.value = response.totalElements;
   } catch (e) { /* ignore */ }
 };
 
 onMounted(() => {
   if (userStore.isAuthenticated) {
     checkTasks();
+    notificationStore.fetchUnreadCount();
   }
 });
 

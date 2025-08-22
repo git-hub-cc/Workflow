@@ -20,11 +20,17 @@
     </bpmn:serviceTask>
     <bpmn:sequenceFlow id="Flow_To_ManagerApproval" sourceRef="Activity_FindManager" targetRef="Activity_ManagerApproval" />
     <bpmn:userTask id="Activity_ManagerApproval" name="主管审核" camunda:assignee="${assignee}">
+      <bpmn:extensionElements>
+        <camunda:taskListener delegateExpression="${taskAssignmentListener}" event="create" />
+      </bpmn:extensionElements>
       <bpmn:incoming>Flow_To_ManagerApproval</bpmn:incoming>
       <bpmn:outgoing>Flow_To_QCInspection</bpmn:outgoing>
     </bpmn:userTask>
     <bpmn:sequenceFlow id="Flow_To_QCInspection" sourceRef="Activity_ManagerApproval" targetRef="Activity_QCInspection" />
     <bpmn:userTask id="Activity_QCInspection" name="QC检验" camunda:candidateGroups="QC_GROUP">
+      <bpmn:extensionElements>
+        <camunda:taskListener delegateExpression="${taskAssignmentListener}" event="create" />
+      </bpmn:extensionElements>
       <bpmn:incoming>Flow_To_QCInspection</bpmn:incoming>
       <bpmn:outgoing>Flow_To_QCGateway</bpmn:outgoing>
     </bpmn:userTask>
@@ -35,10 +41,12 @@
       <bpmn:outgoing>Flow_QCFailed</bpmn:outgoing>
     </bpmn:exclusiveGateway>
     <bpmn:sequenceFlow id="Flow_QCPassed" name="合格" sourceRef="Gateway_QCCheck" targetRef="Activity_PutAwayGoods">
-      <!-- 【核心修改】将 qc_passed 改为 approved -->
-      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">${approved == true}</bpmn:conditionExpression>
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">${qc_passed == true}</bpmn:conditionExpression>
     </bpmn:sequenceFlow>
     <bpmn:userTask id="Activity_PutAwayGoods" name="上架入库" camunda:assignee="${initiator}">
+      <bpmn:extensionElements>
+        <camunda:taskListener delegateExpression="${taskAssignmentListener}" event="create" />
+      </bpmn:extensionElements>
       <bpmn:incoming>Flow_QCPassed</bpmn:incoming>
       <bpmn:outgoing>Flow_To_ArchivePassed</bpmn:outgoing>
     </bpmn:userTask>
@@ -52,10 +60,12 @@
     </bpmn:endEvent>
     <bpmn:sequenceFlow id="Flow_To_EndPassed" sourceRef="Activity_ArchivePassed" targetRef="EndEvent_Passed" />
     <bpmn:sequenceFlow id="Flow_QCFailed" name="不合格" sourceRef="Gateway_QCCheck" targetRef="Activity_HandleException">
-      <!-- 【可选增强】明确指定不合格的条件 -->
-      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">${approved == false}</bpmn:conditionExpression>
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">${qc_passed == false}</bpmn:conditionExpression>
     </bpmn:sequenceFlow>
     <bpmn:userTask id="Activity_HandleException" name="异常处理" camunda:assignee="${assignee}">
+      <bpmn:extensionElements>
+        <camunda:taskListener delegateExpression="${taskAssignmentListener}" event="create" />
+      </bpmn:extensionElements>
       <bpmn:incoming>Flow_QCFailed</bpmn:incoming>
       <bpmn:outgoing>Flow_To_ArchiveRejected</bpmn:outgoing>
     </bpmn:userTask>
@@ -68,6 +78,17 @@
       <bpmn:incoming>Flow_To_EndRejected</bpmn:incoming>
     </bpmn:endEvent>
     <bpmn:sequenceFlow id="Flow_To_EndRejected" sourceRef="Activity_ArchiveRejected" targetRef="EndEvent_Rejected" />
+    <!-- 【核心新增】超时升级边界事件 -->
+    <bpmn:boundaryEvent id="Event_Overdue" name="超时2分钟升级" attachedToRef="Activity_ManagerApproval">
+      <bpmn:outgoing>Flow_1oe7wle</bpmn:outgoing>
+      <bpmn:timerEventDefinition id="TimerEventDefinition_1q7z8p4">
+        <bpmn:timeDuration xsi:type="bpmn:tFormalExpression" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">PT2M</bpmn:timeDuration>
+      </bpmn:timerEventDefinition>
+    </bpmn:boundaryEvent>
+    <bpmn:serviceTask id="Activity_Escalate" name="任务升级给上级" camunda:delegateExpression="${taskEscalationDelegate}">
+      <bpmn:incoming>Flow_1oe7wle</bpmn:incoming>
+    </bpmn:serviceTask>
+    <bpmn:sequenceFlow id="Flow_1oe7wle" sourceRef="Event_Overdue" targetRef="Activity_Escalate" />
   </bpmn:process>
   <bpmndi:BPMNDiagram id="BPMNDiagram_1">
     <bpmndi:BPMNPlane id="BPMNPlane_1" bpmnElement="goods_receipt_process">
@@ -123,6 +144,16 @@
           <dc:Bounds x="1175" y="265" width="70" height="14" />
         </bpmndi:BPMNLabel>
       </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Activity_0k0g4f0_di" bpmnElement="Activity_Escalate">
+        <dc:Bounds x="350" y="200" width="100" height="80" />
+        <bpmndi:BPMNLabel />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Event_0f20436_di" bpmnElement="Event_Overdue">
+        <dc:Bounds x="462" y="142" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="439" y="185" width="82" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
       <bpmndi:BPMNEdge id="Flow_To_FindManager_di" bpmnElement="Flow_To_FindManager">
         <di:waypoint x="215" y="120" />
         <di:waypoint x="270" y="120" />
@@ -170,6 +201,11 @@
       <bpmndi:BPMNEdge id="Flow_To_EndRejected_di" bpmnElement="Flow_To_EndRejected">
         <di:waypoint x="1130" y="240" />
         <di:waypoint x="1192" y="240" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_1oe7wle_di" bpmnElement="Flow_1oe7wle">
+        <di:waypoint x="480" y="178" />
+        <di:waypoint x="480" y="240" />
+        <di:waypoint x="450" y="240" />
       </bpmndi:BPMNEdge>
     </bpmndi:BPMNPlane>
   </bpmndi:BPMNDiagram>

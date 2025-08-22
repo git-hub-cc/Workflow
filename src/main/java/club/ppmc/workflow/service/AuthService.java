@@ -77,6 +77,8 @@ public class AuthService {
                 .user(new AuthResponse.UserAuthInfo(
                         user.getId(),
                         user.getName(),
+                        user.getEmail(), // 【新增】返回email
+                        user.getDepartment() != null ? user.getDepartment().getName() : null, // 【新增】返回部门名称
                         isAdmin ? "ADMIN" : "USER", // 为了兼容旧前端，仍然保留一个主 role
                         user.isPasswordChangeRequired() // 【核心修改】将 passwordChangeRequired 标志放入响应体
                 ))

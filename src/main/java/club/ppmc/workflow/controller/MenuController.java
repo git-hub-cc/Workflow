@@ -67,6 +67,17 @@ public class MenuController {
     }
 
     /**
+     * 【新增】API: (管理员)通过拖拽更新整个菜单树的结构和顺序
+     */
+    @PutMapping("/admin/menus/update-tree")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<Void> updateMenuTree(@RequestBody List<MenuDto> menuTree) {
+        menuService.updateMenuTree(menuTree);
+        return ResponseEntity.ok().build();
+    }
+
+
+    /**
      * API: (管理员)删除菜单
      */
     @DeleteMapping("/admin/menus/{id}")

@@ -86,7 +86,7 @@
         <a-form-item label="部门负责人" name="managerId">
           <a-select
               v-model:value="formState.managerId"
-              :options="userStore.usersForPicker.map(u => ({ label: u.name, value: u.id }))"
+              :options="userStore.usersForManagement.map(u => ({ label: `${u.name} (${u.id})`, value: u.id }))"
               placeholder="请选择部门负责人"
               show-search
               option-filter-prop="label"
@@ -126,20 +126,19 @@ const usersCache = ref(new Map());
 const fetchData = async () => {
   loading.value = true;
   try {
-    const [tree, users] = await Promise.all([
-      getOrganizationTree(),
-      getAllUsers()
+    // 使用 Promise.all 并行加载，并强制刷新 store 中的用户列表
+    await Promise.all([
+      getOrganizationTree().then(data => {
+        treeData.value = data;
+        expandedKeys.value = data.map(dept => dept.key);
+      }),
+      userStore.fetchUsersForManagement(true) // 强制刷新用户列表
     ]);
 
-    treeData.value = tree;
+    // 从已更新的 store 中填充本地缓存，用于拖拽逻辑
     usersCache.value.clear();
-    users.forEach(u => usersCache.value.set(u.id, u));
-    expandedKeys.value = tree.map(dept => dept.key);
+    userStore.usersForManagement.forEach(u => usersCache.value.set(u.id, u));
 
-    // 预加载 user picker 数据
-    if (userStore.usersForPicker.length === 0) {
-      await userStore.fetchUsersForPicker();
-    }
   } catch (error) {
     message.error('加载组织架构失败');
   } finally {

@@ -46,52 +46,76 @@
       </a-space>
     </div>
 
-    <!-- 辅助信息面板 -->
-    <div class="helper-panel-container">
-      <a-tabs v-model:active-key="activeHelperKey" type="card" size="small">
-        <!-- 可用表单变量面板 -->
-        <a-tab-pane key="fields" tab="可用表单变量">
-          <div class="helper-content">
-            <a-input-search
-                v-model:value="fieldSearchText"
-                placeholder="搜索字段 (点击复制为表达式)"
-                size="small"
-                style="margin-bottom: 8px;"
-            />
-            <div class="tag-list">
-              <a-tooltip v-for="field in filteredFormFields" :key="field.id" :title="`字段ID: ${field.id}`">
-                <a-tag @click="copyToClipboard(field.id, true)" class="helper-tag">
-                  {{ field.label }} ({{ field.id }})
+    <!-- 【核心修改】使用 a-tabs 替换 a-collapse -->
+    <a-tabs v-model:activeKey="activeTabKey" class="helper-tabs">
+      <a-tab-pane key="system" tab="系统变量">
+        <div class="collapsible-header" @click="toggleCollapse('system')">
+          <span>系统/角色变量 (点击复制为表达式)</span>
+          <DownOutlined :class="{ 'is-expanded': !collapsedStates.system }" />
+        </div>
+        <div v-show="!collapsedStates.system" class="collapsible-content">
+          <div class="group-list">
+            <a-tooltip title="流程发起人的用户ID">
+              <a-tag @click="copyToClipboard('initiator', true)" class="group-tag">发起人 (initiator)</a-tag>
+            </a-tooltip>
+            <a-tooltip title="发起人的直接上级ID">
+              <a-tag @click="copyToClipboard('managerId', true)" class="group-tag">直接上级 (managerId)</a-tag>
+            </a-tooltip>
+            <a-tooltip title="财务审批角色 (在流程启动时由后端注入)">
+              <a-tag @click="copyToClipboard('financeRole', true)" class="group-tag">财务角色 (financeRole)</a-tag>
+            </a-tooltip>
+          </div>
+        </div>
+      </a-tab-pane>
+
+      <a-tab-pane key="form" tab="表单变量">
+        <div class="collapsible-header" @click="toggleCollapse('form')">
+          <span>可用表单变量 (点击复制为表达式)</span>
+          <DownOutlined :class="{ 'is-expanded': !collapsedStates.form }" />
+        </div>
+        <div v-show="!collapsedStates.form" class="collapsible-content">
+          <a-input-search
+              v-model:value="fieldSearchText"
+              placeholder="搜索字段"
+              size="small"
+              style="margin-bottom: 8px;"
+          />
+          <div class="group-list">
+            <a-tooltip v-for="field in filteredFormFields" :key="field.id" :title="`字段ID: ${field.id}`">
+              <a-tag @click="copyToClipboard(field.id, true)" class="group-tag">
+                {{ field.label }} ({{ field.id }})
+              </a-tag>
+            </a-tooltip>
+            <a-empty v-if="!loading && filteredFormFields.length === 0" :image-style="{ height: '40px' }" description="无可用字段" />
+          </div>
+        </div>
+      </a-tab-pane>
+
+      <a-tab-pane key="group" tab="用户组">
+        <div class="collapsible-header" @click="toggleCollapse('group')">
+          <span>可用用户组 (点击复制ID)</span>
+          <DownOutlined :class="{ 'is-expanded': !collapsedStates.group }" />
+        </div>
+        <div v-show="!collapsedStates.group" class="collapsible-content">
+          <a-input-search
+              v-model:value="groupSearchText"
+              placeholder="搜索用户组"
+              size="small"
+              style="margin-bottom: 8px;"
+          />
+          <a-spin :spinning="groupsLoading">
+            <div class="group-list">
+              <a-tooltip v-for="group in filteredGroups" :key="group.id" :title="group.description">
+                <a-tag @click="copyToClipboard(group.name, false)" class="group-tag">
+                  {{ group.name }}
                 </a-tag>
               </a-tooltip>
-              <a-empty v-if="!loading && filteredFormFields.length === 0" :image-style="{ height: '40px' }" description="无可用字段" />
+              <a-empty v-if="filteredGroups.length === 0" :image-style="{ height: '40px' }" description="无匹配" />
             </div>
-          </div>
-        </a-tab-pane>
-
-        <!-- 可用用户组面板 -->
-        <a-tab-pane key="groups" tab="可用用户组">
-          <div class="helper-content">
-            <a-input-search
-                v-model:value="groupSearchText"
-                placeholder="搜索用户组 (点击复制ID)"
-                size="small"
-                style="margin-bottom: 8px;"
-            />
-            <a-spin :spinning="groupsLoading">
-              <div class="tag-list">
-                <a-tooltip v-for="group in filteredGroups" :key="group.id" :title="group.description">
-                  <a-tag @click="copyToClipboard(group.name, false)" class="helper-tag">
-                    {{ group.name }}
-                  </a-tag>
-                </a-tooltip>
-                <a-empty v-if="filteredGroups.length === 0" :image-style="{ height: '40px' }" description="无匹配" />
-              </div>
-            </a-spin>
-          </div>
-        </a-tab-pane>
-      </a-tabs>
-    </div>
+          </a-spin>
+        </div>
+      </a-tab-pane>
+    </a-tabs>
 
 
     <!-- 设计器区域 -->
@@ -112,7 +136,7 @@ import { message, Modal } from 'ant-design-vue';
 import { getFormById, deployWorkflow, getWorkflowTemplate, updateWorkflowTemplate, getGroupsForWorkflow } from '@/api';
 import {
   UndoOutlined, RedoOutlined, ZoomInOutlined, ZoomOutOutlined,
-  FullscreenOutlined, DownloadOutlined, FileImageOutlined, UploadOutlined
+  FullscreenOutlined, DownloadOutlined, FileImageOutlined, UploadOutlined, DownOutlined
 } from '@ant-design/icons-vue';
 import { flattenFields } from '@/utils/formUtils.js';
 
@@ -153,13 +177,25 @@ const groupsLoading = ref(false);
 const groupSearchText = ref('');
 const formFields = ref([]);
 const fieldSearchText = ref('');
-const activeHelperKey = ref('fields');
+// 【核心修改】从 a-collapse 的 activeKey 改为 a-tabs 的 activeKey
+const activeTabKey = ref('system');
+// 【核心修改】新增状态来管理每个标签页内容的折叠状态
+const collapsedStates = ref({
+  system: true,
+  form: true,
+  group: true,
+});
+
+// 【核心修改】切换折叠状态的方法
+const toggleCollapse = (key) => {
+  collapsedStates.value[key] = !collapsedStates.value[key];
+};
 
 const filteredGroups = computed(() => {
   if (!groupSearchText.value) return availableGroups.value;
   return availableGroups.value.filter(g =>
       g.name.toLowerCase().includes(groupSearchText.value.toLowerCase()) ||
-      g.description.toLowerCase().includes(groupSearchText.value.toLowerCase())
+      (g.description && g.description.toLowerCase().includes(groupSearchText.value.toLowerCase()))
   );
 });
 
@@ -172,7 +208,6 @@ const filteredFormFields = computed(() => {
   );
 });
 
-// 监听 loading，加载完成后再初始化 BPMN
 watch(loading, async (val) => {
   if (!val) {
     await nextTick();
@@ -227,7 +262,6 @@ const handleKeyDown = (event) => {
   }
 };
 
-// --- 页面挂载 ---
 onMounted(async () => {
   groupsLoading.value = true;
   try {
@@ -255,7 +289,6 @@ onMounted(async () => {
   }
 });
 
-// --- 卸载清理 ---
 onBeforeUnmount(() => {
   if (modeler) {
     modeler.destroy();
@@ -264,7 +297,6 @@ onBeforeUnmount(() => {
   window.removeEventListener('keydown', handleKeyDown);
 });
 
-// --- 辅助函数 ---
 async function getModelerContent() {
   if (!modeler) throw new Error('设计器未初始化！');
   const { xml } = await modeler.saveXML({ format: true });
@@ -275,7 +307,6 @@ async function getModelerContent() {
   return { xml, processDefinitionKey };
 }
 
-// --- 核心操作 ---
 const handleSaveDraft = async () => {
   saving.value = true;
   try {
@@ -300,6 +331,7 @@ const handleDeploy = () => {
     onOk: async () => {
       deploying.value = true;
       try {
+        await handleSaveDraft();
         const { xml, processDefinitionKey } = await getModelerContent();
         const payload = {
           formDefinitionId: Number(formId),
@@ -318,7 +350,6 @@ const handleDeploy = () => {
   });
 };
 
-// --- 工具栏方法 ---
 const handleUndo = () => modeler.get('commandStack').undo();
 const handleRedo = () => modeler.get('commandStack').redo();
 let scale = 1;
@@ -326,7 +357,6 @@ const handleZoomIn = () => { scale += 0.1; modeler.get('canvas').zoom(scale); };
 const handleZoomOut = () => { if (scale > 0.2) { scale -= 0.1; modeler.get('canvas').zoom(scale); } };
 const handleFitViewport = () => { scale = 1; modeler.get('canvas').zoom('fit-viewport'); };
 
-// --- 文件导入/导出 ---
 const triggerImport = () => fileInputRef.value?.click();
 
 const handleFileImport = (event) => {
@@ -385,33 +415,26 @@ const copyToClipboard = async (text, isVariable = false) => {
 </script>
 
 <style scoped>
-/* --- 【核心修改】Layout Optimization --- */
 .page-container {
   padding: 0;
   display: flex;
   flex-direction: column;
-  height: 100%; /* Fill the flex container from AppLayout */
+  height: calc(100vh - 64px - 48px);
   background-color: #fff;
 }
-
 .toolbar {
   padding: 8px 24px;
   border-bottom: 1px solid #f0f0f0;
   background: #fff;
   flex-shrink: 0;
 }
-
 .designer-container {
   display: flex;
   flex-grow: 1;
-  min-height: 0; /* Important for flex-grow to work correctly */
+  border-top: 1px solid #f0f0f0;
+  min-height: 0;
 }
-
-#canvas {
-  flex-grow: 1;
-  background-color: #f9f9f9;
-}
-
+#canvas { flex-grow: 1; background-color: #f9f9f9; }
 #properties-panel-container {
   width: 320px;
   background: #f8f8f8;
@@ -419,82 +442,62 @@ const copyToClipboard = async (text, isVariable = false) => {
   border-left: 1px solid #e0e0e0;
   flex-shrink: 0;
 }
+.loading-container { display: flex; justify-content: center; align-items: center; height: 100%; }
+:deep(.bjs-powered-by) { display: none !important; }
+:deep(.djs-palette) { top: 20px; left: 20px; }
 
-.loading-container {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  height: 100%;
-}
-
-:deep(.bjs-powered-by) {
-  display: none !important;
-}
-:deep(.djs-palette) {
-  top: 20px;
-  left: 20px;
-}
-
-/* --- 【核心修改】Tabs & Helper Panel Theming --- */
-.helper-panel-container {
-  padding: 0 24px;
+/* --- 【核心修改】Tabs 样式 --- */
+.helper-tabs {
   background-color: #fafafa;
   border-bottom: 1px solid #f0f0f0;
+  padding: 16px;
 }
-
-.helper-panel-container :deep(.ant-tabs-nav) {
-  margin-bottom: 0;
+.helper-tabs :deep(.ant-tabs-nav) {
+  margin-bottom: 0 !important;
 }
-
-.helper-panel-container :deep(.ant-tabs-tab-active .ant-tabs-tab-btn) {
-  color: var(--ant-primary-color);
+.helper-tabs :deep(.ant-tabs-content-holder) {
+  padding: 8px 16px;
 }
-
-.helper-panel-container :deep(.ant-tabs-ink-bar) {
-  background: var(--ant-primary-color);
+.collapsible-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 4px;
+  cursor: pointer;
+  border-radius: 4px;
+  transition: background-color 0.2s;
 }
-
-.helper-panel-container :deep(.ant-tabs-content-holder) {
-  background-color: #fff;
-  border: 1px solid #f0f0f0;
-  border-top: none;
+.collapsible-header:hover {
+  background-color: #f0f0f0;
 }
-
-.helper-content {
-  padding: 8px 12px;
+.collapsible-header .anticon {
+  transition: transform 0.3s;
 }
+.collapsible-header .is-expanded {
+  transform: rotate(180deg);
+}
+.collapsible-content {
+  padding-top: 12px;
+}
+/* -------------------------- */
 
-.tag-list {
-  max-height: 100px;
+.group-list {
+  max-height: 120px;
   overflow-y: auto;
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
 }
-
-.helper-tag {
+.group-tag {
   cursor: pointer;
   transition: all 0.2s;
 }
-
-.helper-tag:hover {
+.group-tag:hover {
   transform: translateY(-2px);
   color: var(--ant-primary-color);
   border-color: var(--ant-primary-color);
 }
-
 .form-name-highlight {
   color: var(--ant-primary-color);
-}
-
-/* --- 【核心新增】BPMN.js Canvas Theming --- */
-:deep(.djs-element.selected .djs-outline) {
-  stroke: var(--ant-primary-color) !important;
-  stroke-width: 2px !important;
-}
-
-:deep(.djs-context-pad .entry:hover) {
-  background: #e6f7ff; /* A light variant of the theme color */
-  border-color: var(--ant-primary-color);
 }
 </style>

@@ -22,15 +22,17 @@ public class User implements UserDetails {
 
     private String name;
 
+    // --- 【新增】可由用户编辑的字段 ---
+    private String email;
+    private String phoneNumber;
+    // --- 【新增结束】 ---
+
     @Column(nullable = false)
     private String password; // 存储编码后的密码
 
-    // --- 【核心修改】将 department 字段从 String 修改为与 Department 实体的关联 ---
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "department_id")
     private Department department;
-    // --- 【修改结束】 ---
-
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "manager_id")

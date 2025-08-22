@@ -4,10 +4,8 @@
 
   <!-- 条件渲染：只有在满足显隐条件时才渲染组件 -->
   <div v-if="isVisible">
-    <!-- 新增 StaticText 组件的直接渲染，它不应被 a-form-item 包裹 -->
     <StaticTextRenderer v-if="field.type === 'StaticText'" :field="field" />
 
-    <!-- 1. 布局组件的统一处理 -->
     <template v-else-if="['GridRow', 'Collapse'].includes(field.type)">
       <a-row v-if="field.type === 'GridRow'" :gutter="field.props.gutter">
         <a-col v-for="(col, colIndex) in field.columns" :key="colIndex" :span="col.props.span">
@@ -21,7 +19,6 @@
       </a-collapse>
     </template>
 
-    <!-- 2. 描述列表 (纯展示组件) -->
     <a-descriptions
         v-else-if="field.type === 'DescriptionList'"
         :title="field.label"
@@ -34,11 +31,8 @@
       </a-descriptions-item>
     </a-descriptions>
 
-    <!-- 3. 其他所有可交互组件的渲染 -->
     <a-form-item v-else :label="field.label" :name="field.id" :rules="mode === 'edit' ? dynamicRules : []">
-      <!-- ==================== 编辑模式 (mode === 'edit') ==================== -->
       <template v-if="mode === 'edit'">
-        <!-- 【核心修改】将 FileUpload 单独处理以传递 list-type prop -->
         <FileUploader
             v-if="field.type === 'FileUpload'"
             v-model:value="localValue"
@@ -71,7 +65,7 @@
         />
         <a-select v-else-if="field.type === 'Select'" v-model:value="localValue" :placeholder="field.props.placeholder" :options="dynamicOptions" :loading="loadingOptions" show-search :filter-option="filterOption" />
         <a-tree-select v-else-if="field.type === 'TreeSelect'" v-model:value="localValue" :placeholder="field.props.placeholder" :tree-data="dynamicOptions" :loading="loadingOptions" tree-default-expand-all show-search tree-node-filter-prop="title" />
-        <DataPicker v-else-if="field.type === 'DataPicker'" v-model:value="localValue" :field="field" @update:form-data="(mappings) => handleDataPickerUpdate(mappings)" />
+        <DataPicker v-else-if="field.type === 'DataPicker'" v-model:value="localValue" :field="field" :form-data="formData" @update:form-data="(id, val) => emit('update:form-data', id, val)" />
         <EditableSubform v-else-if="field.type === 'Subform'" v-model:value="localValue" :field="field" />
         <KeyValueEditor v-else-if="field.type === 'KeyValue'" v-model:value="localValue" :field-id="field.id" :key-placeholder="field.props.keyPlaceholder" :value-placeholder="field.props.valuePlaceholder" />
         <a-input v-else-if="field.type === 'IconPicker'" :value="localValue" :placeholder="field.props.placeholder" readonly @click="showIconPickerModal = true">
@@ -84,7 +78,6 @@
         <component v-else :is="getComponentByType(field.type)" v-model:value="localValue" v-model:checked="localValue" :placeholder="field.props.placeholder" />
       </template>
 
-      <!-- ==================== 只读模式 (mode === 'readonly') ==================== -->
       <template v-else>
         <span v-if="!['FileUpload', 'RichText', 'Subform', 'KeyValue', 'IconPicker'].includes(field.type)">{{ formattedValue }}</span>
         <div v-if="field.type === 'FileUpload' && localValue && localValue.length > 0">
@@ -108,7 +101,7 @@ import { computed, ref, onMounted, defineAsyncComponent } from 'vue';
 import { useUserStore } from '@/stores/user';
 import { downloadFile, fetchTableData, fetchTreeData, searchUsersForPicker } from '@/api';
 import { message } from 'ant-design-vue';
-import { PaperClipOutlined } from '@ant-design/icons-vue';
+import { PaperClipOutlined, SmileOutlined } from '@ant-design/icons-vue';
 import FileUploader from '@/components/FileUploader.vue';
 import DataPicker from './DataPicker.vue';
 import { QuillEditor } from '@vueup/vue-quill';
@@ -153,6 +146,7 @@ const isVisible = computed(() => {
   return visibility.condition === 'AND' ? visibility.rules.every(checkRule) : visibility.rules.some(checkRule);
 });
 
+// 【核心修改】增强校验规则以支持合计校验
 const dynamicRules = computed(() => {
   if (!props.field.rules) return [];
 
@@ -177,6 +171,26 @@ const dynamicRules = computed(() => {
       };
       return { validator, trigger: 'blur' };
     }
+    // 合计校验
+    if (ruleConfig.type === 'sum') {
+      const validator = (rule, value) => {
+        if (!Array.isArray(value) || value.length === 0) {
+          return Promise.resolve(); // 如果子表单为空，不进行校验
+        }
+        const sum = value.reduce((acc, row) => acc + (Number(row[ruleConfig.subformColumn]) || 0), 0);
+        const mainValue = Number(props.formData[ruleConfig.mainFormField]) || 0;
+
+        let isValid = true;
+        switch (ruleConfig.compareOperator) {
+          case '==': isValid = (sum === mainValue); break;
+          case '>=': isValid = (sum >= mainValue); break;
+          case '<=': isValid = (sum <= mainValue); break;
+        }
+        return isValid ? Promise.resolve() : Promise.reject(new Error(ruleConfig.message));
+      };
+      return { validator, trigger: 'change' };
+    }
+
     return { ...ruleConfig };
   });
 });
@@ -184,12 +198,9 @@ const dynamicRules = computed(() => {
 const richTextToolbarOptions = computed(() => {
   const config = props.field.props?.toolbarOptions;
   if (!config) return 'minimal';
-
   const toolbar = [];
   const allOptions = [...(config.basic || []), ...(config.header || []), ...(config.list || []), ...(config.extra || [])];
-
   if (allOptions.length === 0) return false;
-
   const mapping = {
     'bold': 'bold', 'italic': 'italic', 'underline': 'underline', 'strike': 'strike',
     'header': { 'header': [1, 2, 3, false] },
@@ -197,13 +208,11 @@ const richTextToolbarOptions = computed(() => {
     'list-ordered': { 'list': 'ordered' }, 'list-bullet': { 'list': 'bullet' },
     'link': 'link', 'image': 'image', 'clean': 'clean'
   };
-
   const group = [];
   allOptions.forEach(opt => {
     if (mapping[opt]) group.push(mapping[opt]);
   });
   if (group.length > 0) toolbar.push(group);
-
   return toolbar;
 });
 
@@ -298,7 +307,6 @@ const handleUserSearch = (keyword) => {
 
 const getComponentByType = (type) => {
   const map = { Input: 'a-input', Textarea: 'a-textarea', Checkbox: 'a-checkbox', DatePicker: 'a-date-picker' };
-  // 【核心修改】移除 FileUpload，因为它现在被单独处理
   return map[type] || 'a-input';
 };
 const filterOption = (input, option) => option.label.toLowerCase().indexOf(input.toLowerCase()) >= 0;
@@ -320,8 +328,8 @@ const handleDownload = async (fileId, filename) => {
     URL.revokeObjectURL(url);
   } catch (error) { message.error('文件下载失败'); }
 };
-const handleDataPickerUpdate = (mappings) => {
-  for (const key in mappings) { emit('update:form-data', key, mappings[key]); }
+const handleDataPickerUpdate = (id, val) => {
+  emit('update:form-data', id, val);
 };
 </script>
 

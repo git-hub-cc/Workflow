@@ -3,6 +3,43 @@ import AppLayout from '@/components/AppLayout.vue';
 import { useUserStore } from '@/stores/user';
 import { message } from "ant-design-vue";
 
+// --- 【核心优化】将静态菜单定义移到此处，并导出 ---
+export const adminMenus = [
+    {
+        id: 'admin-root', name: '系统管理', icon: 'SettingOutlined', type: 'DIRECTORY',
+        children: [
+            { id: 'admin-dashboard', name: '仪表盘', path: '/admin/dashboard', icon: 'DashboardOutlined', type: 'DATA_LIST' },
+            { id: 'admin-forms', name: '表单管理', path: '/admin/forms', icon: 'FormOutlined', type: 'DATA_LIST' },
+            { id: 'admin-instances', name: '实例管理', path: '/admin/instances', icon: 'NodeIndexOutlined', type: 'DATA_LIST' },
+            { id: 'admin-menus', name: '菜单管理', path: '/admin/menus', icon: 'AppstoreOutlined', type: 'DATA_LIST' },
+            {
+                id: 'admin-permissions', name: '用户权限', icon: 'TeamOutlined', type: 'DIRECTORY',
+                children: [
+                    { id: 'admin-users', name: '用户管理', path: '/admin/users', icon: 'UserOutlined', type: 'DATA_LIST' },
+                    { id: 'admin-roles', name: '角色管理', path: '/admin/roles', icon: 'SafetyCertificateOutlined', type: 'DATA_LIST' },
+                    { id: 'admin-groups', name: '用户组管理', path: '/admin/groups', icon: 'UsergroupAddOutlined', type: 'DATA_LIST' },
+                ]
+            },
+            {
+                id: 'admin-org', name: '组织架构', icon: 'ApartmentOutlined', type: 'DIRECTORY',
+                children: [
+                    { id: 'admin-org-chart', name: '组织架构图', path: '/admin/org-chart', icon: 'ApartmentOutlined', type: 'DATA_LIST' },
+                    { id: 'admin-org-management', name: '架构管理', path: '/admin/org-management', icon: 'ForkOutlined', type: 'DATA_LIST' }
+                ]
+            },
+            {
+                id: 'admin-logs', name: '日志管理', icon: 'FileSearchOutlined', type: 'DIRECTORY',
+                children: [
+                    { id: 'admin-login-log', name: '登录日志', path: '/admin/logs/login', icon: 'TableOutlined', type: 'DATA_LIST' },
+                    { id: 'admin-operation-log', name: '操作日志', path: '/admin/logs/operation', icon: 'ProfileOutlined', type: 'DATA_LIST' },
+                ]
+            },
+            { id: 'admin-settings', name: '系统设置', path: '/admin/settings', icon: 'BuildOutlined', type: 'DATA_LIST' },
+        ]
+    }
+];
+
+
 // --- 1. 静态路由定义 ---
 const staticRoutes = [
     {
@@ -32,7 +69,6 @@ const staticRoutes = [
             { path: 'admin/org-management', name: 'admin-org-management', component: () => import('../views/admin/OrganizationManagement.vue'), meta: { title: '组织架构管理', requiresAdmin: true } },
             { path: 'admin/logs/login', name: 'admin-login-log', component: () => import('../views/admin/LoginLog.vue'), meta: { title: '登录日志', requiresAdmin: true } },
             { path: 'admin/logs/operation', name: 'admin-operation-log', component: () => import('../views/admin/OperationLog.vue'), meta: { title: '操作日志', requiresAdmin: true } },
-            // --- 【核心新增】系统设置路由 ---
             { path: 'admin/settings', name: 'admin-settings', component: () => import('../views/admin/SystemSettings.vue'), meta: { title: '系统设置', requiresAdmin: true } },
 
             {
@@ -79,6 +115,8 @@ let router = createRouter({
 const dynamicRouteModules = {
     'FORM_ENTRY': () => import('../views/FormViewer.vue'),
     'DATA_LIST': () => import('../views/DataListView.vue'),
+    // --- 【新增】报表路由 ---
+    'REPORT': () => import('../views/ReportViewer.vue'),
 };
 
 export function addDynamicRoutes(menus) {
@@ -89,15 +127,26 @@ export function addDynamicRoutes(menus) {
     }
     const processMenus = (menuItems) => {
         for (const menu of menuItems) {
-            if (menu.path && menu.type !== 'DIRECTORY') {
+            // --- 【核心修改】增加对 EXTERNAL_LINK 的排除 ---
+            if (menu.path && menu.type !== 'DIRECTORY' && menu.type !== 'EXTERNAL_LINK') {
                 const componentLoader = dynamicRouteModules[menu.type];
                 if (componentLoader) {
                     const route = {
                         path: menu.path,
                         name: menu.path.replace(/^\//, '').replace(/\//g, '-'),
                         component: componentLoader,
-                        meta: { title: menu.name, formId: menu.formDefinitionId, menuId: menu.id },
-                        props: route => ({ formId: route.meta.formId })
+                        // --- 【核心修改】将报表 key 也放入 meta ---
+                        meta: {
+                            title: menu.name,
+                            formId: menu.formDefinitionId,
+                            menuId: menu.id,
+                            reportKey: menu.type === 'REPORT' ? menu.path.split('/').pop() : undefined,
+                        },
+                        // --- 【核心修改】根据类型传递不同的 props ---
+                        props: route => ({
+                            formId: route.meta.formId,
+                            reportKey: route.meta.reportKey,
+                        })
                     };
                     if (!router.hasRoute(route.name)) {
                         router.addRoute(layoutRouteName, route);

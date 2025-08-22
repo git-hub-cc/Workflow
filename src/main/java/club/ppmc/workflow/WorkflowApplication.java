@@ -53,92 +53,40 @@ public class WorkflowApplication {
             SystemSettingRepository systemSettingRepository
     ) {
         return args -> {
-//            System.out.println("正在初始化演示用户及角色数据...");
-//
-//            // 1. 创建并保存角色
-//            Role adminRole = new Role();
-//            adminRole.setName("ADMIN");
-//            adminRole.setDescription("系统管理员，拥有所有权限");
-//            roleRepository.save(adminRole);
-//
-//            Role userRole = new Role();
-//            userRole.setName("USER");
-//            userRole.setDescription("普通用户，拥有基本操作权限");
-//            roleRepository.save(userRole);
-//
-//            Role financeRole = new Role();
-//            financeRole.setName("FINANCE_APPROVER");
-//            financeRole.setDescription("财务审批员");
-//            roleRepository.save(financeRole);
-//
-//            // --- 【核心新增：创建部门】 ---
-//            Department itDept = new Department();
-//            itDept.setName("IT部");
-//            departmentRepository.save(itDept);
-//
-//            Department financeDept = new Department();
-//            financeDept.setName("财务部");
-//            departmentRepository.save(financeDept);
-//
-//            Department rdDept = new Department();
-//            rdDept.setName("研发部");
-//            departmentRepository.save(rdDept);
-//
-//
-//            // 2. 创建用户并分配角色和部门
-//            String defaultPassword = passwordEncoder.encode("password");
-//
-//            User admin = new User();
-//            admin.setId("admin");
-//            admin.setName("系统管理员");
-//            admin.setDepartment(itDept); // 关联部门实体
-//            admin.setPassword(passwordEncoder.encode("admin"));
-//            admin.setRoles(Set.of(adminRole, userRole));
-//            userRepository.save(admin);
-//
-//            User user3 = new User(); // 财务总监-王五
-//            user3.setId("hr001");
-//            user3.setName("财务总监-王五");
-//            user3.setDepartment(financeDept); // 关联部门实体
-//            user3.setPassword(defaultPassword);
-//            user3.setRoles(Set.of(userRole, financeRole));
-//            userRepository.save(user3);
-//
-//            User user2 = new User(); // 部门经理-李四
-//            user2.setId("manager001");
-//            user2.setName("研发部经理-李四");
-//            user2.setDepartment(rdDept); // 关联部门实体
-//            user2.setPassword(defaultPassword);
-//            user2.setRoles(Set.of(userRole));
-//            user2.setManager(user3); // 李四的上级是王五
-//            userRepository.save(user2);
-//
-//            User user1 = new User(); // 普通员工-张三
-//            user1.setId("user001");
-//            user1.setName("研发工程师-张三");
-//            user1.setDepartment(rdDept); // 关联部门实体
-//            user1.setPassword(defaultPassword);
-//            user1.setRoles(Set.of(userRole));
-//            user1.setManager(user2); // 张三的上级是李四
-//            userRepository.save(user1);
-//
-//            System.out.println("演示用户、角色和部门数据初始化完成！");
+            System.out.println("正在初始化演示用户及角色数据...");
 
-
-            // ADMIN
+            // 1. 创建并保存角色
             Role adminRole = new Role();
             adminRole.setName("ADMIN");
             adminRole.setDescription("系统管理员，拥有所有权限");
             roleRepository.save(adminRole);
 
-            Department itDept = new Department();
-            itDept.setName("IT部");
-            departmentRepository.save(itDept);
-
             Role userRole = new Role();
             userRole.setName("USER");
             userRole.setDescription("普通用户，拥有基本操作权限");
             roleRepository.save(userRole);
+
+            Role financeRole = new Role();
+            financeRole.setName("FINANCE_APPROVER");
+            financeRole.setDescription("财务审批员");
+            roleRepository.save(financeRole);
+
+            // --- 【核心新增：创建部门】 ---
+            Department itDept = new Department();
+            itDept.setName("IT部");
+            departmentRepository.save(itDept);
+
+            Department financeDept = new Department();
+            financeDept.setName("财务部");
+            departmentRepository.save(financeDept);
+
+            Department rdDept = new Department();
+            rdDept.setName("研发部");
+            departmentRepository.save(rdDept);
+
+
+            // 2. 创建用户并分配角色和部门
+            String defaultPassword = passwordEncoder.encode("password");
 
             User admin = new User();
             admin.setId("admin");
@@ -147,6 +95,58 @@ public class WorkflowApplication {
             admin.setPassword(passwordEncoder.encode("admin"));
             admin.setRoles(Set.of(adminRole, userRole));
             userRepository.save(admin);
+
+            User user3 = new User(); // 财务总监-王五
+            user3.setId("hr001");
+            user3.setName("财务总监-王五");
+            user3.setDepartment(financeDept); // 关联部门实体
+            user3.setPassword(defaultPassword);
+            user3.setRoles(Set.of(userRole, financeRole));
+            userRepository.save(user3);
+
+            User user2 = new User(); // 部门经理-李四
+            user2.setId("manager001");
+            user2.setName("研发部经理-李四");
+            user2.setDepartment(rdDept); // 关联部门实体
+            user2.setPassword(defaultPassword);
+            user2.setRoles(Set.of(userRole));
+            user2.setManager(user3); // 李四的上级是王五
+            userRepository.save(user2);
+
+            User user1 = new User(); // 普通员工-张三
+            user1.setId("user001");
+            user1.setName("研发工程师-张三");
+            user1.setDepartment(rdDept); // 关联部门实体
+            user1.setPassword(defaultPassword);
+            user1.setRoles(Set.of(userRole));
+            user1.setManager(user2); // 张三的上级是李四
+            userRepository.save(user1);
+
+            System.out.println("演示用户、角色和部门数据初始化完成！");
+
+
+            // ADMIN
+//            Role adminRole = new Role();
+//            adminRole.setName("ADMIN");
+//            adminRole.setDescription("系统管理员，拥有所有权限");
+//            roleRepository.save(adminRole);
+//
+//            Department itDept = new Department();
+//            itDept.setName("IT部");
+//            departmentRepository.save(itDept);
+//
+//            Role userRole = new Role();
+//            userRole.setName("USER");
+//            userRole.setDescription("普通用户，拥有基本操作权限");
+//            roleRepository.save(userRole);
+//
+//            User admin = new User();
+//            admin.setId("admin");
+//            admin.setName("系统管理员");
+//            admin.setDepartment(itDept); // 关联部门实体
+//            admin.setPassword(passwordEncoder.encode("admin"));
+//            admin.setRoles(Set.of(adminRole, userRole));
+//            userRepository.save(admin);
 
             // --- 【核心新增】初始化系统设置默认值 ---
             System.out.println("正在初始化系统设置默认值...");
