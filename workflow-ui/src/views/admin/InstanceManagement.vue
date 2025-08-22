@@ -26,19 +26,34 @@
               {{ record.suspended ? '已挂起' : '运行中' }}
             </a-tag>
           </template>
+          <!-- 【核心修改】将 Dropdown 菜单改为直接的文字链接按钮 -->
           <template v-else-if="column.key === 'actions'">
-            <a-dropdown>
-              <a class="ant-dropdown-link" @click.prevent>
-                操作 <DownOutlined />
-              </a>
-              <template #overlay>
-                <a-menu @click="({ key }) => handleMenuClick(key, record)">
-                  <a-menu-item v-if="!record.suspended" key="suspend">挂起</a-menu-item>
-                  <a-menu-item v-if="record.suspended" key="activate">激活</a-menu-item>
-                  <a-menu-item key="terminate" danger>终止</a-menu-item>
-                </a-menu>
-              </template>
-            </a-dropdown>
+            <a-space>
+              <a-button
+                  v-if="!record.suspended"
+                  type="link"
+                  size="small"
+                  @click="handleSuspend(record.processInstanceId)"
+              >
+                挂起
+              </a-button>
+              <a-button
+                  v-if="record.suspended"
+                  type="link"
+                  size="small"
+                  @click="handleActivate(record.processInstanceId)"
+              >
+                激活
+              </a-button>
+              <a-button
+                  type="link"
+                  size="small"
+                  danger
+                  @click="handleTerminate(record)"
+              >
+                终止
+              </a-button>
+            </a-space>
           </template>
         </template>
       </a-table>
@@ -50,7 +65,6 @@
 import { ref, onMounted, h } from 'vue';
 import { getActiveInstances, terminateInstance, suspendInstance, activateInstance } from '@/api';
 import { message, Modal, Input } from 'ant-design-vue';
-import { DownOutlined } from '@ant-design/icons-vue';
 
 const loading = ref(true);
 const instances = ref([]);
@@ -78,20 +92,6 @@ const fetchInstances = async () => {
 };
 
 onMounted(fetchInstances);
-
-const handleMenuClick = async (key, record) => {
-  switch (key) {
-    case 'suspend':
-      await handleSuspend(record.processInstanceId);
-      break;
-    case 'activate':
-      await handleActivate(record.processInstanceId);
-      break;
-    case 'terminate':
-      handleTerminate(record);
-      break;
-  }
-};
 
 const handleSuspend = async (instanceId) => {
   try {

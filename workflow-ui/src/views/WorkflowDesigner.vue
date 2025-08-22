@@ -16,10 +16,10 @@
     <!-- 工具栏 -->
     <div class="toolbar">
       <a-space>
-        <a-tooltip title="撤销">
+        <a-tooltip title="撤销 (Ctrl+Z)">
           <a-button @click="handleUndo" :disabled="!canUndo"><UndoOutlined /></a-button>
         </a-tooltip>
-        <a-tooltip title="重做">
+        <a-tooltip title="重做 (Ctrl+Y / Ctrl+Shift+Z)">
           <a-button @click="handleRedo" :disabled="!canRedo"><RedoOutlined /></a-button>
         </a-tooltip>
         <a-divider type="vertical" />
@@ -46,29 +46,53 @@
       </a-space>
     </div>
 
-    <!-- 用户组辅助面板 -->
-    <a-collapse ghost class="group-helper-collapse">
-      <a-collapse-panel key="1" header="可用用户组 (点击复制ID)">
-        <div class="group-helper-content">
-          <a-input-search
-              v-model:value="groupSearchText"
-              placeholder="搜索用户组"
-              size="small"
-              style="margin-bottom: 8px;"
-          />
-          <a-spin :spinning="groupsLoading">
-            <div class="group-list">
-              <a-tooltip v-for="group in filteredGroups" :key="group.id" :title="group.description">
-                <a-tag @click="copyToClipboard(group.name)" class="group-tag">
-                  {{ group.name }}
+    <!-- 辅助信息面板 -->
+    <div class="helper-panel-container">
+      <a-tabs v-model:active-key="activeHelperKey" type="card" size="small">
+        <!-- 可用表单变量面板 -->
+        <a-tab-pane key="fields" tab="可用表单变量">
+          <div class="helper-content">
+            <a-input-search
+                v-model:value="fieldSearchText"
+                placeholder="搜索字段 (点击复制为表达式)"
+                size="small"
+                style="margin-bottom: 8px;"
+            />
+            <div class="tag-list">
+              <a-tooltip v-for="field in filteredFormFields" :key="field.id" :title="`字段ID: ${field.id}`">
+                <a-tag @click="copyToClipboard(field.id, true)" class="helper-tag">
+                  {{ field.label }} ({{ field.id }})
                 </a-tag>
               </a-tooltip>
-              <a-empty v-if="filteredGroups.length === 0" :image-style="{ height: '40px' }" description="无匹配" />
+              <a-empty v-if="!loading && filteredFormFields.length === 0" :image-style="{ height: '40px' }" description="无可用字段" />
             </div>
-          </a-spin>
-        </div>
-      </a-collapse-panel>
-    </a-collapse>
+          </div>
+        </a-tab-pane>
+
+        <!-- 可用用户组面板 -->
+        <a-tab-pane key="groups" tab="可用用户组">
+          <div class="helper-content">
+            <a-input-search
+                v-model:value="groupSearchText"
+                placeholder="搜索用户组 (点击复制ID)"
+                size="small"
+                style="margin-bottom: 8px;"
+            />
+            <a-spin :spinning="groupsLoading">
+              <div class="tag-list">
+                <a-tooltip v-for="group in filteredGroups" :key="group.id" :title="group.description">
+                  <a-tag @click="copyToClipboard(group.name, false)" class="helper-tag">
+                    {{ group.name }}
+                  </a-tag>
+                </a-tooltip>
+                <a-empty v-if="filteredGroups.length === 0" :image-style="{ height: '40px' }" description="无匹配" />
+              </div>
+            </a-spin>
+          </div>
+        </a-tab-pane>
+      </a-tabs>
+    </div>
+
 
     <!-- 设计器区域 -->
     <div class="designer-container" v-show="!loading">
@@ -90,6 +114,7 @@ import {
   UndoOutlined, RedoOutlined, ZoomInOutlined, ZoomOutOutlined,
   FullscreenOutlined, DownloadOutlined, FileImageOutlined, UploadOutlined
 } from '@ant-design/icons-vue';
+import { flattenFields } from '@/utils/formUtils.js';
 
 // BPMN.js related imports...
 import BpmnModeler from 'bpmn-js/lib/Modeler.js';
@@ -122,16 +147,28 @@ let modeler = null;
 const canUndo = ref(false);
 const canRedo = ref(false);
 
-// --- 用户组辅助功能状态 ---
+// --- 辅助面板状态 ---
 const availableGroups = ref([]);
 const groupsLoading = ref(false);
 const groupSearchText = ref('');
+const formFields = ref([]);
+const fieldSearchText = ref('');
+const activeHelperKey = ref('fields');
 
 const filteredGroups = computed(() => {
   if (!groupSearchText.value) return availableGroups.value;
   return availableGroups.value.filter(g =>
       g.name.toLowerCase().includes(groupSearchText.value.toLowerCase()) ||
       g.description.toLowerCase().includes(groupSearchText.value.toLowerCase())
+  );
+});
+
+const filteredFormFields = computed(() => {
+  if (!fieldSearchText.value) return formFields.value;
+  const query = fieldSearchText.value.toLowerCase();
+  return formFields.value.filter(f =>
+      f.label.toLowerCase().includes(query) ||
+      f.id.toLowerCase().includes(query)
   );
 });
 
@@ -172,6 +209,24 @@ async function initModeler() {
   }
 }
 
+const handleKeyDown = (event) => {
+  if (!modeler) return;
+  const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
+  const isCtrlOrCmd = isMac ? event.metaKey : event.ctrlKey;
+
+  if (isCtrlOrCmd && event.key.toLowerCase() === 'z') {
+    event.preventDefault();
+    if (event.shiftKey) {
+      if (modeler.get('commandStack').canRedo()) modeler.get('commandStack').redo();
+    } else {
+      if (modeler.get('commandStack').canUndo()) modeler.get('commandStack').undo();
+    }
+  } else if (isCtrlOrCmd && event.key.toLowerCase() === 'y') {
+    event.preventDefault();
+    if (modeler.get('commandStack').canRedo()) modeler.get('commandStack').redo();
+  }
+};
+
 // --- 页面挂载 ---
 onMounted(async () => {
   groupsLoading.value = true;
@@ -182,6 +237,15 @@ onMounted(async () => {
     ]);
     formName.value = form.name;
     availableGroups.value = groups;
+
+    const schema = JSON.parse(form.schemaJson);
+    const flattened = flattenFields(schema.fields);
+    formFields.value = flattened
+        .filter(f => !['GridRow', 'GridCol', 'Collapse', 'CollapsePanel', 'StaticText', 'DescriptionList'].includes(f.type))
+        .map(f => ({ id: f.id, label: f.label || f.id }));
+
+    window.addEventListener('keydown', handleKeyDown);
+
   } catch (err) {
     message.error('获取基础信息失败');
     console.error(err);
@@ -197,6 +261,7 @@ onBeforeUnmount(() => {
     modeler.destroy();
     modeler = null;
   }
+  window.removeEventListener('keydown', handleKeyDown);
 });
 
 // --- 辅助函数 ---
@@ -307,11 +372,12 @@ const downloadSvg = async () => {
   }
 };
 
-// --- 复制到剪贴板 ---
-const copyToClipboard = async (text) => {
+const copyToClipboard = async (text, isVariable = false) => {
+  const textToCopy = isVariable ? `\${${text}}` : text;
+  const messageText = isVariable ? `表达式 "${textToCopy}"` : `ID "${textToCopy}"`;
   try {
-    await navigator.clipboard.writeText(text);
-    message.success(`用户组ID "${text}" 已复制到剪贴板!`);
+    await navigator.clipboard.writeText(textToCopy);
+    message.success(`${messageText} 已复制到剪贴板!`);
   } catch (err) {
     message.error('复制失败!');
   }
@@ -319,26 +385,33 @@ const copyToClipboard = async (text) => {
 </script>
 
 <style scoped>
+/* --- 【核心修改】Layout Optimization --- */
 .page-container {
   padding: 0;
   display: flex;
   flex-direction: column;
-  height: calc(100vh - 64px - 48px);
+  height: 100%; /* Fill the flex container from AppLayout */
   background-color: #fff;
 }
+
 .toolbar {
   padding: 8px 24px;
   border-bottom: 1px solid #f0f0f0;
   background: #fff;
   flex-shrink: 0;
 }
+
 .designer-container {
   display: flex;
   flex-grow: 1;
-  border-top: 1px solid #f0f0f0;
-  min-height: 0;
+  min-height: 0; /* Important for flex-grow to work correctly */
 }
-#canvas { flex-grow: 1; background-color: #f9f9f9; }
+
+#canvas {
+  flex-grow: 1;
+  background-color: #f9f9f9;
+}
+
 #properties-panel-container {
   width: 320px;
   background: #f8f8f8;
@@ -346,35 +419,82 @@ const copyToClipboard = async (text) => {
   border-left: 1px solid #e0e0e0;
   flex-shrink: 0;
 }
-.loading-container { display: flex; justify-content: center; align-items: center; height: 100%; }
-:deep(.bjs-powered-by) { display: none !important; }
-:deep(.djs-palette) { top: 20px; left: 20px; }
 
-.group-helper-collapse {
+.loading-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100%;
+}
+
+:deep(.bjs-powered-by) {
+  display: none !important;
+}
+:deep(.djs-palette) {
+  top: 20px;
+  left: 20px;
+}
+
+/* --- 【核心修改】Tabs & Helper Panel Theming --- */
+.helper-panel-container {
+  padding: 0 24px;
+  background-color: #fafafa;
   border-bottom: 1px solid #f0f0f0;
 }
-.group-helper-content {
-  padding: 0 16px;
+
+.helper-panel-container :deep(.ant-tabs-nav) {
+  margin-bottom: 0;
 }
-.group-list {
-  max-height: 120px;
+
+.helper-panel-container :deep(.ant-tabs-tab-active .ant-tabs-tab-btn) {
+  color: var(--ant-primary-color);
+}
+
+.helper-panel-container :deep(.ant-tabs-ink-bar) {
+  background: var(--ant-primary-color);
+}
+
+.helper-panel-container :deep(.ant-tabs-content-holder) {
+  background-color: #fff;
+  border: 1px solid #f0f0f0;
+  border-top: none;
+}
+
+.helper-content {
+  padding: 8px 12px;
+}
+
+.tag-list {
+  max-height: 100px;
   overflow-y: auto;
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
 }
-.group-tag {
+
+.helper-tag {
   cursor: pointer;
   transition: all 0.2s;
 }
-.group-tag:hover {
+
+.helper-tag:hover {
   transform: translateY(-2px);
-  /* 【核心修改】使用 CSS 变量来应用主题色 */
   color: var(--ant-primary-color);
   border-color: var(--ant-primary-color);
 }
+
 .form-name-highlight {
-  /* 【核心修改】使用 CSS 变量来应用主题色 */
   color: var(--ant-primary-color);
+}
+
+/* --- 【核心新增】BPMN.js Canvas Theming --- */
+:deep(.djs-element.selected .djs-outline) {
+  stroke: var(--ant-primary-color) !important;
+  stroke-width: 2px !important;
+}
+
+:deep(.djs-context-pad .entry:hover) {
+  background: #e6f7ff; /* A light variant of the theme color */
+  border-color: var(--ant-primary-color);
 }
 </style>

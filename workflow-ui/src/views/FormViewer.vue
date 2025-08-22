@@ -29,16 +29,15 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted } from 'vue';
+// --- 【核心修复1】从 'vue' 导入 watch ---
+import { ref, reactive, onMounted, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import { getFormById, submitForm } from '@/api';
 import { message } from 'ant-design-vue';
 import FormItemRenderer from './viewer-components/FormItemRenderer.vue';
-// --- 【路径已修改】 ---
 import { flattenFields, initFormData } from '@/utils/formUtils.js';
 
 
-// ⭐ 核心修改: 允许 formId 接收字符串或数字类型
 const props = defineProps({ formId: [String, Number] });
 const router = useRouter();
 
@@ -48,10 +47,14 @@ const formDefinition = ref({ schema: { fields: [] } });
 const formData = reactive({});
 const formRef = ref();
 
-onMounted(async () => {
+// --- 【核心修复2】将数据加载逻辑封装成一个可复用的函数 ---
+const initializeForm = async () => {
+  if (!props.formId) return;
+  loading.value = true;
   try {
     const res = await getFormById(props.formId);
     res.schema = JSON.parse(res.schemaJson);
+    // 重新初始化 formData 以清空旧表单的数据
     initFormData(res.schema.fields, formData);
     formDefinition.value = res;
   } catch (error) {
@@ -59,7 +62,19 @@ onMounted(async () => {
   } finally {
     loading.value = false;
   }
+};
+
+// --- 【核心修复3】onMounted 只负责首次加载 ---
+onMounted(initializeForm);
+
+// --- 【核心修复4】使用 watch 侦听 props.formId 的变化，以处理组件复用时的内容更新 ---
+watch(() => props.formId, (newFormId, oldFormId) => {
+  // 确保 formId 确实发生了变化，再重新加载数据
+  if (newFormId && newFormId !== oldFormId) {
+    initializeForm();
+  }
 });
+
 
 const updateFormData = (fieldId, value) => {
   formData[fieldId] = value;
