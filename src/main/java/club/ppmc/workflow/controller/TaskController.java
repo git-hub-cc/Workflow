@@ -1,6 +1,7 @@
 package club.ppmc.workflow.controller;
 
 import club.ppmc.workflow.dto.CompleteTaskRequest;
+import club.ppmc.workflow.dto.CompletedTaskDto;
 import club.ppmc.workflow.dto.TaskDto;
 import club.ppmc.workflow.service.WorkflowService;
 import lombok.RequiredArgsConstructor;
@@ -25,7 +26,7 @@ public class TaskController {
     private final WorkflowService workflowService;
 
     /**
-     * 【核心修改】API: 获取当前登录用户的待办任务列表，支持分页和搜索
+     * API: 获取当前登录用户的待办任务列表，支持分页和搜索
      * 权限: 已认证用户
      */
     @GetMapping("/pending")
@@ -37,6 +38,22 @@ public class TaskController {
         Page<TaskDto> tasks = workflowService.getPendingTasksForUser(assigneeId, keyword, pageable);
         return ResponseEntity.ok(tasks);
     }
+
+    /**
+     * 【新增】API: 获取当前登录用户的已办任务列表
+     * 权限: 已认证用户
+     */
+    @GetMapping("/completed")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<Page<CompletedTaskDto>> getCompletedTasks(
+            Principal principal,
+            @RequestParam(required = false) String keyword,
+            Pageable pageable) {
+        String assigneeId = principal.getName();
+        Page<CompletedTaskDto> tasks = workflowService.getCompletedTasksForUser(assigneeId, keyword, pageable);
+        return ResponseEntity.ok(tasks);
+    }
+
 
     /**
      * API: 获取单个任务的详情

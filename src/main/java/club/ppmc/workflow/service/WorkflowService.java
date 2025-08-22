@@ -13,6 +13,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.camunda.bpm.engine.*;
 import org.camunda.bpm.engine.history.HistoricActivityInstance;
 import org.camunda.bpm.engine.history.HistoricTaskInstance;
+import org.camunda.bpm.engine.history.HistoricTaskInstanceQuery;
 import org.camunda.bpm.engine.history.HistoricVariableInstance;
 import org.camunda.bpm.engine.repository.Deployment;
 import org.camunda.bpm.engine.repository.ProcessDefinition;
@@ -55,7 +56,7 @@ public class WorkflowService {
     private final FormSubmissionRepository formSubmissionRepository;
     private final UserRepository userRepository;
     private final FileAttachmentRepository fileAttachmentRepository;
-    private final RoleRepository roleRepository; // 【核心新增】
+    private final RoleRepository roleRepository;
 
     private final ObjectMapper objectMapper;
 
@@ -273,7 +274,6 @@ public class WorkflowService {
                         throw new IllegalStateException("提交者 '" + submitter.getName() + "' 没有设置上级经理，无法启动需要上级审批的流程。");
                     }
 
-                    // --- 【核心新增】注入角色变量，以供流程定义使用 ---
                     roleRepository.findByName("FINANCE_APPROVER").ifPresent(role ->
                             variables.put("financeRole", role.getName())
                     );
@@ -362,8 +362,16 @@ public class WorkflowService {
         }
 
         Map<String, Object> variables = new HashMap<>();
-        boolean isApproved = request.getDecision().equals(CompleteTaskRequest.Decision.APPROVED);
+        String outcome = switch (request.getDecision()) {
+            case APPROVED -> "approved";
+            case REJECTED -> "rejected";
+            case RETURN_TO_INITIATOR -> "returnToInitiator";
+            case RETURN_TO_PREVIOUS -> "returnToPrevious";
+            default -> throw new IllegalArgumentException("未知的任务决策: " + request.getDecision());
+        };
+        variables.put("taskOutcome", outcome);
 
+        boolean isApproved = request.getDecision().equals(CompleteTaskRequest.Decision.APPROVED);
         variables.put("approved", isApproved);
         variables.put("passed", isApproved);
         variables.put("qc_passed", isApproved);
@@ -409,6 +417,88 @@ public class WorkflowService {
     }
 
     @Transactional(readOnly = true)
+    public Page<CompletedTaskDto> getCompletedTasksForUser(String assigneeId, String keyword, Pageable pageable) {
+        HistoricTaskInstanceQuery query = historyService.createHistoricTaskInstanceQuery()
+                .taskAssignee(assigneeId)
+                .finished();
+
+        if (StringUtils.hasText(keyword)) {
+            query.processVariableValueLike("formName", "%" + keyword + "%");
+        }
+
+        long total = query.count();
+
+        List<HistoricTaskInstance> historicTasks = query.orderByHistoricTaskInstanceEndTime().desc()
+                .listPage((int) pageable.getOffset(), pageable.getPageSize());
+
+        if (historicTasks.isEmpty()) {
+            return Page.empty(pageable);
+        }
+
+        List<String> taskIds = historicTasks.stream().map(HistoricTaskInstance::getId).collect(Collectors.toList());
+        Map<String, String> commentsMap = historyService.createHistoricVariableInstanceQuery()
+                .taskIdIn(taskIds.toArray(new String[0]))
+                .variableName("approvalComment")
+                .list()
+                .stream()
+                .collect(Collectors.toMap(HistoricVariableInstance::getTaskId, v -> (String) v.getValue()));
+
+        Set<String> processInstanceIds = historicTasks.stream().map(HistoricTaskInstance::getProcessInstanceId).collect(Collectors.toSet());
+        Map<String, Map<String, Object>> processVariablesMap = new HashMap<>();
+        if (!processInstanceIds.isEmpty()) {
+            historyService.createHistoricVariableInstanceQuery()
+                    .processInstanceIdIn(processInstanceIds.toArray(new String[0]))
+                    .list()
+                    .forEach(var -> processVariablesMap
+                            .computeIfAbsent(var.getProcessInstanceId(), k -> new HashMap<>())
+                            .put(var.getName(), var.getValue()));
+        }
+
+        List<CompletedTaskDto> dtos = historicTasks.stream()
+                .map(task -> {
+                    Map<String, Object> pVars = processVariablesMap.getOrDefault(task.getProcessInstanceId(), Collections.emptyMap());
+
+                    // --- 【核心修改】优先从 taskOutcome 获取决策，并提供更详细的决策信息 ---
+                    String decision = "UNKNOWN";
+                    Object taskOutcomeObj = pVars.get("taskOutcome");
+                    if (taskOutcomeObj instanceof String) {
+                        String outcome = (String) taskOutcomeObj;
+                        decision = switch (outcome) {
+                            case "approved" -> "APPROVED";
+                            case "rejected" -> "REJECTED";
+                            case "returnToInitiator" -> "RETURN_TO_INITIATOR";
+                            case "returnToPrevious" -> "RETURN_TO_PREVIOUS";
+                            default -> outcome.toUpperCase();
+                        };
+                    } else {
+                        // 兼容旧流程
+                        Object approvedVar = pVars.get("approved");
+                        if (approvedVar instanceof Boolean) {
+                            decision = (Boolean) approvedVar ? "APPROVED" : "REJECTED";
+                        }
+                    }
+                    // --- 【修改结束】 ---
+
+                    return CompletedTaskDto.builder()
+                            .camundaTaskId(task.getId())
+                            .stepName(task.getName())
+                            .startTime(task.getStartTime())
+                            .endTime(task.getEndTime())
+                            .durationInMillis(task.getDurationInMillis())
+                            .formSubmissionId((Long) pVars.get("formSubmissionId"))
+                            .formName((String) pVars.get("formName"))
+                            .submitterName((String) pVars.get("submitterName"))
+                            .decision(decision)
+                            .comment(commentsMap.get(task.getId()))
+                            .build();
+                })
+                .collect(Collectors.toList());
+
+        return new PageImpl<>(dtos, pageable, total);
+    }
+
+
+    @Transactional(readOnly = true)
     public TaskDto getTaskDetails(String camundaTaskId) {
         Task task = taskService.createTaskQuery().taskId(camundaTaskId).singleResult();
         if (task == null) {
@@ -432,6 +522,16 @@ public class WorkflowService {
 
         dto.setSubmitterName((String) variables.getOrDefault("submitterName", "未知"));
         dto.setFormName((String) variables.getOrDefault("formName", "未知表单"));
+
+        List<String> decisions = new ArrayList<>(List.of("APPROVED", "REJECTED", "RETURN_TO_INITIATOR"));
+        long userTaskCount = historyService.createHistoricTaskInstanceQuery()
+                .processInstanceId(camundaTask.getProcessInstanceId())
+                .finished()
+                .count();
+        if (userTaskCount > 0) {
+            decisions.add("RETURN_TO_PREVIOUS");
+        }
+        dto.setAvailableDecisions(decisions);
 
         return dto;
     }
@@ -467,15 +567,14 @@ public class WorkflowService {
                 .filter(v -> v.getTaskId() != null)
                 .collect(Collectors.toMap(HistoricVariableInstance::getTaskId, Function.identity()));
 
-        // 【核心修复】增加排序和合并函数，解决 Duplicate Key 问题
         Map<String, Object> processVariables = historyService.createHistoricVariableInstanceQuery()
                 .processInstanceId(processInstanceId)
-                .orderByTenantId().asc() // 1. 保证按时间升序排列
+                .orderByTenantId().asc()
                 .list().stream()
                 .collect(Collectors.toMap(
                         HistoricVariableInstance::getName,
                         HistoricVariableInstance::getValue,
-                        (oldValue, newValue) -> newValue // 2. 如果 key 重复，总是取新值
+                        (oldValue, newValue) -> newValue
                 ));
 
         Set<String> userIds = Stream.concat(
@@ -533,6 +632,22 @@ public class WorkflowService {
             historyList.add(dtoBuilder.build());
         }
         return historyList;
+    }
+
+    @Transactional(readOnly = true)
+    public BpmnXmlDto getWorkflowDiagram(Long submissionId) {
+        FormSubmission submission = formSubmissionRepository.findById(submissionId)
+                .orElseThrow(() -> new ResourceNotFoundException("未找到提交记录 ID: " + submissionId));
+
+        WorkflowInstance instance = Optional.ofNullable(submission.getWorkflowInstance())
+                .orElseThrow(() -> new ResourceNotFoundException("该申请未关联任何工作流实例"));
+
+        WorkflowTemplate template = instance.getTemplate();
+        if (template == null || !StringUtils.hasText(template.getBpmnXml())) {
+            throw new ResourceNotFoundException("未找到该工作流实例关联的流程图定义");
+        }
+
+        return new BpmnXmlDto(template.getBpmnXml());
     }
 
     public boolean isTaskOwner(String camundaTaskId, String username) {

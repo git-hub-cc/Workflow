@@ -2,6 +2,7 @@ package club.ppmc.workflow.dto;
 
 import lombok.Data;
 import java.util.Date; // Camunda 的时间是 java.util.Date
+import java.util.List;
 
 /**
  * @author cc
@@ -17,4 +18,11 @@ public class TaskDto {
     private Long formSubmissionId;
     private String formName;
     private String submitterName;
+
+    // --- 【核心新增】 ---
+    /**
+     * 当前任务可用的操作决策列表
+     * e.g., ["APPROVED", "REJECTED", "RETURN_TO_INITIATOR", "RETURN_TO_PREVIOUS"]
+     */
+    private List<String> availableDecisions;
 }

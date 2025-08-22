@@ -7,6 +7,7 @@ export const login = (credentials) => service.post('/auth/login', credentials);
 
 // 创建 axios 实例
 const service = axios.create({
+    //baseURL: '/workflow/api', //服务器配置
     baseURL: '/api', // Vite 代理会自动处理
     timeout: 10000, // 请求超时时间
 });
@@ -125,14 +126,19 @@ export const getWorkflowTemplate = (formId) => service.get(`/workflows/templates
 export const getWorkflowHistory = (submissionId) => service.get(`/workflows/history/${submissionId}`);
 export const updateWorkflowTemplate = (formId, data) => service.put(`/workflows/templates/${formId}`, data);
 export const getGroupsForWorkflow = () => service.get('/workflows/groups');
-// 【核心修改】为 getUsersForPicker 增加 departmentId 和 roleName 参数
 export const getUsersForPicker = (params) => service.get('/workflows/users', { params });
 export const getMySubmissions = (params) => service.get('/workflows/my-submissions', { params });
+// --- 【核心新增】获取流程图的 API ---
+export const getWorkflowDiagram = (submissionId) => service.get(`/workflows/submission/${submissionId}/diagram`);
+
 
 // --- 任务 API ---
 export const getPendingTasks = (params) => service.get('/tasks/pending', { params });
 export const getTaskById = (taskId) => service.get(`/tasks/${taskId}`);
 export const completeTask = (taskId, data) => service.post(`/tasks/${taskId}/complete`, data);
+// 【核心新增】获取已办任务的 API
+export const getCompletedTasks = (params) => service.get('/tasks/completed', { params });
+
 
 // --- 用户和管理 API ---
 export const changePassword = (data) => service.post('/users/me/change-password', data);
@@ -177,7 +183,6 @@ export const deleteMenu = (id) => service.delete(`/admin/menus/${id}`);
 export const updateMenuTree = (treeData) => service.put('/admin/menus/update-tree', treeData);
 
 // --- Admin Instance Management ---
-// 【核心修改】修改 getActiveInstances 为 getProcessInstances 并接收参数
 export const getProcessInstances = (params) => service.get('/admin/instances', { params });
 export const terminateInstance = (instanceId, reason) => service.delete(`/admin/instances/${instanceId}?reason=${reason}`);
 export const suspendInstance = (instanceId) => service.post(`/admin/instances/${instanceId}/suspend`);
@@ -185,11 +190,9 @@ export const activateInstance = (instanceId) => service.post(`/admin/instances/$
 export const reassignTask = (taskId, newAssigneeId) => service.post(`/admin/tasks/${taskId}/reassign`, { newAssigneeId });
 export const getProcessVariables = (instanceId) => service.get(`/admin/instances/${instanceId}/variables`);
 export const updateProcessVariable = (instanceId, data) => service.put(`/admin/instances/${instanceId}/variables`, data);
-// 【核心新增】批量操作 API
 export const batchSuspendInstances = (instanceIds) => service.post('/admin/instances/batch-suspend', { instanceIds });
 export const batchActivateInstances = (instanceIds) => service.post('/admin/instances/batch-activate', { instanceIds });
 export const batchTerminateInstances = (instanceIds, reason) => service.post('/admin/instances/batch-terminate', { instanceIds, reason });
-// 【核心新增】流程图和异常 API
 export const getProcessDefinitionXml = (processDefinitionId) => service.get(`/admin/process-definitions/${processDefinitionId}/xml`);
 export const getActivityInstances = (instanceId) => service.get(`/admin/instances/${instanceId}/activity-instances`);
 export const getIncidents = (instanceId) => service.get(`/admin/instances/${instanceId}/incidents`);

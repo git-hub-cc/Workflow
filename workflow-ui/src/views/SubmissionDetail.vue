@@ -67,37 +67,74 @@
           </a-card>
         </div>
 
-        <!-- 右侧辅助信息区: 仅流程历史 -->
+        <!-- 右侧辅助信息区: 流程历史 -->
         <div class="side-content">
-          <a-card title="流程历史">
-            <a-timeline>
-              <a-timeline-item v-for="item in history" :key="item.activityId" :color="getTimelineColor(item)">
-                <h4>{{ item.activityName }}</h4>
-                <p v-if="item.assigneeName">处理人: {{ item.assigneeName }}</p>
-                <p>开始: {{ item.startTime ? new Date(item.startTime).toLocaleString() : 'N/A' }}</p>
-                <p v-if="item.endTime">结束: {{ new Date(item.endTime).toLocaleString() }}</p>
-                <p v-if="item.durationInMillis">耗时: {{ formatDuration(item.durationInMillis) }}</p>
-                <p v-if="item.comment" class="approval-comment">
-                  <strong>意见:</strong> {{ item.comment }}
-                </p>
-              </a-timeline-item>
-            </a-timeline>
+          <a-card>
+            <a-tabs v-model:activeKey="activeTabKey">
+              <a-tab-pane key="historyList" tab="历史列表">
+                <a-timeline>
+                  <a-timeline-item v-for="item in history" :key="item.activityId" :color="getTimelineColor(item)">
+                    <h4>{{ item.activityName }}</h4>
+                    <p v-if="item.assigneeName">处理人: {{ item.assigneeName }}</p>
+                    <p>开始: {{ item.startTime ? new Date(item.startTime).toLocaleString() : 'N/A' }}</p>
+                    <p v-if="item.endTime">结束: {{ new Date(item.endTime).toLocaleString() }}</p>
+                    <p v-if="item.durationInMillis">耗时: {{ formatDuration(item.durationInMillis) }}</p>
+                    <p v-if="item.comment" class="approval-comment">
+                      <strong>意见:</strong> {{ item.comment }}
+                    </p>
+                  </a-timeline-item>
+                </a-timeline>
+              </a-tab-pane>
+              <a-tab-pane key="diagram" tab="流程图">
+                <!-- 【核心修改】增加包裹容器和放大按钮 -->
+                <div class="diagram-preview-wrapper">
+                  <ProcessDiagramViewer
+                      v-if="bpmnXml"
+                      :bpmn-xml="bpmnXml"
+                      :history-activities="history"
+                  />
+                  <a-empty v-else description="暂无流程图信息" />
+                  <a-button
+                      class="fullscreen-btn"
+                      type="primary"
+                      shape="circle"
+                      size="large"
+                      @click="isDiagramModalVisible = true"
+                      title="全屏查看"
+                  >
+                    <template #icon><FullscreenOutlined /></template>
+                  </a-button>
+                </div>
+              </a-tab-pane>
+            </a-tabs>
           </a-card>
-          <!-- 【核心优化】原“相关附件”卡片已移除 -->
         </div>
       </div>
     </a-spin>
+
+    <!-- 【核心新增】流程图模态框 -->
+    <ProcessDiagramModal
+        v-if="isDiagramModalVisible"
+        v-model:open="isDiagramModalVisible"
+        :bpmn-xml="bpmnXml"
+        :history-activities="history"
+    />
   </div>
 </template>
 
 <script setup>
 import { ref, reactive, onMounted, computed } from 'vue';
-import { getSubmissionById, getFormById, getWorkflowHistory, downloadFile } from '@/api';
+// 【核心修改】引入 getWorkflowDiagram 和 FullscreenOutlined
+import { getSubmissionById, getFormById, getWorkflowHistory, downloadFile, getWorkflowDiagram } from '@/api';
 import { message } from 'ant-design-vue';
-import { PaperClipOutlined } from '@ant-design/icons-vue';
+import { PaperClipOutlined, FullscreenOutlined } from '@ant-design/icons-vue';
 import { flattenFields } from '@/utils/formUtils.js';
 import { iconMap } from '@/utils/iconLibrary.js';
 import { useSystemStore } from '@/stores/system';
+// 【核心修改】引入新的流程图组件和模态框
+import ProcessDiagramViewer from '@/components/ProcessDiagramViewer.vue';
+import ProcessDiagramModal from '@/components/ProcessDiagramModal.vue';
+
 
 const props = defineProps({ submissionId: String });
 const systemStore = useSystemStore();
@@ -107,6 +144,11 @@ const submission = ref({});
 const formDefinition = ref({ schema: { fields: [] } });
 const formData = reactive({});
 const history = ref([]);
+const bpmnXml = ref(null);
+const activeTabKey = ref('historyList');
+// --- 【核心新增】模态框状态 ---
+const isDiagramModalVisible = ref(false);
+
 
 const flattenedFields = computed(() => {
   if (!formDefinition.value.schema) return [];
@@ -116,14 +158,21 @@ const flattenedFields = computed(() => {
 
 onMounted(async () => {
   try {
-    const subRes = await getSubmissionById(props.submissionId);
+    const [subRes, historyRes, diagramRes] = await Promise.all([
+      getSubmissionById(props.submissionId),
+      getWorkflowHistory(props.submissionId),
+      getWorkflowDiagram(props.submissionId)
+    ]);
+
     submission.value = subRes;
     Object.assign(formData, JSON.parse(subRes.dataJson));
+    history.value = historyRes;
+    bpmnXml.value = diagramRes.bpmnXml;
 
     const formRes = await getFormById(subRes.formDefinitionId);
     formRes.schema = JSON.parse(formRes.schemaJson);
+    formDefinition.value = formRes;
 
-    // 【核心逻辑】将附件数据填充到 formData 中对应的 FileUpload 字段
     if (subRes.attachments && subRes.attachments.length > 0) {
       const allFields = flattenFields(formRes.schema.fields);
       const fileUploadField = allFields.find(f => f.type === 'FileUpload');
@@ -132,11 +181,6 @@ onMounted(async () => {
       }
     }
 
-    const historyRes = await getWorkflowHistory(props.submissionId);
-
-    formDefinition.value = formRes;
-    history.value = historyRes;
-
   } catch (error) {
     message.error('加载详情失败');
   } finally {
@@ -144,7 +188,8 @@ onMounted(async () => {
   }
 });
 
-// --- 用于显示和格式化的辅助函数 ---
+
+// --- 用于显示和格式化的辅助函数 (无变化) ---
 
 const isImage = (file) => {
   if (!file || !file.originalFilename) return false;
@@ -156,7 +201,6 @@ const getSubformColumns = (field) => field.props.columns.map(col => ({ title: co
 
 const formatDisplayValue = (field, value) => {
   if (value === null || value === undefined || value === '') return '(未填写)';
-  // 【核心修改】增强 DatePicker 的显示逻辑
   if (field.type === 'DatePicker' && value) {
     if (Array.isArray(value)) {
       if (value.length === 2 && field.props.pickerMode === 'range') {
@@ -248,4 +292,18 @@ const formatDuration = (ms) => {
 .file-link:hover { color: var(--ant-primary-color); border-color: var(--ant-primary-color); box-shadow: 0 2px 8px rgba(0, 0, 0, 0.09); }
 .file-link .anticon { font-size: 28px; }
 .file-link span { font-size: 12px; word-break: break-all; line-height: 1.2; }
+
+/* --- 【核心新增】流程图预览容器样式 --- */
+.diagram-preview-wrapper {
+  position: relative;
+}
+.diagram-preview-wrapper :deep(.diagram-container) {
+  height: 400px; /* 限制预览区域的高度 */
+}
+.fullscreen-btn {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
 </style>

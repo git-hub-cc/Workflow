@@ -19,7 +19,7 @@ public class FormSchemaParser {
     /**
      * 解析表单schema JSON字符串，并提取出可筛选和可列表展示的字段。
      *
-     * @param schemaJson   表单定义的JSON字符串
+     * @param schemaJson    表单定义的JSON字符串
      * @param objectMapper Jackson的ObjectMapper实例
      * @return 包含两个字段列表的ParsedSchema对象
      * @throws IOException 如果JSON解析失败

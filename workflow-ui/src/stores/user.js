@@ -1,6 +1,7 @@
 import { ref, computed } from 'vue';
 import { defineStore } from 'pinia';
-import { login, getAllUsers, getRoles, getGroups, getMyMenus, getUsersForPicker } from '@/api';
+// 【核心新增】导入 getPendingTasks API
+import { login, getAllUsers, getRoles, getGroups, getMyMenus, getUsersForPicker, getPendingTasks } from '@/api';
 import { message } from 'ant-design-vue';
 import router, { resetRouter, addDynamicRoutes } from '@/router';
 
@@ -10,10 +11,11 @@ export const useUserStore = defineStore('user', () => {
     const currentUser = ref(JSON.parse(localStorage.getItem('user')) || null);
     const menus = ref(JSON.parse(localStorage.getItem('menus')) || []);
     const usersForManagement = ref([]);
-    // 【核心移除】不再需要 usersForPicker 状态，因为现在是动态搜索
     const allRoles = ref([]);
     const allGroups = ref([]);
     const loading = ref(false);
+    // 【核心新增】待办任务数量状态
+    const pendingTasksCount = ref(0);
 
 // --- Getters ---
     const isAuthenticated = computed(() => !!token.value && !!currentUser.value);
@@ -31,6 +33,8 @@ export const useUserStore = defineStore('user', () => {
             localStorage.setItem('user', JSON.stringify(currentUser.value));
 
             await fetchAndSetMenus();
+            // 登录成功后，获取一次待办数量
+            await fetchPendingTasksCount();
 
             if (currentUser.value.passwordChangeRequired) {
                 message.warn('为了您的账户安全，请先修改初始密码。');
@@ -38,10 +42,6 @@ export const useUserStore = defineStore('user', () => {
             } else {
                 message.success(`欢迎回来, ${currentUser.value.name}`);
                 await router.push('/');
-            }
-
-            if (isAdmin.value) {
-                // 不再在此处预加载
             }
 
         } catch (error) {
@@ -72,10 +72,24 @@ export const useUserStore = defineStore('user', () => {
         usersForManagement.value = [];
         allRoles.value = [];
         allGroups.value = [];
+        // 【核心新增】登出时重置数量
+        pendingTasksCount.value = 0;
         localStorage.clear();
 
         resetRouter();
         router.push('/login');
+    }
+
+    // --- 【核心新增】获取待办任务数量的 Action ---
+    async function fetchPendingTasksCount() {
+        if (!isAuthenticated.value) return;
+        try {
+            const response = await getPendingTasks({ page: 0, size: 1 });
+            pendingTasksCount.value = response.totalElements;
+        } catch (error) {
+            console.error("Failed to fetch pending tasks count:", error);
+            pendingTasksCount.value = 0; // 出错时重置为0
+        }
     }
 
     async function fetchUsersForManagement(force = false) {
@@ -94,11 +108,9 @@ export const useUserStore = defineStore('user', () => {
         if (!isAdmin.value) return [];
         try {
             const response = await getUsersForPicker(params);
-            // 【核心修改】返回整个分页响应对象，而不仅仅是 content
             return response;
         } catch (error) {
             console.error("Failed to fetch users for picker:", error);
-            // 【核心修改】返回一个符合分页结构的对象
             return { content: [], totalElements: 0 };
         }
     }
@@ -115,7 +127,6 @@ export const useUserStore = defineStore('user', () => {
         try { allGroups.value = await getGroups(); } catch (error) { console.error(error); } finally { loading.value = false; }
     }
 
-    // 【新增】更新当前用户信息的方法
     function updateCurrentUser(profileData) {
         if(currentUser.value) {
             currentUser.value.name = profileData.name;
@@ -128,11 +139,15 @@ export const useUserStore = defineStore('user', () => {
         token, currentUser, menus,
         usersForManagement,
         allRoles, allGroups, loading,
+        // 【核心新增】导出新状态和方法
+        pendingTasksCount,
         isAuthenticated, isAdmin, passwordChangeRequired,
         login: handleLogin, logout,
         fetchUsersForManagement, fetchUsersForPicker,
         fetchAllRoles, fetchAllGroups,
         fetchAndSetMenus,
-        updateCurrentUser
+        updateCurrentUser,
+        // 【核心新增】导出新状态和方法
+        fetchPendingTasksCount
     };
 });

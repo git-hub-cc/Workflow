@@ -7,6 +7,7 @@ import { fileURLToPath, URL } from 'node:url'
 // https://vitejs.dev/config/
 export default defineConfig({
     // 【核心修改】在 plugins 数组中添加 vueJsx()
+    // base: '/workflow/',//服务器配置
     plugins: [
         vue(),
         vueJsx(),

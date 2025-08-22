@@ -17,11 +17,16 @@
           <a-menu-item key="/tasks">
             <template #icon><CheckSquareOutlined /></template>
             <span>我的待办</span>
+            <!-- 【核心修改】直接绑定 store 中的待办数量 -->
             <a-badge :count="pendingTasksCount" :offset="[10, 0]" />
           </a-menu-item>
           <a-menu-item key="/my-submissions">
             <template #icon><SendOutlined /></template>
             <span>我的申请</span>
+          </a-menu-item>
+          <a-menu-item key="/completed-tasks">
+            <template #icon><FileDoneOutlined /></template>
+            <span>我的已办</span>
           </a-menu-item>
         </a-sub-menu>
 
@@ -42,7 +47,6 @@
           </div>
           <div class="user-actions">
             <a-space>
-              <!-- 【新增】通知中心入口 -->
               <a-popover v-model:open="notificationVisible" placement="bottomRight" trigger="click">
                 <template #content>
                   <NotificationPanel @close="notificationVisible = false" />
@@ -96,17 +100,17 @@ import { useRoute, useRouter } from 'vue-router';
 import { useUserStore } from '@/stores/user';
 import { useSystemStore } from '@/stores/system';
 import { useNotificationStore } from '@/stores/notification';
-import { getPendingTasks } from "@/api";
+// 【核心移除】不再需要直接调用 getPendingTasks API
 import { Modal, Menu } from "ant-design-vue";
 import {
   DownOutlined, DashboardOutlined, TeamOutlined, SafetyCertificateOutlined, UsergroupAddOutlined,
   ApartmentOutlined, NodeIndexOutlined, FileSearchOutlined, UserOutlined, LogoutOutlined,
   SettingOutlined, MenuOutlined, TableOutlined,
-  CheckSquareOutlined, SendOutlined, ForkOutlined, BuildOutlined, BellOutlined
+  CheckSquareOutlined, SendOutlined, ForkOutlined, BuildOutlined, BellOutlined,
+  FileDoneOutlined
 } from '@ant-design/icons-vue';
 import { iconMap } from '@/utils/iconLibrary.js';
 import NotificationPanel from '@/views/notifications/NotificationPanel.vue';
-// --- 【核心优化】从路由文件导入静态菜单 ---
 import { adminMenus } from '@/router';
 
 
@@ -117,7 +121,7 @@ const notificationStore = useNotificationStore();
 const router = useRouter();
 const route = useRoute();
 
-const pendingTasksCount = ref(0);
+// 【核心修改】移除本地的 pendingTasksCount 状态
 const collapsed = ref(false);
 const selectedKeys = ref([]);
 const openKeys = ref(['user-center']);
@@ -125,12 +129,12 @@ const openKeys = ref(['user-center']);
 const notificationVisible = ref(false);
 const unreadCount = computed(() => notificationStore.unreadCount);
 
+// 【核心修改】从 store 中获取待办任务数量
+const pendingTasksCount = computed(() => userStore.pendingTasksCount);
 
-// --- 【核心优化】移除此处的静态菜单定义 ---
 
 const displayMenus = computed(() => {
   if (userStore.isAdmin) {
-    // --- 直接使用从 router/index.js 导入的 adminMenus ---
     return [...adminMenus, ...userStore.menus];
   }
   return userStore.menus;
@@ -182,7 +186,8 @@ const breadcrumbs = computed(() => {
   } else if (route.meta.title && route.path !== '/') {
     const staticMenuMapping = {
       '/tasks': { title: '我的待办', parent: { title: '个人中心' } },
-      '/my-submissions': { title: '我的申请', parent: { title: '个人中心' } }
+      '/my-submissions': { title: '我的申请', parent: { title: '个人中心' } },
+      '/completed-tasks': { title: '我的已办', parent: { title: '个人中心' } }
     };
     const staticInfo = staticMenuMapping[route.path];
     if (staticInfo) {
@@ -206,12 +211,10 @@ const handleMenuClick = ({ key }) => {
   }
 };
 
+// 【核心修改】此函数现在调用 store action
 const checkTasks = async () => {
   if (!userStore.isAuthenticated) return;
-  try {
-    const response = await getPendingTasks({ page: 0, size: 1 });
-    pendingTasksCount.value = response.totalElements;
-  } catch (e) { /* ignore */ }
+  await userStore.fetchPendingTasksCount();
 };
 
 onMounted(() => {

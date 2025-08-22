@@ -6,12 +6,10 @@
       <div v-if="!loading" class="detail-layout">
         <!-- 左侧主内容区: 表单 & 操作 -->
         <div class="main-content">
-          <a-card :title="isRejectedTask ? '修改表单' : '表单详情'">
-            <!-- 【核心修改】当为只读模式时，使用 a-descriptions 优化展示，并支持图片预览 -->
+          <a-card :title="isEditMode ? '修改表单' : '表单详情'">
             <template v-if="mode === 'readonly'">
               <a-descriptions bordered :column="1">
                 <template v-for="field in flattenedFields" :key="field.id">
-                  <!-- 文件上传字段特殊渲染 -->
                   <a-descriptions-item v-if="field.type === 'FileUpload'" :label="field.label">
                     <div v-if="formData[field.id] && formData[field.id].length > 0">
                       <div v-for="file in formData[field.id]" :key="file.id" class="attachment-item">
@@ -29,7 +27,6 @@
                     </div>
                     <span v-else>(无附件)</span>
                   </a-descriptions-item>
-                  <!-- 其他字段的只读渲染 -->
                   <a-descriptions-item v-else :label="field.label">
                     <div v-if="field.type === 'RichText'" v-html="formData[field.id]" class="readonly-richtext"></div>
                     <span v-else>{{ getReadonlyDisplayValue(field, formData[field.id]) }}</span>
@@ -37,7 +34,6 @@
                 </template>
               </a-descriptions>
             </template>
-            <!-- 编辑模式保持不变 -->
             <a-form
                 v-else
                 :model="formData"
@@ -55,57 +51,133 @@
             </a-form>
           </a-card>
 
-          <a-card :title="isRejectedTask ? '提交操作' : '审批操作'" style="margin-top: 24px;">
-            <div v-if="!isRejectedTask">
-              <a-textarea v-model:value="comment" placeholder="请输入审批意见 (可选)" :rows="4" />
-              <a-space style="margin-top: 16px; float: right;">
-                <a-button type="primary" danger @click="handleApproval('REJECTED')" :loading="submitting">拒绝</a-button>
-                <a-button type="primary" @click="handleApproval('APPROVED')" :loading="submitting">同意</a-button>
-              </a-space>
-            </div>
-            <div v-else>
-              <a-textarea v-model:value="comment" placeholder="请输入修改说明 (可选)" :rows="4" />
-              <a-space style="margin-top: 16px; float: right;">
-                <a-button type="primary" @click="handleResubmit" :loading="submitting">重新提交</a-button>
-              </a-space>
-            </div>
+          <!-- 【核心修改】将审批操作区改为动态按钮组 -->
+          <a-card :title="isEditMode ? '提交操作' : '审批操作'" style="margin-top: 24px;">
+            <a-form layout="vertical">
+              <a-form-item :label="isEditMode ? '修改说明 (可选)' : '审批意见 (可选)'" name="comment">
+                <a-textarea v-model:value="comment" :rows="4" />
+              </a-form-item>
+              <a-form-item>
+                <a-space style="float: right;">
+                  <!-- 重新提交按钮 (仅在编辑模式下显示) -->
+                  <a-button v-if="isEditMode" type="primary" @click="handleAction('APPROVED')" :loading="submitting">
+                    重新提交
+                  </a-button>
+
+                  <!-- 审批按钮组 (仅在审批模式下显示) -->
+                  <template v-else>
+                    <a-button
+                        v-if="can('REJECTED')"
+                        type="primary" danger
+                        @click="handleAction('REJECTED')"
+                        :loading="submitting"
+                    >
+                      拒绝
+                    </a-button>
+
+                    <!-- 打回按钮 -->
+                    <a-dropdown v-if="can('RETURN_TO_INITIATOR') || can('RETURN_TO_PREVIOUS')">
+                      <template #overlay>
+                        <a-menu @click="({ key }) => handleAction(key)">
+                          <a-menu-item key="RETURN_TO_INITIATOR" v-if="can('RETURN_TO_INITIATOR')">
+                            <RollbackOutlined /> 打回至发起人
+                          </a-menu-item>
+                          <a-menu-item key="RETURN_TO_PREVIOUS" v-if="can('RETURN_TO_PREVIOUS')">
+                            <UndoOutlined /> 打回至上一节点
+                          </a-menu-item>
+                        </a-menu>
+                      </template>
+                      <a-button :loading="submitting">
+                        打回 <DownOutlined />
+                      </a-button>
+                    </a-dropdown>
+
+                    <a-button
+                        v-if="can('APPROVED')"
+                        type="primary"
+                        @click="handleAction('APPROVED')"
+                        :loading="submitting"
+                    >
+                      同意
+                    </a-button>
+                  </template>
+                </a-space>
+              </a-form-item>
+            </a-form>
           </a-card>
         </div>
 
         <!-- 右侧辅助信息区: 流程历史 -->
         <div class="side-content">
-          <a-card title="流程历史">
-            <a-timeline>
-              <a-timeline-item v-for="item in history" :key="item.activityId" :color="getTimelineColor(item)">
-                <h4>{{ item.activityName }}</h4>
-                <p v-if="item.assigneeName">处理人: {{ item.assigneeName }}</p>
-                <p>开始: {{ item.startTime ? new Date(item.startTime).toLocaleString() : 'N/A' }}</p>
-                <p v-if="item.endTime">结束: {{ new Date(item.endTime).toLocaleString() }}</p>
-                <p v-if="item.durationInMillis">耗时: {{ formatDuration(item.durationInMillis) }}</p>
-                <p v-if="item.comment" class="approval-comment">
-                  <strong>意见:</strong> {{ item.comment }}
-                </p>
-              </a-timeline-item>
-            </a-timeline>
+          <a-card>
+            <a-tabs v-model:activeKey="activeTabKey">
+              <a-tab-pane key="historyList" tab="历史列表">
+                <a-timeline>
+                  <a-timeline-item v-for="item in history" :key="item.activityId" :color="getTimelineColor(item)">
+                    <h4>{{ item.activityName }}</h4>
+                    <p v-if="item.assigneeName">处理人: {{ item.assigneeName }}</p>
+                    <p>开始: {{ item.startTime ? new Date(item.startTime).toLocaleString() : 'N/A' }}</p>
+                    <p v-if="item.endTime">结束: {{ new Date(item.endTime).toLocaleString() }}</p>
+                    <p v-if="item.durationInMillis">耗时: {{ formatDuration(item.durationInMillis) }}</p>
+                    <p v-if="item.comment" class="approval-comment">
+                      <strong>意见:</strong> {{ item.comment }}
+                    </p>
+                  </a-timeline-item>
+                </a-timeline>
+              </a-tab-pane>
+              <a-tab-pane key="diagram" tab="流程图">
+                <!-- 【核心修改】增加包裹容器和放大按钮 -->
+                <div class="diagram-preview-wrapper">
+                  <ProcessDiagramViewer
+                      v-if="bpmnXml"
+                      :bpmn-xml="bpmnXml"
+                      :history-activities="history"
+                  />
+                  <a-empty v-else description="暂无流程图信息" />
+                  <a-button
+                      class="fullscreen-btn"
+                      type="primary"
+                      shape="circle"
+                      size="large"
+                      @click="isDiagramModalVisible = true"
+                      title="全屏查看"
+                  >
+                    <template #icon><FullscreenOutlined /></template>
+                  </a-button>
+                </div>
+              </a-tab-pane>
+            </a-tabs>
           </a-card>
         </div>
       </div>
     </a-spin>
+
+    <!-- 【核心新增】流程图模态框 -->
+    <ProcessDiagramModal
+        v-if="isDiagramModalVisible"
+        v-model:open="isDiagramModalVisible"
+        :bpmn-xml="bpmnXml"
+        :history-activities="history"
+    />
   </div>
 </template>
 
 <script setup>
 import { ref, onMounted, computed, reactive } from 'vue';
-import { getTaskById, getSubmissionById, getFormById, completeTask, getWorkflowHistory, downloadFile } from '@/api';
+import { getTaskById, getSubmissionById, getFormById, completeTask, getWorkflowHistory, downloadFile, getWorkflowDiagram } from '@/api';
 import { message } from 'ant-design-vue';
 import { useRouter } from 'vue-router';
+import { useUserStore } from '@/stores/user';
 import FormItemRenderer from './viewer-components/FormItemRenderer.vue';
 import { flattenFields } from '@/utils/formUtils.js';
-// 【核心新增】引入图标
-import { PaperClipOutlined } from '@ant-design/icons-vue';
+// --- 【核心新增】引入新图标和模态框 ---
+import { PaperClipOutlined, DownOutlined, RollbackOutlined, UndoOutlined, FullscreenOutlined } from '@ant-design/icons-vue';
+import ProcessDiagramViewer from '@/components/ProcessDiagramViewer.vue';
+import ProcessDiagramModal from '@/components/ProcessDiagramModal.vue';
 
 const props = defineProps({ taskId: String });
 const router = useRouter();
+const userStore = useUserStore();
 
 const loading = ref(true);
 const submitting = ref(false);
@@ -115,21 +187,27 @@ const formData = reactive({});
 const comment = ref('');
 const formRef = ref();
 const history = ref([]);
+const bpmnXml = ref(null);
+const activeTabKey = ref('historyList');
+// --- 【核心新增】模态框状态 ---
+const isDiagramModalVisible = ref(false);
 
-const isRejectedTask = computed(() => {
+const isEditMode = computed(() => {
   const taskName = task.value.stepName || '';
   return taskName.includes('修改') || taskName.includes('调整') || taskName.includes('重新');
 });
 
-// 【核心新增】根据 isRejectedTask 决定表单模式
-const mode = computed(() => isRejectedTask.value ? 'edit' : 'readonly');
+const mode = computed(() => isEditMode.value ? 'edit' : 'readonly');
 
-// 【核心新增】扁平化字段，用于 a-descriptions 渲染
 const flattenedFields = computed(() => {
   if (!formSchema.value) return [];
   return flattenFields(formSchema.value.fields)
       .filter(f => !['GridRow', 'GridCol', 'Collapse', 'CollapsePanel', 'StaticText', 'DescriptionList'].includes(f.type));
 });
+
+const can = (decision) => {
+  return task.value.availableDecisions?.includes(decision);
+};
 
 const updateFormData = (fieldId, value) => {
   formData[fieldId] = value;
@@ -141,17 +219,19 @@ onMounted(async () => {
     const taskRes = await getTaskById(props.taskId);
     task.value = taskRes;
 
-    const subRes = await getSubmissionById(taskRes.formSubmissionId);
-    Object.assign(formData, JSON.parse(subRes.dataJson));
-
-    const [formRes, historyRes] = await Promise.all([
-      getFormById(subRes.formDefinitionId),
-      getWorkflowHistory(taskRes.formSubmissionId)
+    const [subRes, historyRes, diagramRes] = await Promise.all([
+      getSubmissionById(taskRes.formSubmissionId),
+      getWorkflowHistory(taskRes.formSubmissionId),
+      getWorkflowDiagram(taskRes.formSubmissionId)
     ]);
 
+    Object.assign(formData, JSON.parse(subRes.dataJson));
+    history.value = historyRes;
+    bpmnXml.value = diagramRes.bpmnXml;
+
+    const formRes = await getFormById(subRes.formDefinitionId);
     formSchema.value = JSON.parse(formRes.schemaJson);
 
-    // 【核心修改】确保附件数据能正确地填充到 formData 中，以便 a-descriptions 和 FormItemRenderer 都能使用
     if (subRes.attachments && subRes.attachments.length > 0) {
       const allFields = flattenFields(formSchema.value.fields);
       const fileUploadField = allFields.find(f => f.type === 'FileUpload');
@@ -160,19 +240,48 @@ onMounted(async () => {
       }
     }
 
-    history.value = historyRes;
-
   } catch (error) {
-    // 错误由全局拦截器处理，这里无需显示消息
+    // 错误由全局拦截器处理
   } finally {
     loading.value = false;
   }
 });
 
-const handleApproval = async (decision) => {
+const handleAction = async (decision) => {
+  if (decision.startsWith('RETURN_') && !comment.value.trim()) {
+    message.warn('打回操作必须填写意见！');
+    return;
+  }
+
+  if (isEditMode.value) {
+    try {
+      await formRef.value.validate();
+    } catch(errorInfo) {
+      if(errorInfo && errorInfo.errorFields) {
+        message.warn('请填写所有必填项');
+      }
+      return;
+    }
+  }
+
   submitting.value = true;
   try {
-    await completeTask(props.taskId, { decision, approvalComment: comment.value });
+    const payload = {
+      decision: decision,
+      approvalComment: comment.value,
+    };
+
+    if (isEditMode.value) {
+      const allFields = flattenFields(formSchema.value.fields);
+      const attachmentFields = allFields.filter(f => f.type === 'FileUpload');
+      const attachmentIds = attachmentFields.flatMap(f => formData[f.id]?.map(file => file.id) || []);
+
+      payload.updatedFormData = JSON.stringify(formData);
+      payload.attachmentIds = attachmentIds;
+    }
+
+    await completeTask(props.taskId, payload);
+    await userStore.fetchPendingTasksCount();
     message.success('任务处理成功！');
     router.push({ name: 'task-list' });
   } catch (error) {
@@ -182,32 +291,8 @@ const handleApproval = async (decision) => {
   }
 };
 
-const handleResubmit = async () => {
-  try {
-    await formRef.value.validate();
-    submitting.value = true;
 
-    const allFields = flattenFields(formSchema.value.fields);
-    const attachmentFields = allFields.filter(f => f.type === 'FileUpload');
-    const attachmentIds = attachmentFields.flatMap(f => formData[f.id]?.map(file => file.id) || []);
-
-    await completeTask(props.taskId, {
-      decision: 'APPROVED',
-      approvalComment: comment.value,
-      updatedFormData: JSON.stringify(formData),
-      attachmentIds: attachmentIds,
-    });
-
-    message.success('申请已重新提交！');
-    router.push({ name: 'task-list' });
-  } catch(error) {
-    if(error && error.errorFields) {
-      message.warn('请填写所有必填项');
-    }
-  } finally {
-    submitting.value = false;
-  }
-};
+// --- 其他辅助函数 (无变化) ---
 
 const getTimelineColor = (item) => {
   if (item.activityType.endsWith('EndEvent')) {
@@ -227,7 +312,6 @@ const formatDuration = (ms) => {
   return `${hours}h ${minutes}m ${seconds}s`;
 };
 
-// --- 【核心新增】用于只读模式的辅助函数 ---
 const isImage = (file) => {
   if (!file || !file.originalFilename) return false;
   const imageNameRegex = /\.(jpg|jpeg|png|gif|svg|webp)$/i;
@@ -252,7 +336,6 @@ const handleDownload = async (fileId, filename) => {
 
 const getReadonlyDisplayValue = (field, value) => {
   if (value === null || value === undefined || value === '') return '(未填写)';
-  // 【核心修改】增强 DatePicker 的显示逻辑
   if (field.type === 'DatePicker' && value) {
     if (Array.isArray(value)) {
       if (value.length === 2 && field.props.pickerMode === 'range') {
@@ -307,7 +390,6 @@ const getReadonlyDisplayValue = (field, value) => {
   max-width: 100%;
   height: auto;
 }
-/* --- 【核心新增】附件列表样式 --- */
 .attachment-item {
   padding: 8px 0;
 }
@@ -347,5 +429,19 @@ const getReadonlyDisplayValue = (field, value) => {
 }
 .file-link .anticon {
   margin-right: 8px;
+}
+
+/* --- 【核心新增】流程图预览容器样式 --- */
+.diagram-preview-wrapper {
+  position: relative;
+}
+.diagram-preview-wrapper :deep(.diagram-container) {
+  height: 400px; /* 限制预览区域的高度 */
+}
+.fullscreen-btn {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
 }
 </style>

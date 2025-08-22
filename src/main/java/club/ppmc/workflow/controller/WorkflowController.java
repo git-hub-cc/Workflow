@@ -110,6 +110,22 @@ public class WorkflowController {
     }
 
 
+    // --- 【核心新增】获取流程图 API ---
+    /**
+     * API: 获取指定申请的流程图 BPMN XML
+     * 权限: 仅限申请人、历史或当前处理人、管理员
+     * @param submissionId 申请提交ID
+     * @return 包含BPMN XML的DTO
+     */
+    @GetMapping("/submission/{submissionId}/diagram")
+    @PreAuthorize("@workflowService.isSubmissionOwner(#submissionId, principal.username) " +
+            "or @workflowService.isTaskAssigneeForSubmission(#submissionId, principal.username) " +
+            "or hasRole('ADMIN')")
+    public ResponseEntity<BpmnXmlDto> getWorkflowDiagram(@PathVariable Long submissionId) {
+        return ResponseEntity.ok(workflowService.getWorkflowDiagram(submissionId));
+    }
+
+
     // --- DTO 转换器 ---
 
     /**

@@ -98,6 +98,8 @@ const staticRoutes = [
             { path: 'tasks', name: 'task-list', component: () => import('../views/TaskList.vue'), meta: { title: '我的待办' } },
             { path: 'tasks/:taskId', name: 'task-detail', component: () => import('../views/TaskDetail.vue'), props: true, meta: { title: '任务处理' } },
             { path: 'my-submissions', name: 'my-submissions', component: () => import('../views/MySubmissions.vue'), meta: { title: '我的申请' } },
+            // 【核心新增】我的已办路由
+            { path: 'completed-tasks', name: 'completed-task-list', component: () => import('../views/CompletedTaskList.vue'), meta: { title: '我的已办' } },
         ]
     },
     {
@@ -115,7 +117,6 @@ let router = createRouter({
 const dynamicRouteModules = {
     'FORM_ENTRY': () => import('../views/FormViewer.vue'),
     'DATA_LIST': () => import('../views/DataListView.vue'),
-    // --- 【新增】报表路由 ---
     'REPORT': () => import('../views/ReportViewer.vue'),
 };
 
@@ -127,7 +128,6 @@ export function addDynamicRoutes(menus) {
     }
     const processMenus = (menuItems) => {
         for (const menu of menuItems) {
-            // --- 【核心修改】增加对 EXTERNAL_LINK 的排除 ---
             if (menu.path && menu.type !== 'DIRECTORY' && menu.type !== 'EXTERNAL_LINK') {
                 const componentLoader = dynamicRouteModules[menu.type];
                 if (componentLoader) {
@@ -135,14 +135,12 @@ export function addDynamicRoutes(menus) {
                         path: menu.path,
                         name: menu.path.replace(/^\//, '').replace(/\//g, '-'),
                         component: componentLoader,
-                        // --- 【核心修改】将报表 key 也放入 meta ---
                         meta: {
                             title: menu.name,
                             formId: menu.formDefinitionId,
                             menuId: menu.id,
                             reportKey: menu.type === 'REPORT' ? menu.path.split('/').pop() : undefined,
                         },
-                        // --- 【核心修改】根据类型传递不同的 props ---
                         props: route => ({
                             formId: route.meta.formId,
                             reportKey: route.meta.reportKey,
