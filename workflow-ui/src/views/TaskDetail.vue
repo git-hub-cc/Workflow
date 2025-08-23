@@ -126,7 +126,6 @@
                 </a-timeline>
               </a-tab-pane>
               <a-tab-pane key="diagram" tab="流程图">
-                <!-- 【核心修改】增加包裹容器和放大按钮 -->
                 <div class="diagram-preview-wrapper">
                   <ProcessDiagramViewer
                       v-if="bpmnXml"
@@ -152,7 +151,6 @@
       </div>
     </a-spin>
 
-    <!-- 【核心新增】流程图模态框 -->
     <ProcessDiagramModal
         v-if="isDiagramModalVisible"
         v-model:open="isDiagramModalVisible"
@@ -170,7 +168,6 @@ import { useRouter } from 'vue-router';
 import { useUserStore } from '@/stores/user';
 import FormItemRenderer from './viewer-components/FormItemRenderer.vue';
 import { flattenFields } from '@/utils/formUtils.js';
-// --- 【核心新增】引入新图标和模态框 ---
 import { PaperClipOutlined, DownOutlined, RollbackOutlined, UndoOutlined, FullscreenOutlined } from '@ant-design/icons-vue';
 import ProcessDiagramViewer from '@/components/ProcessDiagramViewer.vue';
 import ProcessDiagramModal from '@/components/ProcessDiagramModal.vue';
@@ -189,11 +186,11 @@ const formRef = ref();
 const history = ref([]);
 const bpmnXml = ref(null);
 const activeTabKey = ref('historyList');
-// --- 【核心新增】模态框状态 ---
 const isDiagramModalVisible = ref(false);
 
 const isEditMode = computed(() => {
   const taskName = task.value.stepName || '';
+  // 任务名包含“修改”、“调整”、“重新”等关键字时，进入表单编辑模式
   return taskName.includes('修改') || taskName.includes('调整') || taskName.includes('重新');
 });
 
@@ -205,7 +202,9 @@ const flattenedFields = computed(() => {
       .filter(f => !['GridRow', 'GridCol', 'Collapse', 'CollapsePanel', 'StaticText', 'DescriptionList'].includes(f.type));
 });
 
+// --- 【核心新增】辅助函数，用于检查当前任务是否支持某个操作 ---
 const can = (decision) => {
+  // `task.value.availableDecisions` 是后端根据BPMN模型动态分析得出的可用操作列表
   return task.value.availableDecisions?.includes(decision);
 };
 
@@ -281,6 +280,7 @@ const handleAction = async (decision) => {
     }
 
     await completeTask(props.taskId, payload);
+    // 任务完成后，通知store更新待办数量
     await userStore.fetchPendingTasksCount();
     message.success('任务处理成功！');
     router.push({ name: 'task-list' });
@@ -431,12 +431,11 @@ const getReadonlyDisplayValue = (field, value) => {
   margin-right: 8px;
 }
 
-/* --- 【核心新增】流程图预览容器样式 --- */
 .diagram-preview-wrapper {
   position: relative;
 }
 .diagram-preview-wrapper :deep(.diagram-container) {
-  height: 400px; /* 限制预览区域的高度 */
+  height: 400px;
 }
 .fullscreen-btn {
   position: absolute;

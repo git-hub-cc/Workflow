@@ -85,6 +85,19 @@ public class WorkflowController {
         return ResponseEntity.ok(groupDtos);
     }
 
+    // --- 【核心新增】为流程设计器提供可用的 Spring Bean 列表 ---
+    /**
+     * API: 获取可用于流程设计器的 Spring Bean 列表
+     * @param type (可选) 'delegate' 或 'listener'，用于过滤
+     * @return DTO 列表
+     */
+    @GetMapping("/designer/beans")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<List<DelegateInfoDTO>> getAvailableBeans(@RequestParam(required = false) String type) {
+        return ResponseEntity.ok(workflowService.getAvailableBeans(type));
+    }
+
+
     // --- 个人流程数据 ---
     /**
      * 【核心修改】API: 获取我的申请列表, 支持分页和筛选

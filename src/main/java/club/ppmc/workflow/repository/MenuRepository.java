@@ -46,4 +46,12 @@ public interface MenuRepository extends JpaRepository<Menu, Long> {
      * @return 如果存在关联则返回 true
      */
     boolean existsByFormDefinitionId(Long formDefinitionId);
+
+    // --- 【核心新增】 ---
+    /**
+     * 查找所有关联到指定表单定义的菜单列表。
+     * @param formDefinitionId 表单定义ID
+     * @return 关联的菜单列表
+     */
+    List<Menu> findByFormDefinitionId(Long formDefinitionId);
 }

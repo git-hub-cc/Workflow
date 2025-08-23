@@ -11,6 +11,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.camunda.bpm.engine.*;
+import org.camunda.bpm.engine.delegate.JavaDelegate;
+import org.camunda.bpm.engine.delegate.TaskListener;
 import org.camunda.bpm.engine.history.HistoricActivityInstance;
 import org.camunda.bpm.engine.history.HistoricTaskInstance;
 import org.camunda.bpm.engine.history.HistoricTaskInstanceQuery;
@@ -20,17 +22,25 @@ import org.camunda.bpm.engine.repository.ProcessDefinition;
 import org.camunda.bpm.engine.runtime.ProcessInstance;
 import org.camunda.bpm.engine.task.Task;
 import org.camunda.bpm.engine.task.TaskQuery;
+// --- 【核心新增】引入 Camunda Model API 和 Regex 相关包 ---
+import org.camunda.bpm.model.bpmn.BpmnModelInstance;
+import org.camunda.bpm.model.bpmn.instance.ConditionExpression;
+import org.camunda.bpm.model.bpmn.instance.ExclusiveGateway;
+import org.camunda.bpm.model.bpmn.instance.FlowNode;
+import org.camunda.bpm.model.bpmn.instance.SequenceFlow;
+import org.springframework.context.ApplicationContext;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.util.CollectionUtils;
 import org.springframework.util.StringUtils;
 
 import java.time.ZoneId;
 import java.util.*;
 import java.util.function.Function;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -60,6 +70,10 @@ public class WorkflowService {
 
     private final ObjectMapper objectMapper;
 
+    // --- 【核心新增】注入 Spring 上下文 ---
+    private final ApplicationContext applicationContext;
+
+    // ... (deployWorkflow, updateWorkflowTemplate, getOrCreateWorkflowTemplate, startWorkflow, completeUserTask, getPendingTasksForUser, getCompletedTasksForUser, getTaskDetails 方法保持不变)
     @LogOperation(module = "流程管理", action = "部署流程", targetIdExpression = "#request.processDefinitionKey")
     public void deployWorkflow(DeployWorkflowRequest request) {
         FormDefinition formDef = formDefinitionRepository.findById(request.getFormDefinitionId())
@@ -507,6 +521,7 @@ public class WorkflowService {
         return convertCamundaTaskToDto(task);
     }
 
+    // --- 【核心重构】开始: 重构 convertCamundaTaskToDto 方法以支持穿透中间节点 ---
     private TaskDto convertCamundaTaskToDto(Task camundaTask) {
         TaskDto dto = new TaskDto();
         dto.setCamundaTaskId(camundaTask.getId());
@@ -523,18 +538,83 @@ public class WorkflowService {
         dto.setSubmitterName((String) variables.getOrDefault("submitterName", "未知"));
         dto.setFormName((String) variables.getOrDefault("formName", "未知表单"));
 
-        List<String> decisions = new ArrayList<>(List.of("APPROVED", "REJECTED", "RETURN_TO_INITIATOR"));
-        long userTaskCount = historyService.createHistoricTaskInstanceQuery()
-                .processInstanceId(camundaTask.getProcessInstanceId())
-                .finished()
-                .count();
-        if (userTaskCount > 0) {
-            decisions.add("RETURN_TO_PREVIOUS");
+        List<String> decisions = new ArrayList<>();
+        try {
+            BpmnModelInstance modelInstance = repositoryService.getBpmnModelInstance(camundaTask.getProcessDefinitionId());
+            FlowNode taskNode = modelInstance.getModelElementById(camundaTask.getTaskDefinitionKey());
+
+            // 使用新的辅助方法查找真正的决策点
+            Collection<SequenceFlow> decisionFlows = findDecisionFlows(taskNode, 0);
+
+            Pattern pattern = Pattern.compile("\\$\\{taskOutcome\\s*==\\s*'([^']*)'\\}");
+
+            for (SequenceFlow flow : decisionFlows) {
+                ConditionExpression condition = flow.getConditionExpression();
+                if (condition != null && condition.getTextContent() != null) {
+                    Matcher matcher = pattern.matcher(condition.getTextContent().trim());
+                    if (matcher.matches()) {
+                        String outcome = matcher.group(1);
+                        String decision = outcome.replaceAll("([a-z])([A-Z])", "$1_$2").toUpperCase();
+                        decisions.add(decision);
+                    }
+                }
+            }
+
+            if (decisions.isEmpty()) {
+                log.warn("任务 '{}' (定义KEY: {}) 未找到基于 'taskOutcome' 的条件分支, 将提供默认操作。",
+                        camundaTask.getId(), camundaTask.getTaskDefinitionKey());
+                decisions.addAll(List.of("APPROVED", "REJECTED"));
+            }
+
+        } catch (Exception e) {
+            log.error("解析任务 {} 的可用决策时发生错误, 将提供默认操作。", camundaTask.getId(), e);
+            decisions.addAll(List.of("APPROVED", "REJECTED"));
         }
         dto.setAvailableDecisions(decisions);
 
         return dto;
     }
+
+    /**
+     * 【核心新增】递归辅助方法，用于查找流程中的决策点。
+     * 它会沿着单一、无条件的路径前进，直到找到一个排他网关或一个有多个条件分支的节点。
+     * @param currentNode 当前开始查找的节点
+     * @param depth 递归深度，防止无限循环
+     * @return 决策点的出口连线集合
+     */
+    private Collection<SequenceFlow> findDecisionFlows(FlowNode currentNode, int depth) {
+        if (depth > 10) { // 防止无限循环的保护机制
+            log.warn("查找决策点时递归深度超过10，已中止。节点ID: {}", currentNode.getId());
+            return Collections.emptyList();
+        }
+
+        Collection<SequenceFlow> outgoingFlows = currentNode.getOutgoing();
+
+        // 情况1: 当前节点本身就是决策点 (有多个出口，或只有一个但带条件)
+        if (outgoingFlows.size() > 1 || (outgoingFlows.size() == 1 && outgoingFlows.iterator().next().getConditionExpression() != null)) {
+            return outgoingFlows;
+        }
+
+        // 情况2: 当前节点有一个无条件的出口
+        if (outgoingFlows.size() == 1) {
+            SequenceFlow singleFlow = outgoingFlows.iterator().next();
+            FlowNode targetNode = singleFlow.getTarget();
+
+            // 目标是排他网关，这是最常见的决策点
+            if (targetNode instanceof ExclusiveGateway) {
+                return targetNode.getOutgoing();
+            }
+
+            // 目标是其他类型的节点，则继续递归查找
+            if (targetNode != null) {
+                return findDecisionFlows(targetNode, depth + 1);
+            }
+        }
+
+        // 情况3: 找不到决策点（例如，流程在此处结束）
+        return Collections.emptyList();
+    }
+    // --- 【核心重构】结束 ---
 
     @Transactional(readOnly = true)
     public List<HistoryActivityDto> getWorkflowHistoryBySubmissionId(Long submissionId) {
@@ -736,5 +816,29 @@ public class WorkflowService {
 
         log.debug("权限检查: 用户 '{}' 不是申请单 #{} 的任何阶段参与者。", username, submissionId);
         return false;
+    }
+
+    // --- 【核心新增】获取设计器可用的 Spring Bean ---
+    @Transactional(readOnly = true)
+    public List<DelegateInfoDTO> getAvailableBeans(String type) {
+        List<DelegateInfoDTO> beans = new ArrayList<>();
+
+        if (type == null || "delegate".equalsIgnoreCase(type)) {
+            Map<String, JavaDelegate> delegateBeans = applicationContext.getBeansOfType(JavaDelegate.class);
+            delegateBeans.forEach((name, bean) ->
+                    beans.add(new DelegateInfoDTO(name, "JavaDelegate", "这是一个Java Delegate Bean"))
+            );
+        }
+
+        if (type == null || "listener".equalsIgnoreCase(type)) {
+            Map<String, TaskListener> listenerBeans = applicationContext.getBeansOfType(TaskListener.class);
+            listenerBeans.forEach((name, bean) ->
+                    beans.add(new DelegateInfoDTO(name, "TaskListener", "这是一个任务监听器 Bean"))
+            );
+        }
+
+        return beans.stream()
+                .sorted(Comparator.comparing(DelegateInfoDTO::getName))
+                .collect(Collectors.toList());
     }
 }

@@ -26,4 +26,11 @@ public interface WorkflowTemplateRepository extends JpaRepository<WorkflowTempla
      * @return 包含该文本的模板数量
      */
     long countByBpmnXmlContaining(String searchText);
+
+    // --- 【核心新增】 ---
+    /**
+     * 根据表单定义ID删除工作流模板。
+     * @param formDefinitionId 表单定义ID
+     */
+    void deleteByFormDefinitionId(Long formDefinitionId);
 }

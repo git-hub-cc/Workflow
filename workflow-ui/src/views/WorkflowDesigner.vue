@@ -1,12 +1,12 @@
 <template>
   <div class="page-container">
-    <a-page-header title="流程设计器" @back="() => $router.push('/')">
+    <a-page-header title="流程设计器" @back="() => $router.push({ name: 'admin-forms' })">
       <template #subTitle>
         为表单: <strong class="form-name-highlight">{{ formName }}</strong>
       </template>
       <template #extra>
         <a-space>
-          <a-button @click="$router.push('/')">取消</a-button>
+          <a-button @click="$router.push({ name: 'admin-forms' })">取消</a-button>
           <a-button @click="handleSaveDraft" :loading="saving">保存草稿</a-button>
           <a-button type="primary" @click="handleDeploy" :loading="deploying">部署</a-button>
         </a-space>
@@ -46,82 +46,18 @@
       </a-space>
     </div>
 
-    <!-- 【核心修改】使用 a-tabs 替换 a-collapse -->
-    <a-tabs v-model:activeKey="activeTabKey" class="helper-tabs">
-      <a-tab-pane key="system" tab="系统变量">
-        <div class="collapsible-header" @click="toggleCollapse('system')">
-          <span>系统/角色变量 (点击复制为表达式)</span>
-          <DownOutlined :class="{ 'is-expanded': !collapsedStates.system }" />
-        </div>
-        <div v-show="!collapsedStates.system" class="collapsible-content">
-          <div class="group-list">
-            <a-tooltip title="流程发起人的用户ID">
-              <a-tag @click="copyToClipboard('initiator', true)" class="group-tag">发起人 (initiator)</a-tag>
-            </a-tooltip>
-            <a-tooltip title="发起人的直接上级ID">
-              <a-tag @click="copyToClipboard('managerId', true)" class="group-tag">直接上级 (managerId)</a-tag>
-            </a-tooltip>
-            <a-tooltip title="财务审批角色 (在流程启动时由后端注入)">
-              <a-tag @click="copyToClipboard('financeRole', true)" class="group-tag">财务角色 (financeRole)</a-tag>
-            </a-tooltip>
-          </div>
-        </div>
-      </a-tab-pane>
-
-      <a-tab-pane key="form" tab="表单变量">
-        <div class="collapsible-header" @click="toggleCollapse('form')">
-          <span>可用表单变量 (点击复制为表达式)</span>
-          <DownOutlined :class="{ 'is-expanded': !collapsedStates.form }" />
-        </div>
-        <div v-show="!collapsedStates.form" class="collapsible-content">
-          <a-input-search
-              v-model:value="fieldSearchText"
-              placeholder="搜索字段"
-              size="small"
-              style="margin-bottom: 8px;"
-          />
-          <div class="group-list">
-            <a-tooltip v-for="field in filteredFormFields" :key="field.id" :title="`字段ID: ${field.id}`">
-              <a-tag @click="copyToClipboard(field.id, true)" class="group-tag">
-                {{ field.label }} ({{ field.id }})
-              </a-tag>
-            </a-tooltip>
-            <a-empty v-if="!loading && filteredFormFields.length === 0" :image-style="{ height: '40px' }" description="无可用字段" />
-          </div>
-        </div>
-      </a-tab-pane>
-
-      <a-tab-pane key="group" tab="用户组">
-        <div class="collapsible-header" @click="toggleCollapse('group')">
-          <span>可用用户组 (点击复制ID)</span>
-          <DownOutlined :class="{ 'is-expanded': !collapsedStates.group }" />
-        </div>
-        <div v-show="!collapsedStates.group" class="collapsible-content">
-          <a-input-search
-              v-model:value="groupSearchText"
-              placeholder="搜索用户组"
-              size="small"
-              style="margin-bottom: 8px;"
-          />
-          <a-spin :spinning="groupsLoading">
-            <div class="group-list">
-              <a-tooltip v-for="group in filteredGroups" :key="group.id" :title="group.description">
-                <a-tag @click="copyToClipboard(group.name, false)" class="group-tag">
-                  {{ group.name }}
-                </a-tag>
-              </a-tooltip>
-              <a-empty v-if="filteredGroups.length === 0" :image-style="{ height: '40px' }" description="无匹配" />
-            </div>
-          </a-spin>
-        </div>
-      </a-tab-pane>
-    </a-tabs>
-
-
     <!-- 设计器区域 -->
     <div class="designer-container" v-show="!loading">
-      <div id="canvas" ref="canvasRef"></div>
-      <div id="properties-panel-container" ref="propertiesPanelRef"></div>
+      <div id="canvas" ref="canvasRef" class="canvas"></div>
+      <!-- 【核心修改】将 modeler 实例通过 prop 传递下去 -->
+      <SimplePropertiesPanel
+          class="properties-panel"
+          :selected-element="selectedElement"
+          :modeler="modeler"
+          :form-fields="formFields"
+          :user-groups="availableGroups"
+          @update="handlePropertiesUpdate"
+      />
     </div>
     <div v-if="loading" class="loading-container">
       <a-spin size="large" tip="正在加载设计器..." />
@@ -130,29 +66,28 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onBeforeUnmount, watch, nextTick, computed } from 'vue';
+// 【核心修复】从 vue 中导入 markRaw
+import { ref, onMounted, onBeforeUnmount, watch, nextTick, markRaw } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { message, Modal } from 'ant-design-vue';
 import { getFormById, deployWorkflow, getWorkflowTemplate, updateWorkflowTemplate, getGroupsForWorkflow } from '@/api';
 import {
   UndoOutlined, RedoOutlined, ZoomInOutlined, ZoomOutOutlined,
-  FullscreenOutlined, DownloadOutlined, FileImageOutlined, UploadOutlined, DownOutlined
+  FullscreenOutlined, DownloadOutlined, FileImageOutlined, UploadOutlined
 } from '@ant-design/icons-vue';
 import { flattenFields } from '@/utils/formUtils.js';
 
-// BPMN.js related imports...
+// BPMN.js related imports
 import BpmnModeler from 'bpmn-js/lib/Modeler.js';
 import 'bpmn-js/dist/assets/diagram-js.css';
 import 'bpmn-js/dist/assets/bpmn-js.css';
 import 'bpmn-js/dist/assets/bpmn-font/css/bpmn.css';
-import '@bpmn-io/properties-panel/dist/assets/properties-panel.css';
-import {
-  BpmnPropertiesPanelModule,
-  BpmnPropertiesProviderModule,
-  CamundaPlatformPropertiesProviderModule
-} from 'bpmn-js-properties-panel';
+// 【核心修改】移除旧属性面板相关导入
 import camundaModdleDescriptors from 'camunda-bpmn-moddle/resources/camunda.json';
 import customTranslateModule from '@/utils/customTranslate';
+
+// 【核心修改】导入新的简化版属性面板组件
+import SimplePropertiesPanel from './workflow/SimplePropertiesPanel.vue';
 
 // --- 路由与状态 ---
 const route = useRoute();
@@ -160,7 +95,6 @@ const router = useRouter();
 const formId = route.params.formId;
 
 const canvasRef = ref(null);
-const propertiesPanelRef = ref(null);
 const fileInputRef = ref(null);
 const formName = ref('加载中...');
 const saving = ref(false);
@@ -171,42 +105,11 @@ let modeler = null;
 const canUndo = ref(false);
 const canRedo = ref(false);
 
-// --- 辅助面板状态 ---
+// --- 面板所需数据 ---
 const availableGroups = ref([]);
-const groupsLoading = ref(false);
-const groupSearchText = ref('');
 const formFields = ref([]);
-const fieldSearchText = ref('');
-// 【核心修改】从 a-collapse 的 activeKey 改为 a-tabs 的 activeKey
-const activeTabKey = ref('system');
-// 【核心修改】新增状态来管理每个标签页内容的折叠状态
-const collapsedStates = ref({
-  system: true,
-  form: true,
-  group: true,
-});
-
-// 【核心修改】切换折叠状态的方法
-const toggleCollapse = (key) => {
-  collapsedStates.value[key] = !collapsedStates.value[key];
-};
-
-const filteredGroups = computed(() => {
-  if (!groupSearchText.value) return availableGroups.value;
-  return availableGroups.value.filter(g =>
-      g.name.toLowerCase().includes(groupSearchText.value.toLowerCase()) ||
-      (g.description && g.description.toLowerCase().includes(groupSearchText.value.toLowerCase()))
-  );
-});
-
-const filteredFormFields = computed(() => {
-  if (!fieldSearchText.value) return formFields.value;
-  const query = fieldSearchText.value.toLowerCase();
-  return formFields.value.filter(f =>
-      f.label.toLowerCase().includes(query) ||
-      f.id.toLowerCase().includes(query)
-  );
-});
+// 【核心新增】用于存储当前选中的BPMN节点
+const selectedElement = ref(null);
 
 watch(loading, async (val) => {
   if (!val) {
@@ -219,20 +122,34 @@ async function initModeler() {
   try {
     modeler = new BpmnModeler({
       container: canvasRef.value,
-      propertiesPanel: { parent: propertiesPanelRef.value },
+      // 【核心修改】移除旧的 propertiesPanel 配置
       additionalModules: [
-        BpmnPropertiesPanelModule,
-        BpmnPropertiesProviderModule,
-        CamundaPlatformPropertiesProviderModule,
+        // 【核心修改】移除旧的属性面板模块
         customTranslateModule
       ],
       moddleExtensions: { camunda: camundaModdleDescriptors },
     });
 
     const eventBus = modeler.get('eventBus');
+
+    // 监听命令栈变化，更新撤销/重做按钮状态
     eventBus.on('commandStack.changed', () => {
       canUndo.value = modeler.get('commandStack').canUndo();
       canRedo.value = modeler.get('commandStack').canRedo();
+    });
+
+    // 【核心修复】监听节点选择事件，并使用 markRaw 防止 Vue 将其转换为响应式对象
+    eventBus.on('selection.changed', (event) => {
+      const { newSelection } = event;
+      selectedElement.value = newSelection && newSelection.length > 0 ? markRaw(newSelection[0]) : null;
+    });
+
+    // 【核心修复】监听节点属性变化事件，同样使用 markRaw
+    eventBus.on('element.changed', (event) => {
+      const { element } = event;
+      if (selectedElement.value && selectedElement.value.id === element.id) {
+        selectedElement.value = markRaw(element);
+      }
     });
 
     const template = await getWorkflowTemplate(formId);
@@ -244,6 +161,14 @@ async function initModeler() {
   }
 }
 
+// 【核心新增】处理来自新属性面板的更新请求
+const handlePropertiesUpdate = (propertiesToUpdate) => {
+  if (!selectedElement.value) return;
+  const modeling = modeler.get('modeling');
+  modeling.updateProperties(selectedElement.value, propertiesToUpdate);
+};
+
+
 const handleKeyDown = (event) => {
   if (!modeler) return;
   const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
@@ -252,18 +177,17 @@ const handleKeyDown = (event) => {
   if (isCtrlOrCmd && event.key.toLowerCase() === 'z') {
     event.preventDefault();
     if (event.shiftKey) {
-      if (modeler.get('commandStack').canRedo()) modeler.get('commandStack').redo();
+      if (canRedo.value) handleRedo();
     } else {
-      if (modeler.get('commandStack').canUndo()) modeler.get('commandStack').undo();
+      if (canUndo.value) handleUndo();
     }
   } else if (isCtrlOrCmd && event.key.toLowerCase() === 'y') {
     event.preventDefault();
-    if (modeler.get('commandStack').canRedo()) modeler.get('commandStack').redo();
+    if (canRedo.value) handleRedo();
   }
 };
 
 onMounted(async () => {
-  groupsLoading.value = true;
   try {
     const [form, groups] = await Promise.all([
       getFormById(formId),
@@ -275,8 +199,8 @@ onMounted(async () => {
     const schema = JSON.parse(form.schemaJson);
     const flattened = flattenFields(schema.fields);
     formFields.value = flattened
-        .filter(f => !['GridRow', 'GridCol', 'Collapse', 'CollapsePanel', 'StaticText', 'DescriptionList'].includes(f.type))
-        .map(f => ({ id: f.id, label: f.label || f.id }));
+        .filter(f => !['GridRow', 'GridCol', 'Collapse', 'CollapsePanel', 'StaticText', 'DescriptionList', 'Divider'].includes(f.type))
+        .map(f => ({ id: f.id, label: f.label || f.id, type: f.type }));
 
     window.addEventListener('keydown', handleKeyDown);
 
@@ -285,7 +209,6 @@ onMounted(async () => {
     console.error(err);
   } finally {
     loading.value = false;
-    groupsLoading.value = false;
   }
 });
 
@@ -340,7 +263,7 @@ const handleDeploy = () => {
         };
         await deployWorkflow(payload);
         message.success('流程部署成功！');
-        router.push('/');
+        router.push({ name: 'admin-forms' });
       } catch (error) {
         message.error(`部署失败: ${error.message}`);
       } finally {
@@ -401,17 +324,6 @@ const downloadSvg = async () => {
     message.error('导出SVG失败');
   }
 };
-
-const copyToClipboard = async (text, isVariable = false) => {
-  const textToCopy = isVariable ? `\${${text}}` : text;
-  const messageText = isVariable ? `表达式 "${textToCopy}"` : `ID "${textToCopy}"`;
-  try {
-    await navigator.clipboard.writeText(textToCopy);
-    message.success(`${messageText} 已复制到剪贴板!`);
-  } catch (err) {
-    message.error('复制失败!');
-  }
-};
 </script>
 
 <style scoped>
@@ -419,7 +331,7 @@ const copyToClipboard = async (text, isVariable = false) => {
   padding: 0;
   display: flex;
   flex-direction: column;
-  height: calc(100vh - 64px - 48px);
+  height: calc(100vh - 64px - 48px); /* 减去 Header 和 Footer 的高度 */
   background-color: #fff;
 }
 .toolbar {
@@ -431,73 +343,34 @@ const copyToClipboard = async (text, isVariable = false) => {
 .designer-container {
   display: flex;
   flex-grow: 1;
-  border-top: 1px solid #f0f0f0;
   min-height: 0;
 }
-#canvas { flex-grow: 1; background-color: #f9f9f9; }
-#properties-panel-container {
+.canvas {
+  flex-grow: 1;
+  background-color: #f9f9f9;
+}
+/* 【核心新增】新属性面板的样式 */
+.properties-panel {
   width: 320px;
-  background: #f8f8f8;
-  overflow-y: auto;
-  border-left: 1px solid #e0e0e0;
   flex-shrink: 0;
-}
-.loading-container { display: flex; justify-content: center; align-items: center; height: 100%; }
-:deep(.bjs-powered-by) { display: none !important; }
-:deep(.djs-palette) { top: 20px; left: 20px; }
-
-/* --- 【核心修改】Tabs 样式 --- */
-.helper-tabs {
-  background-color: #fafafa;
-  border-bottom: 1px solid #f0f0f0;
-  padding: 16px;
-}
-.helper-tabs :deep(.ant-tabs-nav) {
-  margin-bottom: 0 !important;
-}
-.helper-tabs :deep(.ant-tabs-content-holder) {
-  padding: 8px 16px;
-}
-.collapsible-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 6px 4px;
-  cursor: pointer;
-  border-radius: 4px;
-  transition: background-color 0.2s;
-}
-.collapsible-header:hover {
-  background-color: #f0f0f0;
-}
-.collapsible-header .anticon {
-  transition: transform 0.3s;
-}
-.collapsible-header .is-expanded {
-  transform: rotate(180deg);
-}
-.collapsible-content {
-  padding-top: 12px;
-}
-/* -------------------------- */
-
-.group-list {
-  max-height: 120px;
+  background: #f8f8f8;
+  border-left: 1px solid #e0e0e0;
   overflow-y: auto;
+}
+.loading-container {
   display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-.group-tag {
-  cursor: pointer;
-  transition: all 0.2s;
-}
-.group-tag:hover {
-  transform: translateY(-2px);
-  color: var(--ant-primary-color);
-  border-color: var(--ant-primary-color);
+  justify-content: center;
+  align-items: center;
+  height: 100%;
 }
 .form-name-highlight {
   color: var(--ant-primary-color);
+}
+:deep(.bjs-powered-by) {
+  display: none !important;
+}
+:deep(.djs-palette) {
+  top: 20px;
+  left: 20px;
 }
 </style>

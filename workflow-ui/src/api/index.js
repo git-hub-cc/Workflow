@@ -90,7 +90,10 @@ export const getForms = () => service.get('/forms');
 export const getFormById = (id) => service.get(`/forms/${id}`);
 export const createForm = (data) => service.post('/forms', data);
 export const updateForm = (id, data) => service.put(`/forms/${id}`, data);
-export const deleteForm = (id) => service.delete(`/forms/${id}`);
+// --- 【核心修改】修改 deleteForm 以支持级联删除 ---
+export const deleteForm = (id, cascade = false) => service.delete(`/forms/${id}?cascade=${cascade}`);
+// --- 【核心新增】获取表单依赖关系的 API ---
+export const getFormDependencies = (id) => service.get(`/forms/${id}/dependencies`);
 export const getSubmissions = (formId, params) => service.get(`/forms/${formId}/submissions`, { params });
 export const getSubmissionById = (submissionId) => service.get(`/forms/submissions/${submissionId}`);
 export const submitForm = (formId, data) => service.post(`/forms/${formId}/submissions`, data);
@@ -128,15 +131,14 @@ export const updateWorkflowTemplate = (formId, data) => service.put(`/workflows/
 export const getGroupsForWorkflow = () => service.get('/workflows/groups');
 export const getUsersForPicker = (params) => service.get('/workflows/users', { params });
 export const getMySubmissions = (params) => service.get('/workflows/my-submissions', { params });
-// --- 【核心新增】获取流程图的 API ---
 export const getWorkflowDiagram = (submissionId) => service.get(`/workflows/submission/${submissionId}/diagram`);
+export const getAvailableBeans = (params) => service.get('/workflows/designer/beans', { params });
 
 
 // --- 任务 API ---
 export const getPendingTasks = (params) => service.get('/tasks/pending', { params });
 export const getTaskById = (taskId) => service.get(`/tasks/${taskId}`);
 export const completeTask = (taskId, data) => service.post(`/tasks/${taskId}/complete`, data);
-// 【核心新增】获取已办任务的 API
 export const getCompletedTasks = (params) => service.get('/tasks/completed', { params });
 
 

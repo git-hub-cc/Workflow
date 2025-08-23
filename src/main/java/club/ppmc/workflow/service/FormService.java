@@ -71,12 +71,6 @@ public class FormService {
         return convertToDefinitionResponse(formDefinition);
     }
 
-    /**
-     * 【新增】更新表单定义
-     * @param id 表单ID
-     * @param request 更新请求
-     * @return 更新后的表单定义 DTO
-     */
     @LogOperation(module = "表单管理", action = "更新表单定义", targetIdExpression = "#id")
     public FormDefinitionResponse updateFormDefinition(Long id, CreateFormDefinitionRequest request) {
         FormDefinition formDefinition = formDefinitionRepository.findById(id)
@@ -85,27 +79,96 @@ public class FormService {
         formDefinition.setName(request.getName());
         formDefinition.setSchemaJson(request.getSchemaJson());
 
-        // @PreUpdate 注解会自动处理 updatedAt 字段的更新
         FormDefinition updatedForm = formDefinitionRepository.save(formDefinition);
         return convertToDefinitionResponse(updatedForm);
     }
 
+    /**
+     * 【核心修改】删除表单定义，增加级联删除选项
+     * @param id 表单定义ID
+     * @param cascade 是否级联删除关联的工作流和提交数据
+     */
     @LogOperation(module = "表单管理", action = "删除表单定义", targetIdExpression = "#id")
-    public void deleteFormDefinition(Long id) {
+    public void deleteFormDefinition(Long id, boolean cascade) {
         if (!formDefinitionRepository.existsById(id)) {
             throw new ResourceNotFoundException("未找到表单定义 ID: " + id);
         }
-        if (workflowTemplateRepository.findByFormDefinitionId(id).isPresent()) {
-            throw new ResourceInUseException("无法删除：该表单已关联一个工作流模板。请先在流程设计器中解除关联或删除流程。");
-        }
+
+        // 无论是否级联，都必须先检查菜单关联，因为菜单不能被自动删除
         if (menuRepository.existsByFormDefinitionId(id)) {
             throw new ResourceInUseException("无法删除：该表单已被一个或多个菜单项使用。请先在菜单管理中解除关联。");
         }
+
+        if (cascade) {
+            // 执行级联删除
+            log.warn("执行级联删除操作，表单ID: {}", id);
+            workflowTemplateRepository.deleteByFormDefinitionId(id);
+            formSubmissionRepository.deleteByFormDefinitionId(id);
+            // 注意：物理文件的清理需要一个单独的机制，这里只删除了数据库记录
+        } else {
+            // 执行安全检查
+            if (workflowTemplateRepository.findByFormDefinitionId(id).isPresent()) {
+                throw new ResourceInUseException("无法删除：该表单已关联一个工作流模板。请先在流程设计器中解除关联或删除流程。");
+            }
+            if (formSubmissionRepository.countByFormDefinitionId(id) > 0) {
+                throw new ResourceInUseException("无法删除：该表单已存在提交数据。");
+            }
+        }
+
+        // 最后删除表单定义本身
         formDefinitionRepository.deleteById(id);
     }
 
+    /**
+     * 【核心新增】检查表单的依赖关系
+     * @param formId 表单定义ID
+     * @return 依赖关系DTO
+     */
+    @Transactional(readOnly = true)
+    public FormDependencyDto getFormDependencies(Long formId) {
+        List<DependencyItemDto> dependencies = new ArrayList<>();
+
+        // 1. 检查工作流模板
+        workflowTemplateRepository.findByFormDefinitionId(formId).ifPresent(template ->
+                dependencies.add(DependencyItemDto.builder()
+                        .type(DependencyItemDto.DependencyType.WORKFLOW)
+                        .name(StringUtils.hasText(template.getProcessDefinitionKey()) ? template.getProcessDefinitionKey() : "未命名工作流")
+                        .id(template.getId())
+                        .build())
+        );
+
+        // 2. 检查菜单项
+        List<Menu> relatedMenus = menuRepository.findByFormDefinitionId(formId);
+        if (!relatedMenus.isEmpty()) {
+            relatedMenus.forEach(menu ->
+                    dependencies.add(DependencyItemDto.builder()
+                            .type(DependencyItemDto.DependencyType.MENU)
+                            .name(menu.getName())
+                            .id(menu.getId())
+                            .build())
+            );
+        }
+
+        // 3. 检查提交数据
+        long submissionCount = formSubmissionRepository.countByFormDefinitionId(formId);
+        if (submissionCount > 0) {
+            dependencies.add(DependencyItemDto.builder()
+                    .type(DependencyItemDto.DependencyType.SUBMISSION)
+                    .name("提交数据")
+                    .count(submissionCount)
+                    .build());
+        }
+
+        return FormDependencyDto.builder()
+                .canDelete(dependencies.isEmpty())
+                .dependencies(dependencies)
+                .build();
+    }
+
+
     @LogOperation(module = "表单提交", action = "提交申请", targetIdExpression = "#result?.id")
     public FormSubmissionResponse createFormSubmission(Long formDefinitionId, CreateFormSubmissionRequest request, String submitterId) {
+        // ... (此方法逻辑不变)
         FormDefinition formDefinition = formDefinitionRepository.findById(formDefinitionId)
                 .orElseThrow(() -> new ResourceNotFoundException("无法为不存在的表单 (ID: " + formDefinitionId + ") 创建提交记录"));
 
@@ -134,6 +197,7 @@ public class FormService {
 
     @LogOperation(module = "数据列表", action = "更新提交记录", targetIdExpression = "#submissionId")
     public FormSubmissionResponse updateSubmission(Long submissionId, UpdateFormSubmissionRequest request) {
+        // ... (此方法逻辑不变)
         FormSubmission submission = formSubmissionRepository.findById(submissionId)
                 .orElseThrow(() -> new ResourceNotFoundException("未找到提交记录 ID: " + submissionId));
 
@@ -147,6 +211,7 @@ public class FormService {
 
     @LogOperation(module = "数据列表", action = "删除提交记录", targetIdExpression = "#submissionId")
     public void deleteSubmission(Long submissionId) {
+        // ... (此方法逻辑不变)
         FormSubmission submission = formSubmissionRepository.findById(submissionId)
                 .orElseThrow(() -> new ResourceNotFoundException("未找到提交记录 ID: " + submissionId));
 
@@ -160,6 +225,7 @@ public class FormService {
 
     @Transactional(readOnly = true)
     public Page<FormSubmissionResponse> getMySubmissions(String userId, String keyword, String status, Pageable pageable) {
+        // ... (此方法逻辑不变)
         Specification<FormSubmission> spec = (root, query, cb) -> {
             List<Predicate> predicates = new ArrayList<>();
 
@@ -183,6 +249,7 @@ public class FormService {
 
     @Transactional(readOnly = true)
     public Page<FormSubmissionResponse> getSubmissionsByFormId(Long formDefinitionId, Long menuId, Map<String, String> filters, Pageable pageable) {
+        // ... (此方法逻辑不变)
         formDefinitionRepository.findById(formDefinitionId)
                 .orElseThrow(() -> new ResourceNotFoundException("未找到 ID 为 " + formDefinitionId + " 的表单定义"));
 
@@ -213,6 +280,7 @@ public class FormService {
     }
 
     public FormDefinitionResponse convertToDefinitionResponse(FormDefinition entity) {
+        // ... (此方法逻辑不变)
         FormDefinitionResponse dto = new FormDefinitionResponse();
         dto.setId(entity.getId());
         dto.setName(entity.getName());
@@ -234,6 +302,7 @@ public class FormService {
     }
 
     public FormSubmissionResponse convertToSubmissionResponse(FormSubmission entity) {
+        // ... (此方法逻辑不变)
         FormSubmissionResponse dto = new FormSubmissionResponse();
         dto.setId(entity.getId());
         dto.setFormDefinitionId(entity.getFormDefinition().getId());
@@ -262,9 +331,8 @@ public class FormService {
         return dto;
     }
 
-    // --- Private Helper Methods ---
-
     private void applyDataScope(List<Predicate> predicates, jakarta.persistence.criteria.CriteriaQuery<?> query, jakarta.persistence.criteria.CriteriaBuilder cb, jakarta.persistence.criteria.Root<FormSubmission> root, Long menuId, User currentUser) {
+        // ... (此方法逻辑不变)
         if (menuId != null) {
             Menu menu = menuRepository.findById(menuId)
                     .orElseThrow(() -> new ResourceNotFoundException("未找到菜单ID: " + menuId));
@@ -281,20 +349,18 @@ public class FormService {
                 switch (dataScope) {
                     case BY_DEPARTMENT:
                         if (currentUser.getDepartment() != null) {
-                            // 【核心修复】使用子查询代替错误的join
                             Subquery<String> subquery = query.subquery(String.class);
                             jakarta.persistence.criteria.Root<User> userRoot = subquery.from(User.class);
                             subquery.select(userRoot.get("id"))
                                     .where(cb.equal(userRoot.get("department").get("id"), currentUser.getDepartment().getId()));
                             predicates.add(root.get("submitterId").in(subquery));
                         } else {
-                            predicates.add(cb.disjunction()); // 总是返回 false
+                            predicates.add(cb.disjunction());
                         }
                         break;
                     case BY_GROUP:
                         Set<UserGroup> userGroups = currentUser.getUserGroups();
                         if (!userGroups.isEmpty()) {
-                            // 【核心修复】使用子查询代替错误的join
                             Subquery<String> subquery = query.subquery(String.class);
                             jakarta.persistence.criteria.Root<User> userRoot = subquery.from(User.class);
                             subquery.select(userRoot.get("id"))
@@ -322,10 +388,12 @@ public class FormService {
     }
 
     private boolean isPaginationParam(String key) {
+        // ... (此方法逻辑不变)
         return "page".equals(key) || "size".equals(key) || "sort".equals(key);
     }
 
     private void updateAttachments(FormSubmission submission, List<Long> newAttachmentIds) {
+        // ... (此方法逻辑不变)
         if (newAttachmentIds == null) {
             newAttachmentIds = Collections.emptyList();
         }

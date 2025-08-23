@@ -19,7 +19,7 @@ public class TaskDto {
     private String formName;
     private String submitterName;
 
-    // --- 【核心新增】 ---
+    // --- 【核心修改】 ---
     /**
      * 当前任务可用的操作决策列表
      * e.g., ["APPROVED", "REJECTED", "RETURN_TO_INITIATOR", "RETURN_TO_PREVIOUS"]
