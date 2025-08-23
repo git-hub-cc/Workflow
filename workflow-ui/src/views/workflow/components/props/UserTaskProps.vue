@@ -82,36 +82,63 @@ const userGroupsForSelect = computed(() =>
 );
 
 // --- 监听与逻辑 ---
-watch(() => props.selectedElement, (element) => {
-  if (!element || element.type !== 'bpmn:UserTask') return;
-  const bo = element.businessObject;
+watch(
+    () => props.selectedElement,
+    (element) => {
+      // --- 非用户任务直接跳过 ---
+      if (!element || element.type !== 'bpmn:UserTask') return;
 
-  // --- 处理人配置初始化 ---
-  if (bo['camunda:assignee']) {
-    assignmentType.value = 'assignee';
-    const assigneeValue = bo['camunda:assignee'];
-    if (assigneeValue === '${initiator}') assigneeSource.value = 'initiator';
-    else if (assigneeValue === '${managerId}') assigneeSource.value = 'manager';
-    else {
-      const match = assigneeValue.match(/\$\{(.+?)}/);
-      if (match && props.formFields.some(f => f.id === match[1])) assigneeSource.value = match[1];
-      else assigneeSource.value = 'initiator';
-    }
-  } else if (bo['camunda:candidateGroups']) {
-    assignmentType.value = 'candidateGroups';
-    selectedGroups.value = bo['camunda:candidateGroups'].split(',').map(g => g.trim()).filter(Boolean);
-  } else {
-    assignmentType.value = 'assignee';
-    assigneeSource.value = 'initiator';
-    selectedGroups.value = [];
-  }
+      const bo = element.businessObject;
 
-  // --- 【核心新增】监听器初始化 ---
-  const extensionElements = bo.extensionElements?.values || [];
-  taskListeners.value = extensionElements.filter(e => e.$type === 'camunda:TaskListener');
+      // =============================
+      // 处理人配置初始化
+      // =============================
+      const assignee = bo['camunda:assignee'] || bo.assignee;
+      const candidateGroups = bo['camunda:candidateGroups'] || bo.candidateGroups;
 
-}, { immediate: true });
+      if (assignee) {
+        assignmentType.value = 'assignee';
 
+        switch (assignee) {
+          case '${initiator}':
+            assigneeSource.value = 'initiator';
+            break;
+          case '${managerId}':
+            assigneeSource.value = 'manager';
+            break;
+          default: {
+            // 匹配 ${fieldId} 形式
+            const match = assignee.match(/\$\{(.+?)}/);
+            if (match && props.formFields.some((f) => f.id === match[1])) {
+              assigneeSource.value = match[1];
+            } else {
+              assigneeSource.value = 'initiator';
+            }
+          }
+        }
+      } else if (candidateGroups) {
+        assignmentType.value = 'candidateGroups';
+        selectedGroups.value = candidateGroups
+            .split(',')
+            .map((g) => g.trim())
+            .filter(Boolean);
+      } else {
+        // 默认初始化
+        assignmentType.value = 'assignee';
+        assigneeSource.value = 'initiator';
+        selectedGroups.value = [];
+      }
+
+      // =============================
+      // 监听器初始化
+      // =============================
+      const extensionElements = bo.extensionElements?.values ?? [];
+      taskListeners.value = extensionElements.filter(
+          (e) => e.$type === 'camunda:TaskListener'
+      );
+    },
+    { immediate: true }
+);
 
 // 【核心修改】将所有属性更新合并到一个 watch 中
 watch([assignmentType, assigneeSource, selectedGroups], () => {

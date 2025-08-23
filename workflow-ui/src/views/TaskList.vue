@@ -2,7 +2,7 @@
   <div class="page-container">
     <a-page-header title="我的待办任务" />
     <div style="padding: 24px;">
-      <!-- 【核心新增】搜索区域 -->
+      <!-- 搜索区域 -->
       <a-card :bordered="false" style="margin-bottom: 24px;">
         <a-form :model="filterState" layout="inline">
           <a-form-item label="关键字">
@@ -23,7 +23,7 @@
         </a-form>
       </a-card>
 
-      <!-- 【核心修改】将 a-list 替换为 a-table -->
+      <!-- 表格区域 -->
       <a-table
           :columns="columns"
           :data-source="dataSource"
@@ -34,17 +34,19 @@
       >
         <template #bodyCell="{ column, record }">
           <template v-if="column.key === 'taskName'">
-            <a @click="goToTaskDetail(record.camundaTaskId)">{{ record.formName }} - {{ record.stepName }}</a>
+            <!-- 【最终修复】点击时调用智能导航方法 -->
+            <a @click="handleTaskClick(record)">{{ record.formName }} - {{ record.stepName }}</a>
           </template>
           <template v-else-if="column.key === 'createdAt'">
             {{ new Date(record.createdAt).toLocaleString() }}
           </template>
           <template v-else-if="column.key === 'statusTag'">
-            <a-tag v-if="isRejectedTask(record)" color="error">待修改</a-tag>
+            <a-tag v-if="isModificationTask(record)" color="error">待修改</a-tag>
             <a-tag v-else color="processing">待处理</a-tag>
           </template>
           <template v-else-if="column.key === 'actions'">
-            <a-button type="primary" @click="goToTaskDetail(record.camundaTaskId)">去处理</a-button>
+            <!-- 【最终修复】点击时调用智能导航方法 -->
+            <a-button type="primary" @click="handleTaskClick(record)">去处理</a-button>
           </template>
         </template>
       </a-table>
@@ -61,7 +63,6 @@ import { SearchOutlined, ReloadOutlined } from '@ant-design/icons-vue';
 
 const router = useRouter();
 
-// 【核心修改】使用 usePaginatedFetch hook
 const {
   loading,
   dataSource,
@@ -74,7 +75,6 @@ const {
 } = usePaginatedFetch(
     getPendingTasks,
     { keyword: '' },
-    // Camunda Task Query 不直接支持按 createTime 排序，故不设置默认排序
 );
 
 const columns = [
@@ -87,12 +87,31 @@ const columns = [
 
 onMounted(fetchData);
 
-const isRejectedTask = (task) => {
-  return task.stepName.includes('修改') || task.stepName.includes('调整');
+// --- 【最终修复】增强判断逻辑，使其更健壮 ---
+const isModificationTask = (task) => {
+  const taskName = (task.stepName || '').trim();
+  // 增加更多可能的关键字，如 “发起”、“申请”，以兼容旧的或不同的流程定义
+  const modificationKeywords = ['修改', '调整', '重新', '发起', '申请'];
+  // 检查任务名称是否包含任何一个关键字
+  return modificationKeywords.some(keyword => taskName.includes(keyword));
 };
 
-const goToTaskDetail = (taskId) => {
-  router.push({ name: 'task-detail', params: { taskId } });
+// --- 【最终修复】智能导航逻辑 ---
+const handleTaskClick = (record) => {
+  if (isModificationTask(record)) {
+    // 如果是“修改任务”，则跳转到 FormViewer 进行编辑
+    router.push({
+      name: 'form-viewer',
+      params: { formId: record.formDefinitionId }, // 使用后端返回的 formDefinitionId
+      query: {
+        submissionId: record.formSubmissionId,
+        taskId: record.camundaTaskId, // 关键：传递任务ID
+      },
+    });
+  } else {
+    // 如果是“审批任务”，则跳转到 TaskDetail 查看详情和审批
+    router.push({ name: 'task-detail', params: { taskId: record.camundaTaskId } });
+  }
 };
 </script>
 

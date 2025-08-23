@@ -9,14 +9,15 @@
         <a-form-item label="条件类型">
           <a-radio-group v-model:value="conditionType" button-style="solid" size="small" @change="onConditionTypeChange">
             <a-radio-button value="none">无条件 (默认流)</a-radio-button>
-            <!-- 【核心新增】新增“审核”选项 -->
             <a-radio-button value="audit">审核</a-radio-button>
+            <!-- 【核心新增】“准备阶段”选项 -->
+            <a-radio-button value="preparation">准备阶段</a-radio-button>
             <a-radio-button value="builder">条件构建器</a-radio-button>
             <a-radio-button value="expression">表达式</a-radio-button>
           </a-radio-group>
         </a-form-item>
 
-        <!-- 【核心新增】当选择“审核”类型时，显示此选择框 -->
+        <!-- 审核结果 -->
         <a-form-item v-if="conditionType === 'audit'" label="审核结果">
           <a-select
               v-model:value="auditOutcome"
@@ -25,6 +26,17 @@
               @change="applyAuditChanges"
           />
         </a-form-item>
+
+        <!-- 【核心新增】准备阶段结果 -->
+        <a-form-item v-if="conditionType === 'preparation'" label="处理结果">
+          <a-select
+              v-model:value="preparationOutcome"
+              placeholder="请选择一个处理结果"
+              :options="preparationOptions"
+              @change="applyPreparationChanges"
+          />
+        </a-form-item>
+
 
         <!-- 条件构建器 -->
         <div v-if="conditionType === 'builder'" class="condition-builder">
@@ -76,13 +88,20 @@ const conditionType = ref('none');
 const expression = ref('');
 // 构建器状态
 const builderState = reactive({ field: null, operator: '==', value: '' });
-// 【核心新增】审核结果状态和选项
+// 审核结果状态和选项
 const auditOutcome = ref(null);
 const auditOptions = [
   { label: '同意', value: 'approved' },
   { label: '拒绝', value: 'rejected' },
   { label: '打回至发起人', value: 'returnToInitiator' },
   { label: '打回至上一节点', value: 'returnToPrevious' },
+];
+// 【核心新增】准备阶段结果状态和选项
+const preparationOutcome = ref(null);
+const preparationOptions = [
+  { label: '继续', value: 'proceed' },
+  { label: '暂存', value: 'staging' },
+  { label: '终止', value: 'terminate' },
 ];
 
 const isConditionalFlow = computed(() => {
@@ -99,14 +118,26 @@ const resetAllBuilders = () => {
   builderState.operator = '==';
   builderState.value = '';
   auditOutcome.value = null;
+  preparationOutcome.value = null; // 【核心新增】重置准备阶段
 };
 
-// 【核心新增】一个辅助函数，用于解析审核表达式
 const parseAuditExpression = (exprBody) => {
   const auditMatch = exprBody.match(/\$\{taskOutcome\s*==\s*'(.+?)'\}/);
   if (auditMatch) {
     const outcome = auditMatch[1];
     if (auditOptions.some(opt => opt.value === outcome)) {
+      return outcome;
+    }
+  }
+  return null;
+};
+
+// 【核心新增】一个辅助函数，用于解析准备阶段表达式
+const parsePreparationExpression = (exprBody) => {
+  const prepMatch = exprBody.match(/\$\{preparationOutcome\s*==\s*'(.+?)'\}/);
+  if (prepMatch) {
+    const outcome = prepMatch[1];
+    if (preparationOptions.some(opt => opt.value === outcome)) {
       return outcome;
     }
   }
@@ -125,11 +156,18 @@ watch(() => props.selectedElement, (element) => {
     const exprBody = conditionExpression.body;
     expression.value = exprBody;
 
-    // 【核心修改】优先尝试解析为“审核”类型
+    // 优先尝试解析为“审核”类型
     const parsedAuditOutcome = parseAuditExpression(exprBody);
     if (parsedAuditOutcome) {
       conditionType.value = 'audit';
       auditOutcome.value = parsedAuditOutcome;
+      return;
+    }
+    // 【核心新增】其次尝试解析为“准备阶段”类型
+    const parsedPreparationOutcome = parsePreparationExpression(exprBody);
+    if (parsedPreparationOutcome) {
+      conditionType.value = 'preparation';
+      preparationOutcome.value = parsedPreparationOutcome;
       return;
     }
 
@@ -155,10 +193,19 @@ watch(() => props.selectedElement, (element) => {
 }, { immediate: true });
 
 
-// 【核心新增】当审核结果下拉框变化时，生成表达式并更新
 const applyAuditChanges = () => {
   if (auditOutcome.value) {
     expression.value = `\${taskOutcome == '${auditOutcome.value}'}`;
+  } else {
+    expression.value = '';
+  }
+  updateExpression();
+};
+
+// 【核心新增】当准备阶段结果下拉框变化时，生成表达式并更新
+const applyPreparationChanges = () => {
+  if (preparationOutcome.value) {
+    expression.value = `\${preparationOutcome == '${preparationOutcome.value}'}`;
   } else {
     expression.value = '';
   }
@@ -182,10 +229,15 @@ const onConditionTypeChange = () => {
     updateExpression();
     return;
   }
-  // 【核心新增】切换到“审核”时，尝试解析当前表达式
+  // 切换到“审核”时，尝试解析当前表达式
   if (conditionType.value === 'audit') {
     const parsedOutcome = parseAuditExpression(expression.value);
-    auditOutcome.value = parsedOutcome; // 如果解析失败，值为null，下拉框会显示placeholder
+    auditOutcome.value = parsedOutcome;
+  }
+  // 【核心新增】切换到“准备阶段”时，尝试解析当前表达式
+  if (conditionType.value === 'preparation') {
+    const parsedOutcome = parsePreparationExpression(expression.value);
+    preparationOutcome.value = parsedOutcome;
   }
 };
 

@@ -69,10 +69,6 @@ public class FormController {
         return ResponseEntity.ok(response);
     }
 
-    /**
-     * 【核心修改】API: 删除一个表单定义，增加级联删除选项
-     * 权限: 仅限管理员
-     */
     @DeleteMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Void> deleteFormDefinition(
@@ -82,10 +78,6 @@ public class FormController {
         return ResponseEntity.noContent().build();
     }
 
-    /**
-     * 【核心新增】API: 检查表单的依赖关系
-     * 权限: 仅限管理员
-     */
     @GetMapping("/{id}/dependencies")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<FormDependencyDto> getFormDependencies(@PathVariable Long id) {
@@ -94,6 +86,7 @@ public class FormController {
 
 
     @PostMapping("/{formId}/submissions")
+    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<FormSubmissionResponse> createFormSubmission(
             @PathVariable Long formId,
             @RequestBody CreateFormSubmissionRequest request,
@@ -103,7 +96,45 @@ public class FormController {
         return new ResponseEntity<>(response, HttpStatus.CREATED);
     }
 
+    /**
+     * 【核心新增】创建草稿的 API (用户自己)
+     */
+    @PostMapping("/{formId}/submissions/draft")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<FormSubmissionResponse> createDraft(
+            @PathVariable Long formId,
+            @RequestBody CreateFormSubmissionRequest request,
+            Principal principal) {
+        String submitterId = principal.getName();
+        FormSubmissionResponse response = formService.createDraft(formId, request, submitterId);
+        return new ResponseEntity<>(response, HttpStatus.CREATED);
+    }
+
+    @PutMapping("/my-submissions/{submissionId}")
+    @PreAuthorize("@appFormService.isOwner(#submissionId, principal.username)")
+    public ResponseEntity<FormSubmissionResponse> updateMyDraft(
+            @PathVariable Long submissionId,
+            @RequestBody UpdateFormSubmissionRequest request,
+            Principal principal) {
+        String updaterId = principal.getName();
+        FormSubmissionResponse response = formService.updateDraft(submissionId, request, updaterId);
+        return ResponseEntity.ok(response);
+    }
+
+    @PutMapping("/submissions/{submissionId}/submit")
+    @PreAuthorize("@appFormService.isOwner(#submissionId, principal.username)")
+    public ResponseEntity<FormSubmissionResponse> submitDraft(
+            @PathVariable Long submissionId,
+            @RequestBody CreateFormSubmissionRequest request,
+            Principal principal) {
+        String submitterId = principal.getName();
+        FormSubmissionResponse response = formService.submitDraft(submissionId, request, submitterId);
+        return ResponseEntity.ok(response);
+    }
+
+
     @GetMapping("/{formId}/submissions")
+    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<Page<FormSubmissionResponse>> getSubmissionsByFormId(
             @PathVariable Long formId,
             @RequestParam(required = false) Long menuId,
@@ -114,6 +145,7 @@ public class FormController {
     }
 
     @GetMapping("/submissions/{submissionId}")
+    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<FormSubmissionResponse> getSubmissionById(@PathVariable Long submissionId) {
         FormSubmission submission = formSubmissionRepository.findById(submissionId)
                 .orElseThrow(() -> new ResourceNotFoundException("未找到提交记录 ID: " + submissionId));

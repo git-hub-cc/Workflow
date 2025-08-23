@@ -73,7 +73,7 @@ public class WorkflowService {
     // --- 【核心新增】注入 Spring 上下文 ---
     private final ApplicationContext applicationContext;
 
-    // ... (deployWorkflow, updateWorkflowTemplate, getOrCreateWorkflowTemplate, startWorkflow, completeUserTask, getPendingTasksForUser, getCompletedTasksForUser, getTaskDetails 方法保持不变)
+    // ... (deployWorkflow, updateWorkflowTemplate, getOrCreateWorkflowTemplate 方法保持不变)
     @LogOperation(module = "流程管理", action = "部署流程", targetIdExpression = "#request.processDefinitionKey")
     public void deployWorkflow(DeployWorkflowRequest request) {
         FormDefinition formDef = formDefinitionRepository.findById(request.getFormDefinitionId())
@@ -132,114 +132,146 @@ public class WorkflowService {
                 .orElseGet(() -> {
                     String processDefinitionKey = "Process_Form_" + formId;
                     String defaultXml = String.format("""
-                        <?xml version="1.0" encoding="UTF-8"?>
-                        <bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" xmlns:camunda="http://camunda.org/schema/1.0/bpmn" xmlns:di="http://www.omg.org/spec/DD/20100524/DI" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" id="Definitions_0zla03s" targetNamespace="http://bpmn.io/schema/bpmn" exporter="Camunda Modeler" exporterVersion="5.20.0">
-                          <bpmn:process id="%s" name="新流程" isExecutable="true" camunda:historyTimeToLive="P180D">
-                            <bpmn:startEvent id="StartEvent_1" name="开始">
-                              <bpmn:outgoing>Flow_Start_To_Approve</bpmn:outgoing>
-                            </bpmn:startEvent>
-                            <bpmn:sequenceFlow id="Flow_Start_To_Approve" sourceRef="StartEvent_1" targetRef="Activity_ManagerApprove" />
-                            <bpmn:userTask id="Activity_ManagerApprove" name="上级审批" camunda:assignee="${managerId}">
-                              <bpmn:incoming>Flow_Start_To_Approve</bpmn:incoming>
-                              <bpmn:outgoing>Flow_Approve_To_Gateway</bpmn:outgoing>
-                            </bpmn:userTask>
-                            <bpmn:exclusiveGateway id="Gateway_Approved" name="审批是否通过?">
-                              <bpmn:incoming>Flow_Approve_To_Gateway</bpmn:incoming>
-                              <bpmn:outgoing>Flow_Approved</bpmn:outgoing>
-                              <bpmn:outgoing>Flow_Rejected</bpmn:outgoing>
-                            </bpmn:exclusiveGateway>
-                            <bpmn:sequenceFlow id="Flow_Approve_To_Gateway" sourceRef="Activity_ManagerApprove" targetRef="Gateway_Approved" />
-                            <bpmn:sequenceFlow id="Flow_Approved" name="通过" sourceRef="Gateway_Approved" targetRef="Activity_Archive">
-                              <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">${approved}</bpmn:conditionExpression>
-                            </bpmn:sequenceFlow>
-                            <bpmn:sequenceFlow id="Flow_Rejected" name="拒绝" sourceRef="Gateway_Approved" targetRef="Activity_Reject" />
-                            <bpmn:serviceTask id="Activity_Archive" name="归档(通过)" camunda:delegateExpression="${archiveProcessDelegate}">
-                              <bpmn:incoming>Flow_Approved</bpmn:incoming>
-                              <bpmn:outgoing>Flow_Archive_ToEnd</bpmn:outgoing>
-                            </bpmn:serviceTask>
-                            <bpmn:endEvent id="EndEvent_Approved" name="审批通过">
-                              <bpmn:incoming>Flow_Archive_ToEnd</bpmn:incoming>
-                            </bpmn:endEvent>
-                            <bpmn:sequenceFlow id="Flow_Archive_ToEnd" sourceRef="Activity_Archive" targetRef="EndEvent_Approved" />
-                            <bpmn:serviceTask id="Activity_Reject" name="归档(拒绝)" camunda:delegateExpression="${rejectProcessDelegate}">
-                              <bpmn:incoming>Flow_Rejected</bpmn:incoming>
-                              <bpmn:outgoing>Flow_Reject_ToEnd</bpmn:outgoing>
-                            </bpmn:serviceTask>
-                            <bpmn:endEvent id="EndEvent_Rejected" name="审批拒绝">
-                              <bpmn:incoming>Flow_Reject_ToEnd</bpmn:incoming>
-                            </bpmn:endEvent>
-                            <bpmn:sequenceFlow id="Flow_Reject_ToEnd" sourceRef="Activity_Reject" targetRef="EndEvent_Rejected" />
-                          </bpmn:process>
-                          <bpmndi:BPMNDiagram id="BPMNDiagram_1">
-                            <bpmndi:BPMNPlane id="BPMNPlane_1" bpmnElement="%s">
-                              <bpmndi:BPMNShape id="_BPMNShape_StartEvent_2" bpmnElement="StartEvent_1">
-                                <dc:Bounds x="179" y="102" width="36" height="36" />
-                                <bpmndi:BPMNLabel>
-                                  <dc:Bounds x="185" y="145" width="22" height="14" />
-                                </bpmndi:BPMNLabel>
-                              </bpmndi:BPMNShape>
-                              <bpmndi:BPMNShape id="Activity_1c76uyj_di" bpmnElement="Activity_ManagerApprove">
-                                <dc:Bounds x="270" y="80" width="100" height="80" />
-                              </bpmndi:BPMNShape>
-                              <bpmndi:BPMNShape id="Gateway_0j5x0jd_di" bpmnElement="Gateway_Approved" isMarkerVisible="true">
-                                <dc:Bounds x="435" y="95" width="50" height="50" />
-                                <bpmndi:BPMNLabel>
-                                  <dc:Bounds x="424" y="65" width="72" height="14" />
-                                </bpmndi:BPMNLabel>
-                              </bpmndi:BPMNShape>
-                              <bpmndi:BPMNShape id="Activity_0sq1112_di" bpmnElement="Activity_Archive">
-                                <dc:Bounds x="540" y="80" width="100" height="80" />
-                              </bpmndi:BPMNShape>
-                              <bpmndi:BPMNShape id="Event_1l8csf7_di" bpmnElement="EndEvent_Approved">
-                                <dc:Bounds x="702" y="102" width="36" height="36" />
-                                <bpmndi:BPMNLabel>
-                                  <dc:Bounds x="695" y="145" width="51" height="14" />
-                                </bpmndi:BPMNLabel>
-                              </bpmndi:BPMNShape>
-                              <bpmndi:BPMNShape id="Activity_0s140wi_di" bpmnElement="Activity_Reject">
-                                <dc:Bounds x="540" y="200" width="100" height="80" />
-                                <bpmndi:BPMNLabel />
-                              </bpmndi:BPMNShape>
-                              <bpmndi:BPMNShape id="Event_06d8x10_di" bpmnElement="EndEvent_Rejected">
-                                <dc:Bounds x="702" y="222" width="36" height="36" />
-                                <bpmndi:BPMNLabel>
-                                  <dc:Bounds x="695" y="265" width="51" height="14" />
-                                </bpmndi:BPMNLabel>
-                              </bpmndi:BPMNShape>
-                              <bpmndi:BPMNEdge id="Flow_00yq16d_di" bpmnElement="Flow_Start_To_Approve">
-                                <di:waypoint x="215" y="120" />
-                                <di:waypoint x="270" y="120" />
-                              </bpmndi:BPMNEdge>
-                              <bpmndi:BPMNEdge id="Flow_1c79aab_di" bpmnElement="Flow_Approve_To_Gateway">
-                                <di:waypoint x="370" y="120" />
-                                <di:waypoint x="435" y="120" />
-                              </bpmndi:BPMNEdge>
-                              <bpmndi:BPMNEdge id="Flow_08vqy1p_di" bpmnElement="Flow_Approved">
-                                <di:waypoint x="485" y="120" />
-                                <di:waypoint x="540" y="120" />
-                                <bpmndi:BPMNLabel>
-                                  <dc:Bounds x="506" y="102" width="22" height="14" />
-                                </bpmndi:BPMNLabel>
-                              </bpmndi:BPMNEdge>
-                              <bpmndi:BPMNEdge id="Flow_1y5bbd1_di" bpmnElement="Flow_Rejected">
-                                <di:waypoint x="460" y="145" />
-                                <di:waypoint x="460" y="240" />
-                                <di:waypoint x="540" y="240" />
-                                <bpmndi:BPMNLabel>
-                                  <dc:Bounds x="466" y="190" width="22" height="14" />
-                                </bpmndi:BPMNLabel>
-                              </bpmndi:BPMNEdge>
-                              <bpmndi:BPMNEdge id="Flow_0k64d3v_di" bpmnElement="Flow_Archive_ToEnd">
-                                <di:waypoint x="640" y="120" />
-                                <di:waypoint x="702" y="120" />
-                              </bpmndi:BPMNEdge>
-                              <bpmndi:BPMNEdge id="Flow_0x6o019_di" bpmnElement="Flow_Reject_ToEnd">
-                                <di:waypoint x="640" y="240" />
-                                <di:waypoint x="702" y="240" />
-                              </bpmndi:BPMNEdge>
-                            </bpmndi:BPMNPlane>
-                          </bpmndi:BPMNDiagram>
-                        </bpmn:definitions>
+<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" xmlns:camunda="http://camunda.org/schema/1.0/bpmn" xmlns:di="http://www.omg.org/spec/DD/20100524/DI" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" id="Definitions_0zla03s" targetNamespace="http://bpmn.io/schema/bpmn" exporter="Camunda Modeler" exporterVersion="5.20.0">
+  <bpmn:process id="%s" name="新流程" isExecutable="true" camunda:historyTimeToLive="P180D">
+    <bpmn:startEvent id="StartEvent_1" name="开始">
+      <bpmn:outgoing>Flow_1p6l8ge</bpmn:outgoing>
+    </bpmn:startEvent>
+    <bpmn:sequenceFlow id="Flow_1p6l8ge" sourceRef="StartEvent_1" targetRef="Activity_0bmvcuj" />
+    <bpmn:exclusiveGateway id="Gateway_0wgpc9l">
+      <bpmn:incoming>Flow_0rg62ya</bpmn:incoming>
+      <bpmn:outgoing>Flow_1olivqv</bpmn:outgoing>
+      <bpmn:outgoing>Flow_0s8894b</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:sequenceFlow id="Flow_0rg62ya" sourceRef="Activity_0bmvcuj" targetRef="Gateway_0wgpc9l" />
+    <bpmn:sequenceFlow id="Flow_1olivqv" name="继续" sourceRef="Gateway_0wgpc9l" targetRef="Activity_1xlcl7u">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">${preparationOutcome == 'proceed'}</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:exclusiveGateway id="Gateway_1pbw0x6">
+      <bpmn:incoming>Flow_0imfrb2</bpmn:incoming>
+      <bpmn:outgoing>Flow_0twujez</bpmn:outgoing>
+      <bpmn:outgoing>Flow_0omffa0</bpmn:outgoing>
+      <bpmn:outgoing>Flow_110p3r9</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:sequenceFlow id="Flow_0imfrb2" sourceRef="Activity_1xlcl7u" targetRef="Gateway_1pbw0x6" />
+    <bpmn:endEvent id="Event_0mtkumc">
+      <bpmn:incoming>Flow_0twujez</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:sequenceFlow id="Flow_0twujez" name="同意" sourceRef="Gateway_1pbw0x6" targetRef="Event_0mtkumc">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">${taskOutcome == 'approved'}</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:endEvent id="Event_1agf6lw">
+      <bpmn:incoming>Flow_0omffa0</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:sequenceFlow id="Flow_0omffa0" name="拒绝" sourceRef="Gateway_1pbw0x6" targetRef="Event_1agf6lw">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">${taskOutcome == 'rejected'}</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_110p3r9" name="打回发起人" sourceRef="Gateway_1pbw0x6" targetRef="Activity_0bmvcuj">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">${taskOutcome == 'returnToInitiator'}</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:userTask id="Activity_0bmvcuj" name="发起" camunda:assignee="${initiator}">
+      <bpmn:incoming>Flow_1p6l8ge</bpmn:incoming>
+      <bpmn:incoming>Flow_110p3r9</bpmn:incoming>
+      <bpmn:outgoing>Flow_0rg62ya</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:userTask id="Activity_1xlcl7u" name="审核" camunda:assignee="${managerId}">
+      <bpmn:incoming>Flow_1olivqv</bpmn:incoming>
+      <bpmn:outgoing>Flow_0imfrb2</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:endEvent id="Event_0pvvl3v">
+      <bpmn:incoming>Flow_0s8894b</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:sequenceFlow id="Flow_0s8894b" name="终止" sourceRef="Gateway_0wgpc9l" targetRef="Event_0pvvl3v">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">${preparationOutcome == 'terminate'}</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+  </bpmn:process>
+  <bpmndi:BPMNDiagram id="BPMNDiagram_1">
+    <bpmndi:BPMNPlane id="BPMNPlane_1" bpmnElement="%s">
+      <bpmndi:BPMNShape id="_BPMNShape_StartEvent_2" bpmnElement="StartEvent_1">
+        <dc:Bounds x="179" y="102" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="185" y="145" width="22" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gateway_0wgpc9l_di" bpmnElement="Gateway_0wgpc9l" isMarkerVisible="true">
+        <dc:Bounds x="425" y="95" width="50" height="50" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gateway_1pbw0x6_di" bpmnElement="Gateway_1pbw0x6" isMarkerVisible="true">
+        <dc:Bounds x="685" y="95" width="50" height="50" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Event_0mtkumc_di" bpmnElement="Event_0mtkumc">
+        <dc:Bounds x="792" y="102" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Event_1agf6lw_di" bpmnElement="Event_1agf6lw">
+        <dc:Bounds x="792" y="212" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Activity_18y6bq4_di" bpmnElement="Activity_0bmvcuj">
+        <dc:Bounds x="270" y="80" width="100" height="80" />
+        <bpmndi:BPMNLabel />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Activity_0lz1pwx_di" bpmnElement="Activity_1xlcl7u">
+        <dc:Bounds x="530" y="80" width="100" height="80" />
+        <bpmndi:BPMNLabel />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Event_0pvvl3v_di" bpmnElement="Event_0pvvl3v">
+        <dc:Bounds x="532" y="212" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="Flow_1p6l8ge_di" bpmnElement="Flow_1p6l8ge">
+        <di:waypoint x="215" y="120" />
+        <di:waypoint x="270" y="120" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_0rg62ya_di" bpmnElement="Flow_0rg62ya">
+        <di:waypoint x="370" y="120" />
+        <di:waypoint x="425" y="120" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_1olivqv_di" bpmnElement="Flow_1olivqv">
+        <di:waypoint x="475" y="120" />
+        <di:waypoint x="530" y="120" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="492" y="102" width="22" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_0imfrb2_di" bpmnElement="Flow_0imfrb2">
+        <di:waypoint x="630" y="120" />
+        <di:waypoint x="685" y="120" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_0twujez_di" bpmnElement="Flow_0twujez">
+        <di:waypoint x="735" y="120" />
+        <di:waypoint x="792" y="120" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="753" y="102" width="22" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_0omffa0_di" bpmnElement="Flow_0omffa0">
+        <di:waypoint x="710" y="145" />
+        <di:waypoint x="710" y="230" />
+        <di:waypoint x="792" y="230" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="714" y="185" width="22" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_110p3r9_di" bpmnElement="Flow_110p3r9">
+        <di:waypoint x="710" y="95" />
+        <di:waypoint x="710" y="-30" />
+        <di:waypoint x="320" y="-30" />
+        <di:waypoint x="320" y="80" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="488" y="-48" width="55" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_0s8894b_di" bpmnElement="Flow_0s8894b">
+        <di:waypoint x="450" y="145" />
+        <di:waypoint x="450" y="230" />
+        <di:waypoint x="532" y="230" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="454" y="185" width="22" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+</bpmn:definitions>
+
                         """, processDefinitionKey, processDefinitionKey);
 
                     WorkflowTemplateResponse dto = new WorkflowTemplateResponse();
@@ -250,7 +282,10 @@ public class WorkflowService {
                 });
     }
 
-    public void startWorkflow(FormSubmission submission) {
+    /**
+     * 【核心修改】重载 startWorkflow 方法，增加 initialAction 参数
+     */
+    public void startWorkflow(FormSubmission submission, String initialAction) {
         try {
             identityService.setAuthenticatedUserId(submission.getSubmitterId());
             templateRepository.findByFormDefinitionId(submission.getFormDefinition().getId()).ifPresent(template -> {
@@ -306,6 +341,12 @@ public class WorkflowService {
                     instanceRepository.save(localInstance);
                     submission.setWorkflowInstance(localInstance);
 
+                    // --- 【核心新增逻辑】自动完成第一个任务 ---
+                    if (StringUtils.hasText(initialAction)) {
+                        autoCompleteFirstTask(camundaInstance.getId(), submission.getSubmitterId(), initialAction);
+                    }
+                    // --- 【新增逻辑结束】 ---
+
                 } catch (JsonProcessingException e) {
                     throw new RuntimeException("解析表单数据以启动工作流失败", e);
                 }
@@ -315,8 +356,50 @@ public class WorkflowService {
         }
     }
 
+    /**
+     * 【重载】为了兼容旧的调用，保留一个不带 initialAction 的版本
+     */
+    public void startWorkflow(FormSubmission submission) {
+        startWorkflow(submission, null);
+    }
+
+    /**
+     * 【新增】自动完成流程的第一个任务
+     */
+    private void autoCompleteFirstTask(String processInstanceId, String submitterId, String action) {
+        Task firstTask = taskService.createTaskQuery()
+                .processInstanceId(processInstanceId)
+                .taskAssignee(submitterId)
+                .singleResult();
+
+        if (firstTask != null) {
+            log.info("找到流程实例 {} 的第一个任务 {}，准备以动作 '{}' 自动完成。", processInstanceId, firstTask.getId(), action);
+            CompleteTaskRequest request = new CompleteTaskRequest();
+            // 假设第一个任务后的网关是基于 preparationOutcome
+            request.setPreparationOutcome(action);
+            // 默认决策是 APPROVED，因为这个动作只是为了驱动流程，而不是真正的审批
+            request.setDecision(CompleteTaskRequest.Decision.APPROVED);
+
+            // 直接调用内部方法完成任务
+            completeUserTaskInternal(firstTask.getId(), request);
+        } else {
+            log.warn("无法为流程实例 {} 找到分配给 {} 的初始任务，无法自动完成。", processInstanceId, submitterId);
+        }
+    }
+
+
+    /**
+     * 【核心重构】将 completeUserTask 拆分为外部接口和内部实现
+     */
     @LogOperation(module = "任务处理", action = "完成任务", targetIdExpression = "#camundaTaskId")
     public void completeUserTask(String camundaTaskId, CompleteTaskRequest request) {
+        completeUserTaskInternal(camundaTaskId, request);
+    }
+
+    /**
+     * 内部任务完成逻辑，不带日志注解，以便被其他Service方法调用
+     */
+    private void completeUserTaskInternal(String camundaTaskId, CompleteTaskRequest request) {
         Task task = taskService.createTaskQuery().taskId(camundaTaskId).singleResult();
         if (task == null) {
             throw new ResourceNotFoundException("在 Camunda 中未找到任务 ID: " + camundaTaskId);
@@ -376,19 +459,36 @@ public class WorkflowService {
         }
 
         Map<String, Object> variables = new HashMap<>();
-        String outcome = switch (request.getDecision()) {
-            case APPROVED -> "approved";
-            case REJECTED -> "rejected";
-            case RETURN_TO_INITIATOR -> "returnToInitiator";
-            case RETURN_TO_PREVIOUS -> "returnToPrevious";
-            default -> throw new IllegalArgumentException("未知的任务决策: " + request.getDecision());
-        };
-        variables.put("taskOutcome", outcome);
 
-        boolean isApproved = request.getDecision().equals(CompleteTaskRequest.Decision.APPROVED);
-        variables.put("approved", isApproved);
-        variables.put("passed", isApproved);
-        variables.put("qc_passed", isApproved);
+        // --- 【核心修改】开始 ---
+
+        // 1. 设置通用的 `taskOutcome`，用于驱动流程离开当前任务节点
+        if (request.getDecision() != null) {
+            String outcome = switch (request.getDecision()) {
+                case APPROVED -> "approved";
+                case REJECTED -> "rejected";
+                case RETURN_TO_INITIATOR -> "returnToInitiator";
+                case RETURN_TO_PREVIOUS -> "returnToPrevious";
+            };
+            variables.put("taskOutcome", outcome);
+        }
+
+        // 2. 检查并设置新的、独立的 `preparationOutcome` 变量
+        if (request.getPreparationOutcome() != null && !request.getPreparationOutcome().isBlank()) {
+            variables.put("preparationOutcome", request.getPreparationOutcome());
+            log.info("为流程实例 {} 设置准备阶段决策变量: {}", processInstanceId, request.getPreparationOutcome());
+        }
+
+        // --- 【核心修改】结束 ---
+
+
+        // 兼容旧流程可能需要的变量
+        if (request.getDecision() != null) {
+            boolean isApproved = request.getDecision().equals(CompleteTaskRequest.Decision.APPROVED);
+            variables.put("approved", isApproved);
+            variables.put("passed", isApproved);
+            variables.put("qc_passed", isApproved);
+        }
 
         taskService.complete(camundaTaskId, variables);
     }
@@ -521,7 +621,6 @@ public class WorkflowService {
         return convertCamundaTaskToDto(task);
     }
 
-    // --- 【核心重构】开始: 重构 convertCamundaTaskToDto 方法以支持穿透中间节点 ---
     private TaskDto convertCamundaTaskToDto(Task camundaTask) {
         TaskDto dto = new TaskDto();
         dto.setCamundaTaskId(camundaTask.getId());
@@ -532,7 +631,16 @@ public class WorkflowService {
 
         Object formSubmissionIdObj = variables.get("formSubmissionId");
         if (formSubmissionIdObj instanceof Number) {
-            dto.setFormSubmissionId(((Number) formSubmissionIdObj).longValue());
+            Long submissionId = ((Number) formSubmissionIdObj).longValue();
+            dto.setFormSubmissionId(submissionId);
+
+            // --- 【阶段一核心修改】根据 submissionId 查找并设置 formDefinitionId ---
+            formSubmissionRepository.findById(submissionId).ifPresent(submission -> {
+                if (submission.getFormDefinition() != null) {
+                    dto.setFormDefinitionId(submission.getFormDefinition().getId());
+                }
+            });
+            // --- 【修改结束】 ---
         }
 
         dto.setSubmitterName((String) variables.getOrDefault("submitterName", "未知"));
@@ -543,7 +651,6 @@ public class WorkflowService {
             BpmnModelInstance modelInstance = repositoryService.getBpmnModelInstance(camundaTask.getProcessDefinitionId());
             FlowNode taskNode = modelInstance.getModelElementById(camundaTask.getTaskDefinitionKey());
 
-            // 使用新的辅助方法查找真正的决策点
             Collection<SequenceFlow> decisionFlows = findDecisionFlows(taskNode, 0);
 
             Pattern pattern = Pattern.compile("\\$\\{taskOutcome\\s*==\\s*'([^']*)'\\}");

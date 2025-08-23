@@ -1,8 +1,10 @@
 package club.ppmc.workflow.service;
 
+import club.ppmc.workflow.domain.FormSubmission;
 import club.ppmc.workflow.domain.WorkflowInstance;
 import club.ppmc.workflow.integration.erp.ErpService;
 import club.ppmc.workflow.integration.erp.dto.InventoryDeductionRequest;
+import club.ppmc.workflow.repository.FormSubmissionRepository;
 import club.ppmc.workflow.repository.WorkflowInstanceRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -25,6 +27,8 @@ public class ArchiveProcessDelegate implements JavaDelegate {
 
     private final WorkflowInstanceRepository instanceRepository;
     private final ErpService erpService;
+    // --- 【核心新增】注入 FormSubmissionRepository ---
+    private final FormSubmissionRepository submissionRepository;
 
     @Override
     @Transactional
@@ -44,7 +48,12 @@ public class ArchiveProcessDelegate implements JavaDelegate {
             instance.setCompletedAt(LocalDateTime.now());
             instanceRepository.save(instance);
 
-            log.info("流程实例 {} 的状态已成功更新为 APPROVED。", instance.getId());
+            // --- 【核心新增】同步更新 FormSubmission 的状态 ---
+            FormSubmission submission = instance.getFormSubmission();
+            submission.setStatus(FormSubmission.SubmissionStatus.APPROVED);
+            submissionRepository.save(submission);
+
+            log.info("流程实例 {} 的状态已成功更新为 APPROVED，关联的申请单 {} 状态也已同步。", instance.getId(), submission.getId());
 
 
             // --- 【核心修改】从流程变量中动态获取数据并调用ERP服务 ---

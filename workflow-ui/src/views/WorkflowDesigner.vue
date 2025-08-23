@@ -77,7 +77,7 @@ import {
 } from '@ant-design/icons-vue';
 import { flattenFields } from '@/utils/formUtils.js';
 
-// BPMN.js related imports
+// BPMN.js 相关导入
 import BpmnModeler from 'bpmn-js/lib/Modeler.js';
 import 'bpmn-js/dist/assets/diagram-js.css';
 import 'bpmn-js/dist/assets/bpmn-js.css';
@@ -287,12 +287,44 @@ const handleFileImport = (event) => {
   if (!file) return;
   const reader = new FileReader();
   reader.onload = (e) => {
-    modeler.importXML(e.target.result)
-        .then(() => message.success('BPMN 文件导入成功！'))
-        .catch(err => message.error('导入失败，请检查文件格式。'));
+    let xmlContent = e.target.result;
+    const expectedProcessId = `Process_Form_${formId}`;
+
+    // 用于查找 <bpmn:process id="..."> 并提取 ID 的正则表达式
+    const processIdRegex = /(<bpmn:process[^>]*id=")([^"]+)(")/;
+    const match = xmlContent.match(processIdRegex);
+
+    // 如果找到了流程ID，并且它与当前表单预期的ID不符，则进行替换
+    if (match && match[2] && match[2] !== expectedProcessId) {
+      const oldProcessId = match[2];
+      // 对旧的流程ID进行转义，以便在新的正则表达式中使用，防止特殊字符导致匹配失败
+      const escapedOldProcessId = oldProcessId.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      // 创建一个专门用于替换 BPMNPlane 中 bpmnElement 属性的正则表达式
+      const planeElementRegexForReplace = new RegExp(`(<bpmndi:BPMNPlane[^>]*bpmnElement=")` + escapedOldProcessId + `(")`);
+
+      // 1. 替换 <bpmn:process> 标签中的 id
+      xmlContent = xmlContent.replace(processIdRegex, `$1${expectedProcessId}$3`);
+      // 2. 替换 <bpmndi:BPMNPlane> 标签中的 bpmnElement
+      xmlContent = xmlContent.replace(planeElementRegexForReplace, `$1${expectedProcessId}$2`);
+
+      message.info(`导入的流程ID "${oldProcessId}" 已自动更新为 "${expectedProcessId}" 以匹配当前表单。`, 5);
+    }
+
+    modeler.importXML(xmlContent)
+        .then(({ warnings }) => {
+          if (warnings.length) {
+            console.warn('BPMN 导入警告:', warnings);
+          }
+          message.success('BPMN 文件导入成功！');
+          handleFitViewport(); // 导入后自动适应屏幕
+        })
+        .catch(err => {
+          console.error('BPMN 导入错误:', err);
+          message.error(`导入失败: ${err.message || '请检查文件格式是否正确。'}`);
+        });
   };
   reader.readAsText(file);
-  event.target.value = '';
+  event.target.value = ''; // 重置文件输入框，以便可以再次选择同一个文件
 };
 
 function downloadFile(filename, data, type) {

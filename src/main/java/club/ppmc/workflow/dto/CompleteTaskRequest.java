@@ -14,10 +14,17 @@ public class CompleteTaskRequest {
     private String updatedFormData; // 用于接收被驳回后修改的表单数据
     private List<Long> attachmentIds; // 重新提交时更新的附件ID列表
 
+    // --- 【核心新增】用于准备阶段的决策 ---
+    /**
+     * 【新增】准备阶段的决策结果 (例如: 'proceed', 'staging', 'terminate')
+     * 此字段独立于通用的 'decision' 字段，专门用于处理第一个任务节点后的分支。
+     */
+    private String preparationOutcome;
+
+
     public enum Decision {
         APPROVED,
         REJECTED,
-        // --- 【核心新增】 ---
         /**
          * 打回至发起人
          */

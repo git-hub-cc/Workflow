@@ -19,7 +19,13 @@ public class TaskDto {
     private String formName;
     private String submitterName;
 
-    // --- 【核心修改】 ---
+    // --- 【阶段一新增】 ---
+    /**
+     * 关联的表单定义ID，用于在“我的待办”中点击修改任务时，能够正确跳转到FormViewer
+     */
+    private Long formDefinitionId;
+    // --- 【新增结束】 ---
+
     /**
      * 当前任务可用的操作决策列表
      * e.g., ["APPROVED", "REJECTED", "RETURN_TO_INITIATOR", "RETURN_TO_PREVIOUS"]

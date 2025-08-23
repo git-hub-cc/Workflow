@@ -5,7 +5,7 @@
     <parent>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
-        <version>3.2.5</version>
+        <version>3.5.5</version>
         <relativePath/> <!-- lookup parent from repository -->
     </parent>
     <groupId>club.ppmc</groupId>
@@ -15,7 +15,7 @@
     <description>A form and workflow engine based on Spring Boot and Camunda</description>
     <properties>
         <java.version>17</java.version>
-        <camunda.version>7.21.0</camunda.version>
+        <camunda.version>7.22.0</camunda.version>
     </properties>
     <dependencies>
         <dependency>

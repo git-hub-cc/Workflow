@@ -25,13 +25,14 @@ import org.springframework.util.CollectionUtils;
 import org.springframework.util.StringUtils;
 
 import java.util.*;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /**
  * @author cc
  * @description 表单相关的业务逻辑服务
  */
-@Service("appFormService")
+@Service("appFormService") // 命名 Service Bean 以便在 @PreAuthorize 中使用
 @RequiredArgsConstructor
 @Transactional
 @Slf4j
@@ -83,30 +84,21 @@ public class FormService {
         return convertToDefinitionResponse(updatedForm);
     }
 
-    /**
-     * 【核心修改】删除表单定义，增加级联删除选项
-     * @param id 表单定义ID
-     * @param cascade 是否级联删除关联的工作流和提交数据
-     */
     @LogOperation(module = "表单管理", action = "删除表单定义", targetIdExpression = "#id")
     public void deleteFormDefinition(Long id, boolean cascade) {
         if (!formDefinitionRepository.existsById(id)) {
             throw new ResourceNotFoundException("未找到表单定义 ID: " + id);
         }
 
-        // 无论是否级联，都必须先检查菜单关联，因为菜单不能被自动删除
         if (menuRepository.existsByFormDefinitionId(id)) {
             throw new ResourceInUseException("无法删除：该表单已被一个或多个菜单项使用。请先在菜单管理中解除关联。");
         }
 
         if (cascade) {
-            // 执行级联删除
             log.warn("执行级联删除操作，表单ID: {}", id);
             workflowTemplateRepository.deleteByFormDefinitionId(id);
             formSubmissionRepository.deleteByFormDefinitionId(id);
-            // 注意：物理文件的清理需要一个单独的机制，这里只删除了数据库记录
         } else {
-            // 执行安全检查
             if (workflowTemplateRepository.findByFormDefinitionId(id).isPresent()) {
                 throw new ResourceInUseException("无法删除：该表单已关联一个工作流模板。请先在流程设计器中解除关联或删除流程。");
             }
@@ -115,20 +107,13 @@ public class FormService {
             }
         }
 
-        // 最后删除表单定义本身
         formDefinitionRepository.deleteById(id);
     }
 
-    /**
-     * 【核心新增】检查表单的依赖关系
-     * @param formId 表单定义ID
-     * @return 依赖关系DTO
-     */
     @Transactional(readOnly = true)
     public FormDependencyDto getFormDependencies(Long formId) {
         List<DependencyItemDto> dependencies = new ArrayList<>();
 
-        // 1. 检查工作流模板
         workflowTemplateRepository.findByFormDefinitionId(formId).ifPresent(template ->
                 dependencies.add(DependencyItemDto.builder()
                         .type(DependencyItemDto.DependencyType.WORKFLOW)
@@ -137,7 +122,6 @@ public class FormService {
                         .build())
         );
 
-        // 2. 检查菜单项
         List<Menu> relatedMenus = menuRepository.findByFormDefinitionId(formId);
         if (!relatedMenus.isEmpty()) {
             relatedMenus.forEach(menu ->
@@ -149,7 +133,6 @@ public class FormService {
             );
         }
 
-        // 3. 检查提交数据
         long submissionCount = formSubmissionRepository.countByFormDefinitionId(formId);
         if (submissionCount > 0) {
             dependencies.add(DependencyItemDto.builder()
@@ -165,10 +148,41 @@ public class FormService {
                 .build();
     }
 
+    /**
+     * 【核心新增】仅创建草稿，不启动工作流
+     */
+    @LogOperation(module = "表单提交", action = "保存草稿", targetIdExpression = "#result?.id")
+    public FormSubmissionResponse createDraft(Long formDefinitionId, CreateFormSubmissionRequest request, String submitterId) {
+        FormDefinition formDefinition = formDefinitionRepository.findById(formDefinitionId)
+                .orElseThrow(() -> new ResourceNotFoundException("无法为不存在的表单 (ID: " + formDefinitionId + ") 创建提交记录"));
 
-    @LogOperation(module = "表单提交", action = "提交申请", targetIdExpression = "#result?.id")
+        FormSubmission submission = new FormSubmission();
+        submission.setFormDefinition(formDefinition);
+        submission.setDataJson(request.getDataJson());
+        submission.setSubmitterId(submitterId);
+        // 核心：状态强制为 DRAFT
+        submission.setStatus(FormSubmission.SubmissionStatus.DRAFT);
+
+        // 保存附件
+        if (!CollectionUtils.isEmpty(request.getAttachmentIds())) {
+            List<FileAttachment> attachments = fileAttachmentRepository.findAllById(request.getAttachmentIds());
+            for (FileAttachment attachment : attachments) {
+                attachment.setFormSubmission(submission);
+                attachment.setStatus(FileAttachment.FileStatus.LINKED);
+            }
+            submission.setAttachments(attachments);
+        }
+
+        FormSubmission savedSubmission = formSubmissionRepository.save(submission);
+        // 注意：这里不调用 workflowService.startWorkflow
+        return convertToSubmissionResponse(savedSubmission);
+    }
+
+    /**
+     * 【核心修改】创建表单提交记录并启动工作流。移除了创建草稿的逻辑。
+     */
+    @LogOperation(module = "表单提交", action = "创建并提交申请", targetIdExpression = "#result?.id")
     public FormSubmissionResponse createFormSubmission(Long formDefinitionId, CreateFormSubmissionRequest request, String submitterId) {
-        // ... (此方法逻辑不变)
         FormDefinition formDefinition = formDefinitionRepository.findById(formDefinitionId)
                 .orElseThrow(() -> new ResourceNotFoundException("无法为不存在的表单 (ID: " + formDefinitionId + ") 创建提交记录"));
 
@@ -177,32 +191,78 @@ public class FormService {
         submission.setDataJson(request.getDataJson());
         submission.setSubmitterId(submitterId);
 
-        FormSubmission savedSubmission = formSubmissionRepository.save(submission);
-
+        // 保存附件
         if (!CollectionUtils.isEmpty(request.getAttachmentIds())) {
             List<FileAttachment> attachments = fileAttachmentRepository.findAllById(request.getAttachmentIds());
             for (FileAttachment attachment : attachments) {
-                attachment.setFormSubmission(savedSubmission);
+                attachment.setFormSubmission(submission);
                 attachment.setStatus(FileAttachment.FileStatus.LINKED);
             }
-            fileAttachmentRepository.saveAll(attachments);
+            submission.setAttachments(attachments);
         }
 
-        workflowService.startWorkflow(savedSubmission);
+        String action = request.getInitialAction();
 
-        FormSubmission finalSubmission = formSubmissionRepository.findById(savedSubmission.getId())
-                .orElseThrow(() -> new IllegalStateException("刚保存的提交记录找不到了"));
-        return convertToSubmissionResponse(finalSubmission);
+        // ⭐ 核心简化：此方法现在只处理需要立即启动工作流的场景
+        if ("proceed".equals(action) || "terminate".equals(action)) {
+            submission.setStatus(FormSubmission.SubmissionStatus.PROCESSING);
+            FormSubmission savedSubmission = formSubmissionRepository.save(submission);
+            workflowService.startWorkflow(savedSubmission, action);
+            return convertToSubmissionResponse(savedSubmission);
+        } else {
+            // 不再支持 'staging' 或其他隐式草稿创建
+            throw new IllegalArgumentException("无效的初始动作: " + action);
+        }
+    }
+
+    @LogOperation(module = "我的申请", action = "更新草稿", targetIdExpression = "#submissionId")
+    public FormSubmissionResponse updateDraft(Long submissionId, UpdateFormSubmissionRequest request, String updaterId) {
+        FormSubmission submission = formSubmissionRepository.findById(submissionId)
+                .orElseThrow(() -> new ResourceNotFoundException("未找到提交记录 ID: " + submissionId));
+
+        if (!submission.getSubmitterId().equals(updaterId)) {
+            throw new UnauthorizedException("您没有权限修改此草稿");
+        }
+        if (submission.getStatus() != FormSubmission.SubmissionStatus.DRAFT) {
+            throw new IllegalStateException("只有草稿状态的申请才能被修改");
+        }
+
+        submission.setDataJson(request.getDataJson());
+        updateAttachments(submission, request.getAttachmentIds());
+
+        FormSubmission updatedSubmission = formSubmissionRepository.save(submission);
+        return convertToSubmissionResponse(updatedSubmission);
+    }
+
+    @LogOperation(module = "我的申请", action = "提交草稿并发起流程", targetIdExpression = "#submissionId")
+    public FormSubmissionResponse submitDraft(Long submissionId, CreateFormSubmissionRequest request, String submitterId) {
+        FormSubmission submission = formSubmissionRepository.findById(submissionId)
+                .orElseThrow(() -> new ResourceNotFoundException("未找到提交记录 ID: " + submissionId));
+
+        if (!submission.getSubmitterId().equals(submitterId)) {
+            throw new UnauthorizedException("您没有权限提交此草稿");
+        }
+        if (submission.getStatus() != FormSubmission.SubmissionStatus.DRAFT) {
+            throw new IllegalStateException("此申请已在流程中，无法重复提交");
+        }
+
+        submission.setDataJson(request.getDataJson());
+        updateAttachments(submission, request.getAttachmentIds());
+
+        workflowService.startWorkflow(submission, request.getInitialAction());
+
+        submission.setStatus(FormSubmission.SubmissionStatus.PROCESSING);
+        FormSubmission savedSubmission = formSubmissionRepository.save(submission);
+
+        return convertToSubmissionResponse(savedSubmission);
     }
 
     @LogOperation(module = "数据列表", action = "更新提交记录", targetIdExpression = "#submissionId")
     public FormSubmissionResponse updateSubmission(Long submissionId, UpdateFormSubmissionRequest request) {
-        // ... (此方法逻辑不变)
         FormSubmission submission = formSubmissionRepository.findById(submissionId)
                 .orElseThrow(() -> new ResourceNotFoundException("未找到提交记录 ID: " + submissionId));
 
         submission.setDataJson(request.getDataJson());
-
         updateAttachments(submission, request.getAttachmentIds());
 
         FormSubmission updatedSubmission = formSubmissionRepository.save(submission);
@@ -211,7 +271,6 @@ public class FormService {
 
     @LogOperation(module = "数据列表", action = "删除提交记录", targetIdExpression = "#submissionId")
     public void deleteSubmission(Long submissionId) {
-        // ... (此方法逻辑不变)
         FormSubmission submission = formSubmissionRepository.findById(submissionId)
                 .orElseThrow(() -> new ResourceNotFoundException("未找到提交记录 ID: " + submissionId));
 
@@ -222,10 +281,8 @@ public class FormService {
         formSubmissionRepository.delete(submission);
     }
 
-
     @Transactional(readOnly = true)
     public Page<FormSubmissionResponse> getMySubmissions(String userId, String keyword, String status, Pageable pageable) {
-        // ... (此方法逻辑不变)
         Specification<FormSubmission> spec = (root, query, cb) -> {
             List<Predicate> predicates = new ArrayList<>();
 
@@ -237,8 +294,7 @@ public class FormService {
             }
 
             if (StringUtils.hasText(status)) {
-                Join<FormSubmission, WorkflowInstance> instanceJoin = root.join("workflowInstance", jakarta.persistence.criteria.JoinType.LEFT);
-                predicates.add(cb.equal(instanceJoin.get("status"), WorkflowInstance.Status.valueOf(status)));
+                predicates.add(cb.equal(root.get("status"), FormSubmission.SubmissionStatus.valueOf(status)));
             }
 
             return cb.and(predicates.toArray(new Predicate[0]));
@@ -249,7 +305,6 @@ public class FormService {
 
     @Transactional(readOnly = true)
     public Page<FormSubmissionResponse> getSubmissionsByFormId(Long formDefinitionId, Long menuId, Map<String, String> filters, Pageable pageable) {
-        // ... (此方法逻辑不变)
         formDefinitionRepository.findById(formDefinitionId)
                 .orElseThrow(() -> new ResourceNotFoundException("未找到 ID 为 " + formDefinitionId + " 的表单定义"));
 
@@ -280,7 +335,6 @@ public class FormService {
     }
 
     public FormDefinitionResponse convertToDefinitionResponse(FormDefinition entity) {
-        // ... (此方法逻辑不变)
         FormDefinitionResponse dto = new FormDefinitionResponse();
         dto.setId(entity.getId());
         dto.setName(entity.getName());
@@ -302,13 +356,13 @@ public class FormService {
     }
 
     public FormSubmissionResponse convertToSubmissionResponse(FormSubmission entity) {
-        // ... (此方法逻辑不变)
         FormSubmissionResponse dto = new FormSubmissionResponse();
         dto.setId(entity.getId());
         dto.setFormDefinitionId(entity.getFormDefinition().getId());
         dto.setFormName(entity.getFormDefinition().getName());
         dto.setDataJson(entity.getDataJson());
         dto.setCreatedAt(entity.getCreatedAt());
+        dto.setSubmissionStatus(entity.getStatus().name());
 
         List<FileAttachment> attachments = fileAttachmentRepository.findByFormSubmissionId(entity.getId());
         if (!attachments.isEmpty()) {
@@ -318,21 +372,17 @@ public class FormService {
         userRepository.findById(entity.getSubmitterId())
                 .ifPresent(user -> dto.setSubmitterName(user.getName()));
 
-        WorkflowInstance instance = entity.getWorkflowInstance();
-        if (instance == null) {
-            dto.setWorkflowStatus("无流程");
-        } else {
-            dto.setWorkflowStatus(switch (instance.getStatus()) {
-                case PROCESSING -> "审批中";
-                case APPROVED -> "已通过";
-                case REJECTED -> "已拒绝";
-            });
-        }
+        dto.setWorkflowStatus(switch (entity.getStatus()) {
+            case DRAFT -> "草稿";
+            case PROCESSING -> "审批中";
+            case APPROVED -> "已通过";
+            case REJECTED -> "已拒绝";
+            case TERMINATED -> "已终止";
+        });
         return dto;
     }
 
     private void applyDataScope(List<Predicate> predicates, jakarta.persistence.criteria.CriteriaQuery<?> query, jakarta.persistence.criteria.CriteriaBuilder cb, jakarta.persistence.criteria.Root<FormSubmission> root, Long menuId, User currentUser) {
-        // ... (此方法逻辑不变)
         if (menuId != null) {
             Menu menu = menuRepository.findById(menuId)
                     .orElseThrow(() -> new ResourceNotFoundException("未找到菜单ID: " + menuId));
@@ -388,12 +438,10 @@ public class FormService {
     }
 
     private boolean isPaginationParam(String key) {
-        // ... (此方法逻辑不变)
         return "page".equals(key) || "size".equals(key) || "sort".equals(key);
     }
 
     private void updateAttachments(FormSubmission submission, List<Long> newAttachmentIds) {
-        // ... (此方法逻辑不变)
         if (newAttachmentIds == null) {
             newAttachmentIds = Collections.emptyList();
         }
@@ -424,5 +472,13 @@ public class FormService {
                 submission.getAttachments().add(attachment);
             }
         }
+    }
+
+    @Transactional(readOnly = true)
+    public boolean isOwner(Long submissionId, String username) {
+        if (username == null) return false;
+        return formSubmissionRepository.findById(submissionId)
+                .map(sub -> sub.getSubmitterId().equals(username))
+                .orElse(false);
     }
 }

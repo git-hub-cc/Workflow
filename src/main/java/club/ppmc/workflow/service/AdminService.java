@@ -64,6 +64,10 @@ public class AdminService {
     private final DepartmentService departmentService;
     private final ObjectMapper objectMapper;
     private final SystemSettingService systemSettingService; // 注入系统设置服务
+    // --- 【核心新增】注入相关 Repository ---
+    private final WorkflowInstanceRepository workflowInstanceRepository;
+    private final FormSubmissionRepository formSubmissionRepository;
+
 
     // --- 流程实例管理 ---
 
@@ -227,7 +231,24 @@ public class AdminService {
 
     @LogOperation(module = "实例管理", action = "终止流程实例", targetIdExpression = "#processInstanceId")
     public void terminateProcessInstance(String processInstanceId, String reason) {
+        // --- 【核心修改】先从本地数据库找到实例和申请，再执行终止操作 ---
+        WorkflowInstance instance = workflowInstanceRepository.findByProcessInstanceId(processInstanceId)
+                .orElseThrow(() -> new ResourceNotFoundException("未找到与 Camunda 实例 " + processInstanceId + " 关联的本地流程记录"));
+
+        // 1. 执行 Camunda 的终止操作
         runtimeService.deleteProcessInstance(processInstanceId, reason);
+
+        // 2. 更新本地 WorkflowInstance 的状态
+        instance.setStatus(WorkflowInstance.Status.TERMINATED);
+        instance.setCompletedAt(LocalDateTime.now());
+        workflowInstanceRepository.save(instance);
+
+        // 3. 更新关联的 FormSubmission 的状态
+        FormSubmission submission = instance.getFormSubmission();
+        if (submission != null) {
+            submission.setStatus(FormSubmission.SubmissionStatus.TERMINATED);
+            formSubmissionRepository.save(submission);
+        }
     }
 
     @LogOperation(module = "实例管理", action = "挂起流程实例", targetIdExpression = "#processInstanceId")

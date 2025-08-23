@@ -154,6 +154,9 @@ import { QuillEditor } from '@vueup/vue-quill';
 import '@vueup/vue-quill/dist/vue-quill.snow.css';
 import { iconMap } from '@/utils/iconLibrary.js';
 
+// --- 【核心修复】引入 dayjs ---
+import dayjs from 'dayjs';
+
 import EditableSubform from './EditableSubform.vue';
 import KeyValueEditor from './KeyValueEditor.vue';
 import IconPickerModal from '@/components/IconPickerModal.vue';
@@ -171,9 +174,25 @@ const showIconPickerModal = ref(false);
 const userOptions = ref([]);
 
 const localValue = computed({
-  get: () => props.formData[props.field.id],
+  get: () => {
+    // --- 【核心修复】开始 ---
+    const rawValue = props.formData[props.field.id];
+    // 如果是日期选择器，并且值是字符串或字符串数组，则转换为 dayjs 对象
+    if (props.field.type === 'DatePicker' && rawValue) {
+      if (Array.isArray(rawValue)) {
+        // 处理范围选择器或多选日期
+        return rawValue.map(d => d ? dayjs(d) : null).filter(Boolean);
+      }
+      // 处理单选日期
+      return dayjs(rawValue);
+    }
+    // 对于其他所有类型的组件，返回原始值
+    return rawValue;
+    // --- 【核心修复】结束 ---
+  },
   set: (value) => emit('update:form-data', props.field.id, value),
 });
+
 
 const isVisible = computed(() => {
   const visibility = props.field.visibility;

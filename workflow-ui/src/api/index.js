@@ -38,24 +38,21 @@ service.interceptors.response.use(
     error => {
         console.error('API Error:', error);
 
-        // 1. 网络错误或请求被取消等没有响应体的情况
         if (!error.response) {
             message.error('网络错误，请检查您的连接或联系管理员。');
             return Promise.reject(error);
         }
 
-        // 2. 有响应体，根据状态码和后端返回的结构化信息进行处理
         const status = error.response.status;
         const data = error.response.data;
-        // 优先使用后端在 ErrorResponse DTO 中定义的友好消息
         const errorMessage = data?.message || error.message || '请求失败';
 
         switch (status) {
-            case 400: // Bad Request: 通常是参数验证失败
-            case 409: // Conflict: 业务逻辑冲突，如资源被占用
+            case 400:
+            case 409:
                 message.error(`操作失败: ${errorMessage}`);
                 break;
-            case 401: // Unauthorized: Token 无效或过期
+            case 401:
                 if (error.config.url.endsWith('/auth/login')) {
                     message.error(`登录失败: ${errorMessage}`);
                 } else {
@@ -71,10 +68,10 @@ service.interceptors.response.use(
                     }
                 }
                 break;
-            case 403: // Forbidden: 用户已认证，但无权访问该资源
+            case 403:
                 message.error(`权限不足: ${errorMessage}`);
                 break;
-            case 500: // Internal Server Error: 服务器内部错误
+            case 500:
                 message.error(`服务器内部错误: ${errorMessage}`);
                 break;
             default:
@@ -90,16 +87,13 @@ export const getForms = () => service.get('/forms');
 export const getFormById = (id) => service.get(`/forms/${id}`);
 export const createForm = (data) => service.post('/forms', data);
 export const updateForm = (id, data) => service.put(`/forms/${id}`, data);
-// --- 【核心修改】修改 deleteForm 以支持级联删除 ---
 export const deleteForm = (id, cascade = false) => service.delete(`/forms/${id}?cascade=${cascade}`);
-// --- 【核心新增】获取表单依赖关系的 API ---
 export const getFormDependencies = (id) => service.get(`/forms/${id}/dependencies`);
 export const getSubmissions = (formId, params) => service.get(`/forms/${formId}/submissions`, { params });
 export const getSubmissionById = (submissionId) => service.get(`/forms/submissions/${submissionId}`);
 export const submitForm = (formId, data) => service.post(`/forms/${formId}/submissions`, data);
 export const updateSubmission = (submissionId, data) => service.put(`/forms/submissions/${submissionId}`, data);
 export const deleteSubmission = (submissionId) => service.delete(`/forms/submissions/${submissionId}`);
-
 export const fetchTableData = (url, params) => service.get(url, { params });
 export const fetchTreeData = (source) => service.get('/admin/tree-data-source', { params: { source } });
 export const importFromWord = (file) => {
@@ -110,6 +104,11 @@ export const importFromWord = (file) => {
         timeout: 30000
     });
 };
+// --- 【核心新增】用户草稿相关 API ---
+export const createDraft = (formId, data) => service.post(`/forms/${formId}/submissions/draft`, data);
+export const updateMyDraft = (submissionId, data) => service.put(`/forms/my-submissions/${submissionId}`, data);
+export const submitDraft = (submissionId, data) => service.put(`/forms/submissions/${submissionId}/submit`, data);
+
 
 // --- 文件 API ---
 export const uploadFile = (file) => {

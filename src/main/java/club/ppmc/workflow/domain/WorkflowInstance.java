@@ -35,7 +35,13 @@ public class WorkflowInstance {
 
     private LocalDateTime completedAt;
 
-    public enum Status { PROCESSING, APPROVED, REJECTED }
+    public enum Status {
+        PROCESSING,
+        APPROVED,
+        REJECTED,
+        // --- 【核心新增】增加终止状态，与 Camunda 保持一致 ---
+        TERMINATED
+    }
 
     @PrePersist
     protected void onCreate() {
