@@ -9,12 +9,35 @@
       </template>
     </a-page-header>
 
-    <div style="padding: 0 24px;">
+    <div style="padding: 24px;">
+      <!-- 【阶段二新增】筛选区域 -->
+      <a-card :bordered="false" style="margin-bottom: 24px;">
+        <a-form :model="filterState" layout="inline">
+          <a-form-item label="角色名称">
+            <a-input v-model:value="filterState.name" placeholder="输入名称模糊查询" allow-clear />
+          </a-form-item>
+          <a-form-item>
+            <a-space>
+              <a-button type="primary" @click="handleSearch">
+                <template #icon><SearchOutlined /></template>
+                查询
+              </a-button>
+              <a-button @click="handleReset">
+                <template #icon><ReloadOutlined /></template>
+                重置
+              </a-button>
+            </a-space>
+          </a-form-item>
+        </a-form>
+      </a-card>
+
       <a-table
           :columns="columns"
-          :data-source="userStore.allRoles"
+          :data-source="dataSource"
           :loading="loading"
+          :pagination="pagination"
           row-key="id"
+          @change="handleTableChange"
       >
         <template #bodyCell="{ column, record }">
           <template v-if="column.key === 'name'">
@@ -60,26 +83,32 @@
 
 <script setup>
 import { ref, reactive, onMounted } from 'vue';
-import { useUserStore } from '@/stores/user';
-import { createRole, updateRole, deleteRole } from '@/api';
+import { createRole, updateRole, deleteRole, getRoles } from '@/api';
+import { usePaginatedFetch } from '@/composables/usePaginatedFetch';
 import { message } from 'ant-design-vue';
-import { PlusOutlined } from '@ant-design/icons-vue';
+import { PlusOutlined, SearchOutlined, ReloadOutlined } from '@ant-design/icons-vue';
 
-const userStore = useUserStore();
-const loading = ref(false);
+// --- 【阶段二修改】使用 usePaginatedFetch Hook ---
+const {
+  loading,
+  dataSource,
+  pagination,
+  filterState,
+  handleTableChange,
+  handleSearch,
+  handleReset,
+  fetchData,
+} = usePaginatedFetch(
+    getRoles,
+    { name: '' },
+    { defaultSort: 'id,asc' }
+);
 
-onMounted(() => {
-  if (userStore.allRoles.length === 0 && userStore.isAdmin) {
-    loading.value = true;
-    userStore.fetchAllRoles().finally(() => {
-      loading.value = false;
-    });
-  }
-});
+onMounted(fetchData);
 
 const columns = [
   { title: 'ID', dataIndex: 'id', key: 'id', width: 80 },
-  { title: '角色名称', dataIndex: 'name', key: 'name' },
+  { title: '角色名称', dataIndex: 'name', key: 'name', sorter: true },
   { title: '描述', dataIndex: 'description', key: 'description' },
   { title: '操作', key: 'actions', align: 'center', width: 150 },
 ];
@@ -128,8 +157,7 @@ const handleOk = async () => {
       message.success('角色创建成功！');
     }
     modalVisible.value = false;
-    // --- 【状态管理修复】统一调用Store的Action来刷新数据 ---
-    await userStore.fetchAllRoles();
+    await fetchData(); // 【阶段二修改】刷新数据
   } catch (error) {
     console.error('Form validation/submission failed:', error);
   } finally {
@@ -151,8 +179,7 @@ const handleDelete = async (roleId) => {
   try {
     await deleteRole(roleId);
     message.success('角色删除成功！');
-    // --- 【状态管理修复】统一调用Store的Action来刷新数据 ---
-    await userStore.fetchAllRoles();
+    await fetchData(); // 【阶段二修改】刷新数据
   } catch (error) {
     // API 错误已全局处理
   }

@@ -347,12 +347,22 @@ public class AdminService {
     }
 
 
-    // --- 用户管理 --- (保持不变)
+    // --- 用户管理 ---
+    /**
+     * 【阶段一修改】获取用户列表，支持分页和筛选
+     */
     @Transactional(readOnly = true)
-    public List<UserDto> getAllUsers() {
-        return userRepository.findAll().stream()
-                .map(this::toUserDto)
-                .collect(Collectors.toList());
+    public Page<UserDto> getAllUsers(String keyword, Pageable pageable) {
+        Specification<User> spec = (root, query, cb) -> {
+            if (StringUtils.hasText(keyword)) {
+                Predicate idMatch = cb.like(cb.lower(root.get("id")), "%" + keyword.toLowerCase() + "%");
+                Predicate nameMatch = cb.like(cb.lower(root.get("name")), "%" + keyword.toLowerCase() + "%");
+                return cb.or(idMatch, nameMatch);
+            }
+            return cb.conjunction();
+        };
+        Page<User> userPage = userRepository.findAll(spec, pageable);
+        return userPage.map(this::toUserDto);
     }
 
     @LogOperation(module = "用户管理", action = "创建用户", targetIdExpression = "#result?.id")
@@ -434,7 +444,7 @@ public class AdminService {
         userRepository.save(user);
     }
 
-    // --- 角色管理 --- (保持不变)
+    // --- 角色管理 ---
     @LogOperation(module = "角色管理", action = "创建角色", targetIdExpression = "#result?.name")
     public RoleDto createRole(RoleDto roleDto) {
         if(roleRepository.findByName(roleDto.getName()).isPresent()) {
@@ -446,8 +456,18 @@ public class AdminService {
         return toRoleDto(roleRepository.save(role));
     }
 
-    public List<RoleDto> getAllRoles() {
-        return roleRepository.findAll().stream().map(this::toRoleDto).collect(Collectors.toList());
+    /**
+     * 【阶段一修改】获取角色列表，支持分页和筛选
+     */
+    @Transactional(readOnly = true)
+    public Page<RoleDto> getAllRoles(String name, Pageable pageable) {
+        Specification<Role> spec = (root, query, cb) -> {
+            if (StringUtils.hasText(name)) {
+                return cb.like(cb.lower(root.get("name")), "%" + name.toLowerCase() + "%");
+            }
+            return cb.conjunction();
+        };
+        return roleRepository.findAll(spec, pageable).map(this::toRoleDto);
     }
 
     @LogOperation(module = "角色管理", action = "更新角色", targetIdExpression = "#id")
@@ -490,7 +510,7 @@ public class AdminService {
         roleRepository.delete(role);
     }
 
-    // --- 用户组管理 --- (保持不变)
+    // --- 用户组管理 ---
     @LogOperation(module = "用户组管理", action = "创建用户组", targetIdExpression = "#result?.name")
     public UserGroupDto createGroup(UserGroupDto groupDto) {
         if(userGroupRepository.findByName(groupDto.getName()).isPresent()) {
@@ -502,8 +522,18 @@ public class AdminService {
         return toUserGroupDto(userGroupRepository.save(group));
     }
 
-    public List<UserGroupDto> getAllGroups() {
-        return userGroupRepository.findAll().stream().map(this::toUserGroupDto).collect(Collectors.toList());
+    /**
+     * 【阶段一修改】获取用户组列表，支持分页和筛选
+     */
+    @Transactional(readOnly = true)
+    public Page<UserGroupDto> getAllGroups(String name, Pageable pageable) {
+        Specification<UserGroup> spec = (root, query, cb) -> {
+            if (StringUtils.hasText(name)) {
+                return cb.like(cb.lower(root.get("name")), "%" + name.toLowerCase() + "%");
+            }
+            return cb.conjunction();
+        };
+        return userGroupRepository.findAll(spec, pageable).map(this::toUserGroupDto);
     }
 
     @LogOperation(module = "用户组管理", action = "更新用户组", targetIdExpression = "#id")
@@ -544,7 +574,7 @@ public class AdminService {
     }
 
 
-    // --- DTO 转换器 --- (保持不变)
+    // --- DTO 转换器 ---
     private UserDto toUserDto(User user) {
         UserDto dto = new UserDto();
         dto.setId(user.getId());
@@ -585,7 +615,7 @@ public class AdminService {
     }
 
 
-    // --- 组织架构与日志 --- (保持不变)
+    // --- 组织架构与日志 ---
 
     @Transactional(readOnly = true)
     public List<DepartmentTreeNode> getOrganizationTree() {

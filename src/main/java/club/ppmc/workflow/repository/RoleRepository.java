@@ -2,6 +2,7 @@ package club.ppmc.workflow.repository;
 
 import club.ppmc.workflow.domain.Role;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
@@ -13,7 +14,7 @@ import java.util.Set;
  * @description Role 实体的 JPA Repository 接口
  */
 @Repository
-public interface RoleRepository extends JpaRepository<Role, Long> {
+public interface RoleRepository extends JpaRepository<Role, Long>, JpaSpecificationExecutor<Role> {
 
     /**
      * 根据角色名称查找角色

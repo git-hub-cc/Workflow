@@ -84,9 +84,10 @@
           />
         </a-form-item>
         <a-form-item label="部门负责人" name="managerId">
+          <!-- 【已修复】使用本地 allUsers 状态填充下拉框 -->
           <a-select
               v-model:value="formState.managerId"
-              :options="userStore.usersForManagement.map(u => ({ label: `${u.name} (${u.id})`, value: u.id }))"
+              :options="allUsers.map(u => ({ label: `${u.name} (${u.id})`, value: u.id }))"
               placeholder="请选择部门负责人"
               show-search
               option-filter-prop="label"
@@ -104,8 +105,8 @@
 
 <script setup>
 import { ref, onMounted, reactive, computed } from 'vue';
-import { getOrganizationTree, updateUser, getAllUsers, getDepartmentTree, createDepartment, updateDepartment, deleteDepartment } from '@/api';
-import { useUserStore } from '@/stores/user';
+// 【已修复】引入 getAllUsers API
+import { getOrganizationTree, updateUser, getAllUsers, createDepartment, updateDepartment, deleteDepartment } from '@/api';
 import { message, Modal } from 'ant-design-vue';
 import {
   ReloadOutlined,
@@ -117,27 +118,29 @@ import {
   PlusCircleOutlined
 } from '@ant-design/icons-vue';
 
-const userStore = useUserStore();
 const loading = ref(true);
 const treeData = ref([]);
 const expandedKeys = ref([]);
+// 【已修复】创建本地 ref 存储用户列表
+const allUsers = ref([]);
 const usersCache = ref(new Map());
 
 const fetchData = async () => {
   loading.value = true;
   try {
-    // 使用 Promise.all 并行加载，并强制刷新 store 中的用户列表
-    await Promise.all([
-      getOrganizationTree().then(data => {
-        treeData.value = data;
-        expandedKeys.value = data.map(dept => dept.key);
-      }),
-      userStore.fetchUsersForManagement(true) // 强制刷新用户列表
+    // 【已修复】并行获取组织树和全量用户数据
+    const [orgTree, usersResponse] = await Promise.all([
+      getOrganizationTree(),
+      getAllUsers({ page: 0, size: 1000 }) // 获取足够多的用户用于下拉选择
     ]);
 
-    // 从已更新的 store 中填充本地缓存，用于拖拽逻辑
+    treeData.value = orgTree;
+    expandedKeys.value = orgTree.map(dept => dept.key);
+    allUsers.value = usersResponse.content;
+
+    // 填充用于拖拽逻辑的用户缓存
     usersCache.value.clear();
-    userStore.usersForManagement.forEach(u => usersCache.value.set(u.id, u));
+    allUsers.value.forEach(u => usersCache.value.set(u.id, u));
 
   } catch (error) {
     message.error('加载组织架构失败');
@@ -148,7 +151,7 @@ const fetchData = async () => {
 
 onMounted(fetchData);
 
-// --- 员工拖拽逻辑 (保持不变) ---
+// --- 员工拖拽逻辑 ---
 const handleDragStart = ({ event, node }) => {
   if (node.dataRef.type !== 'user') {
     event.preventDefault();
@@ -195,7 +198,7 @@ const handleDrop = async ({ event, node, dragNode }) => {
 };
 
 
-// --- 新增：部门管理 Modal 逻辑 ---
+// --- 部门管理 Modal 逻辑 ---
 const modalVisible = ref(false);
 const modalConfirmLoading = ref(false);
 const isEditing = ref(false);
@@ -214,16 +217,14 @@ const departmentTreeForSelect = computed(() => {
     return nodes.map(node => {
       const isDisabled = node.value === disableId;
       const children = node.children ? disableNodeAndChildren(node.children, disableId) : undefined;
-      // If the node itself is disabled, all its children are effectively disabled too
       return { ...node, children, disabled: isDisabled };
-    }).filter(node => node.value !== disableId); // Also remove the node itself
+    }).filter(node => node.value !== disableId);
   };
 
   const rawTree = transformDeptTreeForSelect(treeData.value);
   return isEditing.value ? disableNodeAndChildren(rawTree, formState.id) : rawTree;
 });
 
-// 递归转换组织树为部门选择器所需格式
 const transformDeptTreeForSelect = (nodes) => {
   return nodes.filter(n => n.type === 'department').map(node => ({
     title: node.title,
@@ -239,13 +240,12 @@ const showModal = (mode, data = null) => {
   if (mode === 'edit') {
     isEditing.value = true;
     modalTitle.value = '编辑部门';
+    const deptToEdit = allUsers.value.find(u => u.departmentId === data.value) || {};
     Object.assign(formState, {
       id: data.value,
       name: data.title.split(' (')[0],
-      // Find parent from tree structure if possible
+      managerId: deptToEdit.managerId
     });
-    // This is a bit tricky since tree data is flat. We need to find the full department DTO later.
-    // For now, we'll just pre-fill what we can. A dedicated API to get a single dept would be better.
   } else if (mode === 'create-sub') {
     isEditing.value = false;
     modalTitle.value = `新增子部门 (上级: ${data.title})`;
@@ -317,10 +317,9 @@ const handleDelete = async (dataRef) => {
 }
 
 .node-actions {
-  display: none; /* Hide by default */
+  display: none;
 }
 
-/* Show actions on hover */
 :deep(.ant-tree-treenode-selected) .node-actions,
 :deep(.ant-tree-treenode:hover) .node-actions {
   display: inline-flex;
@@ -335,7 +334,6 @@ const handleDelete = async (dataRef) => {
   background-color: #e6f7ff !important;
 }
 
-/* Drag hover style */
 :deep(.ant-tree-node-content-wrapper.drop-hover) {
   background-color: #bae7ff !important;
 }

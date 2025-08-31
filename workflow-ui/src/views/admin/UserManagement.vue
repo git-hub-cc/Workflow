@@ -9,12 +9,35 @@
       </template>
     </a-page-header>
 
-    <div style="padding: 0 24px;">
+    <div style="padding: 24px;">
+      <!-- 【阶段二新增】筛选区域 -->
+      <a-card :bordered="false" style="margin-bottom: 24px;">
+        <a-form :model="filterState" layout="inline">
+          <a-form-item label="关键字">
+            <a-input v-model:value="filterState.keyword" placeholder="按用户ID或姓名搜索" allow-clear />
+          </a-form-item>
+          <a-form-item>
+            <a-space>
+              <a-button type="primary" @click="handleSearch">
+                <template #icon><SearchOutlined /></template>
+                查询
+              </a-button>
+              <a-button @click="handleReset">
+                <template #icon><ReloadOutlined /></template>
+                重置
+              </a-button>
+            </a-space>
+          </a-form-item>
+        </a-form>
+      </a-card>
+
       <a-table
           :columns="columns"
-          :data-source="userStore.usersForManagement"
+          :data-source="dataSource"
           :loading="loading"
+          :pagination="pagination"
           row-key="id"
+          @change="handleTableChange"
       >
         <template #bodyCell="{ column, record }">
           <template v-if="column.key === 'roleNames'">
@@ -33,7 +56,6 @@
           <template v-else-if="column.key === 'managerName'">
             {{ getManagerName(record.managerId) }}
           </template>
-          <!-- 【核心优化】将 Dropdown 菜单改为直接显示的文字链接按钮 -->
           <template v-else-if="column.key === 'actions'">
             <a-space>
               <a-button type="link" size="small" @click="showModal(record)">
@@ -82,7 +104,7 @@
         :confirm-loading="modalConfirmLoading"
         @ok="handleOk"
         @cancel="handleCancel"
-        width="600px"
+        width="800px"
         destroyOnClose
     >
       <a-form :model="formState" :rules="rules" ref="formRef" layout="vertical">
@@ -97,7 +119,16 @@
               <a-input v-model:value="formState.name" />
             </a-form-item>
           </a-col>
-
+          <a-col :span="12">
+            <a-form-item label="邮箱" name="email">
+              <a-input v-model:value="formState.email" />
+            </a-form-item>
+          </a-col>
+          <a-col :span="12">
+            <a-form-item label="手机号" name="phoneNumber">
+              <a-input v-model:value="formState.phoneNumber" />
+            </a-form-item>
+          </a-col>
           <a-col :span="12">
             <a-form-item label="部门" name="departmentId">
               <a-tree-select
@@ -132,7 +163,7 @@
                   v-model:value="formState.roleNames"
                   mode="multiple"
                   placeholder="请分配角色"
-                  :options="userStore.allRoles.map(r => ({ label: `${r.name} (${r.description})`, value: r.name }))"
+                  :options="allRoles.map(r => ({ label: `${r.name} (${r.description})`, value: r.name }))"
               />
             </a-form-item>
           </a-col>
@@ -142,7 +173,7 @@
                   v-model:value="formState.groupNames"
                   mode="multiple"
                   placeholder="请分配用户组"
-                  :options="userStore.allGroups.map(g => ({ label: `${g.name} (${g.description})`, value: g.name }))"
+                  :options="allGroups.map(g => ({ label: `${g.name} (${g.description})`, value: g.name }))"
               />
             </a-form-item>
           </a-col>
@@ -156,36 +187,56 @@
 <script setup>
 import { ref, reactive, onMounted, computed } from 'vue';
 import { useUserStore } from '@/stores/user';
-import { createUser, updateUser, disableUser, enableUser, resetPassword, getOrganizationTree, getDepartmentTree } from '@/api';
+import {
+  createUser, updateUser, disableUser, enableUser, resetPassword,
+  getOrganizationTree, getDepartmentTree,
+  getAllUsers, getRoles, getGroups
+} from '@/api';
+import { usePaginatedFetch } from '@/composables/usePaginatedFetch';
 import { message, Modal } from 'ant-design-vue';
-// 【核心优化】移除了不再使用的 Dropdown 菜单相关图标
-import { PlusOutlined } from '@ant-design/icons-vue';
+import { PlusOutlined, SearchOutlined, ReloadOutlined } from '@ant-design/icons-vue';
 
 const userStore = useUserStore();
-const loading = ref(false);
+
+const {
+  loading,
+  dataSource,
+  pagination,
+  filterState,
+  handleTableChange,
+  handleSearch,
+  handleReset,
+  fetchData,
+} = usePaginatedFetch(
+    getAllUsers,
+    { keyword: '' },
+    { defaultSort: 'id,asc' }
+);
+
+
 const orgTreeData = ref([]);
 const departmentTree = ref([]);
+const allRoles = ref([]);
+const allGroups = ref([]);
 
-
-const fetchInitialData = async () => {
-  loading.value = true;
+const fetchAuxiliaryData = async () => {
   try {
     const promises = [
-      userStore.usersForManagement.length === 0 ? userStore.fetchUsersForManagement() : Promise.resolve(),
-      userStore.allRoles.length === 0 ? userStore.fetchAllRoles() : Promise.resolve(),
-      userStore.allGroups.length === 0 ? userStore.fetchAllGroups() : Promise.resolve(),
       getOrganizationTree().then(data => { orgTreeData.value = data; }),
-      getDepartmentTree().then(data => { departmentTree.value = transformDeptTree(data); })
+      getDepartmentTree().then(data => { departmentTree.value = transformDeptTree(data); }),
+      getRoles({ page: 0, size: 1000 }).then(res => { allRoles.value = res.content; }),
+      getGroups({ page: 0, size: 1000 }).then(res => { allGroups.value = res.content; }),
     ];
     await Promise.all(promises);
   } catch (error) {
-    message.error("初始化页面数据失败");
-  } finally {
-    loading.value = false;
+    message.error("加载辅助数据失败");
   }
 };
 
-onMounted(fetchInitialData);
+onMounted(() => {
+  fetchData();
+  fetchAuxiliaryData();
+});
 
 const transformDeptTree = (nodes) => {
   return nodes.map(node => ({
@@ -198,29 +249,25 @@ const transformDeptTree = (nodes) => {
 
 const orgTreeDataForSelector = computed(() => {
   const currentUserId = isEditing.value ? formState.id : null;
-
   const filterAndProcessTree = (nodes) => {
     if (!nodes) return [];
     return nodes.reduce((acc, node) => {
       if (node.type === 'department') {
         const processedChildren = filterAndProcessTree(node.children);
-        if (processedChildren.length > 0) {
-          acc.push({ ...node, children: processedChildren, disabled: true });
-        }
+        acc.push({ ...node, children: processedChildren });
       } else if (node.type === 'user' && node.value !== currentUserId) {
         acc.push(node);
       }
       return acc;
     }, []);
   };
-
   return filterAndProcessTree(orgTreeData.value);
 });
 
 
 const columns = [
-  { title: '用户ID', dataIndex: 'id', key: 'id' },
-  { title: '姓名', dataIndex: 'name', key: 'name' },
+  { title: '用户ID', dataIndex: 'id', key: 'id', sorter: true },
+  { title: '姓名', dataIndex: 'name', key: 'name', sorter: true },
   { title: '部门', dataIndex: 'departmentName', key: 'departmentName' },
   { title: '角色', dataIndex: 'roleNames', key: 'roleNames' },
   { title: '用户组', dataIndex: 'groupNames', key: 'groupNames' },
@@ -239,7 +286,7 @@ const getStatusColor = (status) => {
 const getStatusText = (status) => ({ ACTIVE: '正常', INACTIVE: '禁用', LOCKED: '锁定' }[status] || '未知');
 const getManagerName = (managerId) => {
   if (!managerId) return '-';
-  const manager = userStore.usersForManagement.find(u => u.id === managerId);
+  const manager = dataSource.value.find(u => u.id === managerId);
   return manager ? manager.name : managerId;
 };
 
@@ -248,18 +295,15 @@ const modalConfirmLoading = ref(false);
 const isEditing = ref(false);
 const formRef = ref();
 const formState = reactive({
-  id: '',
-  name: '',
-  departmentId: null,
-  managerId: null,
-  roleNames: [],
-  groupNames: [],
+  id: '', name: '', email: '', phoneNumber: '',
+  departmentId: null, managerId: null, roleNames: [], groupNames: [],
 });
 
 const rules = {
   id: [{ required: true, message: '请输入用户ID' }],
   name: [{ required: true, message: '请输入用户姓名' }],
   roleNames: [{ required: true, message: '请至少选择一个角色', type: 'array' }],
+  email: [{ type: 'email', message: '请输入有效的邮箱地址' }],
 };
 
 const showModal = (user) => {
@@ -292,8 +336,7 @@ const handleOk = async () => {
       message.success('用户创建成功！');
     }
     modalVisible.value = false;
-    await userStore.fetchUsersForManagement();
-    await userStore.fetchUsersForPicker();
+    await fetchData();
   } catch (error) {
     console.error('Form validation/submission failed:', error);
   } finally {
@@ -307,7 +350,8 @@ const handleCancel = () => {
 
 const resetForm = () => {
   Object.assign(formState, {
-    id: '', name: '', departmentId: null, managerId: null, roleNames: [], groupNames: []
+    id: '', name: '', email: '', phoneNumber: '',
+    departmentId: null, managerId: null, roleNames: [], groupNames: []
   });
 };
 
@@ -315,7 +359,7 @@ const handleDisable = async (userId) => {
   try {
     await disableUser(userId);
     message.success('用户禁用成功！');
-    await userStore.fetchUsersForManagement();
+    await fetchData();
   } catch (error) {}
 };
 
@@ -323,7 +367,7 @@ const handleEnable = async (userId) => {
   try {
     await enableUser(userId);
     message.success('用户启用成功！');
-    await userStore.fetchUsersForManagement();
+    await fetchData();
   } catch (error) {}
 };
 

@@ -10,11 +10,34 @@
     </a-page-header>
 
     <div style="padding: 24px;">
+      <!-- 【阶段二新增】筛选区域 -->
+      <a-card :bordered="false" style="margin-bottom: 24px;">
+        <a-form :model="filterState" layout="inline">
+          <a-form-item label="表单名称">
+            <a-input v-model:value="filterState.name" placeholder="输入名称模糊查询" allow-clear />
+          </a-form-item>
+          <a-form-item>
+            <a-space>
+              <a-button type="primary" @click="handleSearch">
+                <template #icon><SearchOutlined /></template>
+                查询
+              </a-button>
+              <a-button @click="handleReset">
+                <template #icon><ReloadOutlined /></template>
+                重置
+              </a-button>
+            </a-space>
+          </a-form-item>
+        </a-form>
+      </a-card>
+
       <a-table
           :columns="columns"
-          :data-source="forms"
+          :data-source="dataSource"
           :loading="loading"
+          :pagination="pagination"
           row-key="id"
+          @change="handleTableChange"
       >
         <template #bodyCell="{ column, record }">
           <template v-if="column.key === 'createdAt' || column.key === 'updatedAt'">
@@ -31,7 +54,6 @@
               <a-button type="link" size="small" @click="viewSubmissions(record.id)">
                 查看数据
               </a-button>
-              <!-- 【核心修改】移除 a-popconfirm，改为直接调用 showDeleteModal 方法 -->
               <a-button type="link" danger size="small" @click="showDeleteModal(record)">删除</a-button>
             </a-space>
           </template>
@@ -39,7 +61,7 @@
       </a-table>
     </div>
 
-    <!-- 【核心新增】删除确认与依赖展示模态框 -->
+    <!-- 删除确认与依赖展示模态框 -->
     <a-modal
         v-model:open="deleteModalInfo.visible"
         :title="`删除确认：${deleteModalInfo.formName}`"
@@ -95,55 +117,61 @@
 <script setup>
 import {ref, onMounted, reactive, h} from 'vue';
 import { useRouter } from 'vue-router';
-// --- 【核心修改】引入新的 API 函数和图标 ---
+// --- 【阶段二修改】引入 usePaginatedFetch 和新的图标 ---
 import { getForms, deleteForm, getFormDependencies } from '@/api';
+import { usePaginatedFetch } from '@/composables/usePaginatedFetch';
 import { message, Modal } from 'ant-design-vue';
 import {
   PlusOutlined,
   ExclamationCircleOutlined,
   ForkOutlined,
   MenuOutlined,
-  DatabaseOutlined
+  DatabaseOutlined,
+  SearchOutlined,
+  ReloadOutlined
 } from '@ant-design/icons-vue';
 
 const router = useRouter();
-const loading = ref(true);
-const forms = ref([]);
+
+// --- 【阶段二修改】使用 usePaginatedFetch Hook ---
+const {
+  loading,
+  dataSource,
+  pagination,
+  filterState,
+  handleTableChange,
+  handleSearch,
+  handleReset,
+  fetchData,
+} = usePaginatedFetch(
+    getForms,
+    { name: '' }, // 初始筛选条件
+    { defaultSort: 'updatedAt,desc' } // 默认排序
+);
 
 const columns = [
   { title: 'ID', dataIndex: 'id', key: 'id', width: 80 },
-  { title: '表单名称', dataIndex: 'name', key: 'name' },
-  { title: '创建时间', dataIndex: 'createdAt', key: 'createdAt', width: 200 },
-  { title: '更新时间', dataIndex: 'updatedAt', key: 'updatedAt', width: 200 },
+  { title: '表单名称', dataIndex: 'name', key: 'name', sorter: true },
+  { title: '创建时间', dataIndex: 'createdAt', key: 'createdAt', width: 200, sorter: true },
+  { title: '更新时间', dataIndex: 'updatedAt', key: 'updatedAt', width: 200, sorter: true },
   { title: '操作', key: 'actions', align: 'center', width: 320 },
 ];
 
-const fetchForms = async () => {
-  loading.value = true;
-  try {
-    forms.value = await getForms();
-  } catch (error) {
-    // 错误已全局处理
-  } finally {
-    loading.value = false;
-  }
-};
-
-onMounted(fetchForms);
+onMounted(fetchData); // 首次加载数据
 
 const goToBuilder = (formId) => router.push({ name: 'form-builder-edit', params: { formId } });
 const goToDesigner = (formId) => router.push({ name: 'workflow-designer', params: { formId } });
 const viewSubmissions = (formId) => router.push({ name: 'form-submissions', params: { formId } });
 
 
-// --- 【核心新增】删除模态框相关逻辑 ---
+// --- 删除模态框相关逻辑 (保持不变) ---
 const deleteModalInfo = reactive({
   visible: false,
   loading: false,
   formId: null,
   formName: '',
   dependencies: [],
-  canCascade: false, // 是否可以提供级联删除选项
+  canCascade: false,
 });
 const cascadeDeleteConfirmed = ref(false);
 
@@ -152,19 +180,15 @@ const showDeleteModal = async (record) => {
   try {
     const res = await getFormDependencies(record.id);
     if (res.canDelete) {
-      // 如果可以安全删除，则显示传统确认框
       confirmSimpleDelete(record);
     } else {
-      // 否则，显示包含依赖信息的复杂模态框
       deleteModalInfo.formId = record.id;
       deleteModalInfo.formName = record.name;
       deleteModalInfo.dependencies = res.dependencies;
-      // 只有当依赖项不包含菜单时，才允许级联删除
       deleteModalInfo.canCascade = !res.dependencies.some(d => d.type === 'MENU');
       deleteModalInfo.visible = true;
     }
   } catch(e) {
-    // API 错误已全局处理
   } finally {
     deleteModalInfo.loading = false;
   }
@@ -182,7 +206,7 @@ const confirmSimpleDelete = (record) => {
       try {
         await deleteForm(record.id, false);
         message.success('表单删除成功！');
-        await fetchForms();
+        await fetchData(); // 【阶段二修改】刷新数据
       } catch (error) {}
     },
   });
@@ -194,9 +218,8 @@ const handleCascadeDelete = async () => {
     await deleteForm(deleteModalInfo.formId, true);
     message.success(`表单 “${deleteModalInfo.formName}” 及其关联数据已成功删除！`);
     closeDeleteModal();
-    await fetchForms();
+    await fetchData(); // 【阶段二修改】刷新数据
   } catch (error) {
-    // API 错误已全局处理
   } finally {
     deleteModalInfo.loading = false;
   }
@@ -209,7 +232,7 @@ const closeDeleteModal = () => {
   cascadeDeleteConfirmed.value = false;
 };
 
-// --- 依赖项显示辅助函数 ---
+// --- 依赖项显示辅助函数 (保持不变) ---
 const getDependencyIcon = (type) => {
   const map = { WORKFLOW: ForkOutlined, MENU: MenuOutlined, SUBMISSION: DatabaseOutlined };
   return map[type];

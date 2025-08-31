@@ -58,11 +58,18 @@ public class FormService {
         return convertToDefinitionResponse(savedForm);
     }
 
+    /**
+     * 【阶段一修改】获取表单定义列表，支持分页和筛选
+     */
     @Transactional(readOnly = true)
-    public List<FormDefinitionResponse> getAllFormDefinitions() {
-        return formDefinitionRepository.findAll().stream()
-                .map(this::convertToDefinitionResponse)
-                .collect(Collectors.toList());
+    public Page<FormDefinitionResponse> getAllFormDefinitions(String name, Pageable pageable) {
+        Specification<FormDefinition> spec = (root, query, cb) -> {
+            if (StringUtils.hasText(name)) {
+                return cb.like(cb.lower(root.get("name")), "%" + name.toLowerCase() + "%");
+            }
+            return cb.conjunction();
+        };
+        return formDefinitionRepository.findAll(spec, pageable).map(this::convertToDefinitionResponse);
     }
 
     @Transactional(readOnly = true)

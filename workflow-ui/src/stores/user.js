@@ -1,7 +1,6 @@
 import { ref, computed } from 'vue';
 import { defineStore } from 'pinia';
-// 【核心新增】导入 getPendingTasks API
-import { login, getAllUsers, getRoles, getGroups, getMyMenus, getUsersForPicker, getPendingTasks } from '@/api';
+import { login, getMyMenus, getUsersForPicker, getPendingTasks } from '@/api';
 import { message } from 'ant-design-vue';
 import router, { resetRouter, addDynamicRoutes } from '@/router';
 
@@ -10,11 +9,11 @@ export const useUserStore = defineStore('user', () => {
     const token = ref(localStorage.getItem('token') || null);
     const currentUser = ref(JSON.parse(localStorage.getItem('user')) || null);
     const menus = ref(JSON.parse(localStorage.getItem('menus')) || []);
-    const usersForManagement = ref([]);
-    const allRoles = ref([]);
-    const allGroups = ref([]);
+    // 【阶段二修改】移除不再需要由 Store 管理的列表状态
+    // const usersForManagement = ref([]);
+    // const allRoles = ref([]);
+    // const allGroups = ref([]);
     const loading = ref(false);
-    // 【核心新增】待办任务数量状态
     const pendingTasksCount = ref(0);
 
 // --- Getters ---
@@ -33,7 +32,6 @@ export const useUserStore = defineStore('user', () => {
             localStorage.setItem('user', JSON.stringify(currentUser.value));
 
             await fetchAndSetMenus();
-            // 登录成功后，获取一次待办数量
             await fetchPendingTasksCount();
 
             if (currentUser.value.passwordChangeRequired) {
@@ -69,10 +67,10 @@ export const useUserStore = defineStore('user', () => {
         token.value = null;
         currentUser.value = null;
         menus.value = [];
-        usersForManagement.value = [];
-        allRoles.value = [];
-        allGroups.value = [];
-        // 【核心新增】登出时重置数量
+        // 【阶段二修改】移除重置
+        // usersForManagement.value = [];
+        // allRoles.value = [];
+        // allGroups.value = [];
         pendingTasksCount.value = 0;
         localStorage.clear();
 
@@ -80,7 +78,6 @@ export const useUserStore = defineStore('user', () => {
         router.push('/login');
     }
 
-    // --- 【核心新增】获取待办任务数量的 Action ---
     async function fetchPendingTasksCount() {
         if (!isAuthenticated.value) return;
         try {
@@ -88,21 +85,14 @@ export const useUserStore = defineStore('user', () => {
             pendingTasksCount.value = response.totalElements;
         } catch (error) {
             console.error("Failed to fetch pending tasks count:", error);
-            pendingTasksCount.value = 0; // 出错时重置为0
+            pendingTasksCount.value = 0;
         }
     }
 
-    async function fetchUsersForManagement(force = false) {
-        if (!isAdmin.value || (usersForManagement.value.length > 0 && !force)) return;
-        loading.value = true;
-        try {
-            usersForManagement.value = await getAllUsers();
-        } catch (error) {
-            console.error("Failed to fetch users for management:", error);
-        } finally {
-            loading.value = false;
-        }
-    }
+    // 【阶段二移除】不再需要这些 Action，因为页面会直接通过 API Hook 获取数据
+    // async function fetchUsersForManagement(force = false) { ... }
+    // async function fetchAllRoles(force = false) { ... }
+    // async function fetchAllGroups(force = false) { ... }
 
     async function fetchUsersForPicker(params = {}) {
         if (!isAdmin.value) return [];
@@ -115,18 +105,6 @@ export const useUserStore = defineStore('user', () => {
         }
     }
 
-    async function fetchAllRoles(force = false) {
-        if (!isAdmin.value || (allRoles.value.length > 0 && !force)) return;
-        loading.value = true;
-        try { allRoles.value = await getRoles(); } catch (error) { console.error(error); } finally { loading.value = false; }
-    }
-
-    async function fetchAllGroups(force = false) {
-        if (!isAdmin.value || (allGroups.value.length > 0 && !force)) return;
-        loading.value = true;
-        try { allGroups.value = await getGroups(); } catch (error) { console.error(error); } finally { loading.value = false; }
-    }
-
     function updateCurrentUser(profileData) {
         if(currentUser.value) {
             currentUser.value.name = profileData.name;
@@ -137,17 +115,13 @@ export const useUserStore = defineStore('user', () => {
 
     return {
         token, currentUser, menus,
-        usersForManagement,
-        allRoles, allGroups, loading,
-        // 【核心新增】导出新状态和方法
+        loading,
         pendingTasksCount,
         isAuthenticated, isAdmin, passwordChangeRequired,
         login: handleLogin, logout,
-        fetchUsersForManagement, fetchUsersForPicker,
-        fetchAllRoles, fetchAllGroups,
+        fetchUsersForPicker,
         fetchAndSetMenus,
         updateCurrentUser,
-        // 【核心新增】导出新状态和方法
         fetchPendingTasksCount
     };
 });

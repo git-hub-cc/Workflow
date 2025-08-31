@@ -87,7 +87,8 @@ service.interceptors.response.use(
 );
 
 // --- 表单 API ---
-export const getForms = () => service.get('/forms');
+// 【阶段二修改】getForms 函数现在接受参数
+export const getForms = (params) => service.get('/forms', { params });
 export const getFormById = (id) => service.get(`/forms/${id}`);
 export const createForm = (data) => service.post('/forms', data);
 export const updateForm = (id, data) => service.put(`/forms/${id}`, data);
@@ -164,7 +165,8 @@ export const updateDepartment = (id, data) => service.put(`/admin/departments/${
 export const deleteDepartment = (id) => service.delete(`/admin/departments/${id}`);
 
 // --- Admin User Management ---
-export const getAllUsers = () => service.get('/admin/users');
+// 【阶段二修改】getAllUsers 函数现在接受参数
+export const getAllUsers = (params) => service.get('/admin/users', { params });
 export const createUser = (data) => service.post('/admin/users', data);
 export const updateUser = (id, data) => service.put(`/admin/users/${id}`, data);
 export const disableUser = (id) => service.delete(`/admin/users/${id}`);
@@ -172,13 +174,15 @@ export const enableUser = (id) => service.post(`/admin/users/${id}/enable`);
 export const resetPassword = (id) => service.post(`/admin/users/${id}/reset-password`);
 
 // --- 角色管理 API ---
-export const getRoles = () => service.get('/admin/roles');
+// 【阶段二修改】getRoles 函数现在接受参数
+export const getRoles = (params) => service.get('/admin/roles', { params });
 export const createRole = (data) => service.post('/admin/roles', data);
 export const updateRole = (id, data) => service.put(`/admin/roles/${id}`, data);
 export const deleteRole = (id) => service.delete(`/admin/roles/${id}`);
 
 // --- 用户组管理 API ---
-export const getGroups = () => service.get('/admin/groups');
+// 【阶段二修改】getGroups 函数现在接受参数
+export const getGroups = (params) => service.get('/admin/groups', { params });
 export const createGroup = (data) => service.post('/admin/groups', data);
 export const updateGroup = (id, data) => service.put(`/admin/groups/${id}`, data);
 export const deleteGroup = (id) => service.delete(`/admin/groups/${id}`);

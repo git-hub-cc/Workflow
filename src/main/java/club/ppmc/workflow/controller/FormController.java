@@ -48,9 +48,14 @@ public class FormController {
         return ResponseEntity.ok(response);
     }
 
+    /**
+     * 【阶段一修改】获取表单定义列表，支持分页和筛选
+     */
     @GetMapping
-    public ResponseEntity<List<FormDefinitionResponse>> getAllFormDefinitions() {
-        List<FormDefinitionResponse> responses = formService.getAllFormDefinitions();
+    public ResponseEntity<Page<FormDefinitionResponse>> getAllFormDefinitions(
+            @RequestParam(required = false) String name,
+            Pageable pageable) {
+        Page<FormDefinitionResponse> responses = formService.getAllFormDefinitions(name, pageable);
         return ResponseEntity.ok(responses);
     }
 

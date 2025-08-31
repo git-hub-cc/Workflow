@@ -98,9 +98,14 @@ public class AdminController {
 
 
     // --- 用户管理 ---
+    /**
+     * 【阶段一修改】获取用户列表，支持分页和筛选
+     */
     @GetMapping("/users")
-    public ResponseEntity<List<UserDto>> getAllUsersForAdmin() {
-        return ResponseEntity.ok(adminService.getAllUsers());
+    public ResponseEntity<Page<UserDto>> getAllUsers(
+            @RequestParam(required = false) String keyword,
+            Pageable pageable) {
+        return ResponseEntity.ok(adminService.getAllUsers(keyword, pageable));
     }
 
     @PostMapping("/users")
@@ -140,9 +145,14 @@ public class AdminController {
         return new ResponseEntity<>(createdRole, HttpStatus.CREATED);
     }
 
+    /**
+     * 【阶段一修改】获取角色列表，支持分页和筛选
+     */
     @GetMapping("/roles")
-    public ResponseEntity<List<RoleDto>> getAllRoles() {
-        return ResponseEntity.ok(adminService.getAllRoles());
+    public ResponseEntity<Page<RoleDto>> getAllRoles(
+            @RequestParam(required = false) String name,
+            Pageable pageable) {
+        return ResponseEntity.ok(adminService.getAllRoles(name, pageable));
     }
 
     @PutMapping("/roles/{id}")
@@ -163,9 +173,14 @@ public class AdminController {
         return new ResponseEntity<>(createdGroup, HttpStatus.CREATED);
     }
 
+    /**
+     * 【阶段一修改】获取用户组列表，支持分页和筛选
+     */
     @GetMapping("/groups")
-    public ResponseEntity<List<UserGroupDto>> getAllGroups() {
-        return ResponseEntity.ok(adminService.getAllGroups());
+    public ResponseEntity<Page<UserGroupDto>> getAllGroups(
+            @RequestParam(required = false) String name,
+            Pageable pageable) {
+        return ResponseEntity.ok(adminService.getAllGroups(name, pageable));
     }
 
     @PutMapping("/groups/{id}")

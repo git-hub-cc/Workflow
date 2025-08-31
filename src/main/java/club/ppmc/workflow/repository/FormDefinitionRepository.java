@@ -2,6 +2,7 @@ package club.ppmc.workflow.repository;
 
 import club.ppmc.workflow.domain.FormDefinition;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.stereotype.Repository;
 
 /**
@@ -9,5 +10,5 @@ import org.springframework.stereotype.Repository;
  * @description FormDefinition 实体的 JPA Repository 接口
  */
 @Repository
-public interface FormDefinitionRepository extends JpaRepository<FormDefinition, Long> {
+public interface FormDefinitionRepository extends JpaRepository<FormDefinition, Long>, JpaSpecificationExecutor<FormDefinition> {
 }

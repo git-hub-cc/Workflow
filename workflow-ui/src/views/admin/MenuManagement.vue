@@ -108,7 +108,8 @@
           </a-col>
           <a-col :span="24">
             <a-form-item label="授权角色" name="roleNames">
-              <a-select v-model:value="formState.roleNames" mode="multiple" placeholder="选择可以访问此菜单的角色" :options="userStore.allRoles.map(r => ({label: r.description, value: r.name}))" />
+              <!-- 【已修复】下拉框现在可以从本地 allRoles ref 获取数据 -->
+              <a-select v-model:value="formState.roleNames" mode="multiple" placeholder="选择可以访问此菜单的角色" :options="allRoles.map(r => ({label: r.description, value: r.name}))" />
             </a-form-item>
           </a-col>
         </a-row>
@@ -120,18 +121,19 @@
 
 <script setup>
 import { ref, onMounted, reactive, computed } from 'vue';
-import { getMenuTree, createMenu, updateMenu, deleteMenu, getForms, updateMenuTree } from '@/api';
-import { useUserStore } from '@/stores/user';
+// 【已修复】引入 getRoles API
+import { getMenuTree, createMenu, updateMenu, deleteMenu, getForms, updateMenuTree, getRoles } from '@/api';
 import { message } from 'ant-design-vue';
-import { PlusOutlined, AppstoreOutlined } from '@ant-design/icons-vue';
+import { PlusOutlined } from '@ant-design/icons-vue';
 import { iconMap } from '@/utils/iconLibrary.js';
 import IconPickerModal from '@/components/IconPickerModal.vue';
 import { cloneDeep } from 'lodash-es';
 
-const userStore = useUserStore();
 const loading = ref(true);
 const menuTree = ref([]);
 const allForms = ref([]);
+// 【已修复】创建本地 ref 来存储角色列表
+const allRoles = ref([]);
 let draggedNode = null;
 
 const columns = [
@@ -154,17 +156,26 @@ const fetchMenus = async () => {
 
 const fetchForms = async () => {
   try {
-    allForms.value = await getForms();
+    const response = await getForms({ page: 0, size: 1000 });
+    allForms.value = response.content;
   } catch (e) {}
+};
+
+// 【已修复】创建获取角色的函数
+const fetchRoles = async () => {
+  try {
+    const response = await getRoles({ page: 0, size: 1000 });
+    allRoles.value = response.content;
+  } catch(e) {}
 };
 
 onMounted(() => {
   fetchMenus();
   fetchForms();
-  if (userStore.allRoles.length === 0) userStore.fetchAllRoles();
+  fetchRoles(); // 【已修复】在 onMounted 中调用
 });
 
-// --- 【新增】拖拽排序逻辑 ---
+// --- 拖拽排序逻辑 ---
 const findNodeAndParent = (key, tree, parent = null) => {
   for (let i = 0; i < tree.length; i++) {
     const node = tree[i];
@@ -195,26 +206,22 @@ const customRow = (record) => ({
     loading.value = true;
     const newTree = cloneDeep(menuTree.value);
 
-    // 1. Remove dragged node from its original position
     const sourceInfo = findNodeAndParent(draggedNode.id, newTree);
     if (!sourceInfo) { loading.value = false; return; }
     const sourceList = sourceInfo.parent ? sourceInfo.parent.children : newTree;
     sourceList.splice(sourceInfo.index, 1);
 
-    // 2. Insert dragged node at the new position
     const targetInfo = findNodeAndParent(record.id, newTree);
     if (!targetInfo) { loading.value = false; return; }
     const targetList = targetInfo.parent ? targetInfo.parent.children : newTree;
-    // Insert before the target node
     targetList.splice(targetInfo.index, 0, draggedNode);
 
-    // 3. Update parentId for the moved node
     draggedNode.parentId = targetInfo.parent ? targetInfo.parent.id : null;
 
     try {
       await updateMenuTree(newTree);
       message.success('菜单顺序已更新！');
-      await fetchMenus(); // Refresh from backend to get correct orderNum
+      await fetchMenus();
     } catch(err) {
       // global handler
     } finally {
@@ -250,7 +257,7 @@ const menuTreeForSelect = computed(() => {
   const process = (nodes) => {
     return nodes.map(node => ({
       title: node.name, value: node.id,
-      disabled: isEditing.value && (node.id === formState.id || node.path?.startsWith(formState.path + '/')),
+      disabled: isEditing.value && (node.id === formState.id || (node.path && formState.path && node.path.startsWith(formState.path + '/'))),
       children: node.children ? process(node.children) : []
     }));
   };
@@ -313,7 +320,6 @@ const handleDelete = async (id) => {
   } catch (e) {}
 };
 
-// Helper functions
 const getMenuTypeText = (type) => ({ 'DIRECTORY': '目录', 'FORM_ENTRY': '表单入口', 'DATA_LIST': '数据列表', 'REPORT': '报表', 'EXTERNAL_LINK': '外链' }[type] || '未知');
 const getMenuTypeTagColor = (type) => ({ 'DIRECTORY': 'blue', 'FORM_ENTRY': 'green', 'DATA_LIST': 'purple', 'REPORT': 'orange', 'EXTERNAL_LINK': 'cyan' }[type] || 'default');
 </script>
