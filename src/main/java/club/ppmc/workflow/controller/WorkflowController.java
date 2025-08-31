@@ -125,7 +125,7 @@ public class WorkflowController {
 
     // --- 【核心新增】获取流程图 API ---
     /**
-     * API: 获取指定申请的流程图 BPMN XML
+     * API: 获取指定申请的流程图 BPMN XML (基于 submissionId)
      * 权限: 仅限申请人、历史或当前处理人、管理员
      * @param submissionId 申请提交ID
      * @return 包含BPMN XML的DTO
@@ -136,6 +136,18 @@ public class WorkflowController {
             "or hasRole('ADMIN')")
     public ResponseEntity<BpmnXmlDto> getWorkflowDiagram(@PathVariable Long submissionId) {
         return ResponseEntity.ok(workflowService.getWorkflowDiagram(submissionId));
+    }
+
+    /**
+     * 【新增】API: 获取指定流程实例的流程图 BPMN XML (基于 processInstanceId)
+     * 权限: 仅限管理员
+     * @param instanceId Camunda 流程实例 ID
+     * @return 包含BPMN XML的DTO
+     */
+    @GetMapping("/instance/{instanceId}/diagram")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<BpmnXmlDto> getWorkflowDiagramForInstance(@PathVariable String instanceId) {
+        return ResponseEntity.ok(workflowService.getWorkflowDiagramByInstanceId(instanceId));
     }
 
 

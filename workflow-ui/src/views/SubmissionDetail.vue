@@ -2,12 +2,22 @@
   <div class="page-container">
     <a-page-header
         :title="formDefinition.name || '申请详情'"
-        :sub-title="`提交人: ${submission.submitterName}`"
+        :sub-title="submission.submitterName ? `提交人: ${submission.submitterName}` : ''"
         @back="() => $router.go(-1)"
     />
 
     <a-spin :spinning="loading" tip="正在加载详情...">
-      <div v-if="!loading" class="detail-layout">
+      <!-- 【核心修改】当加载失败时，显示错误提示 -->
+      <a-empty
+          v-if="loadError"
+          :description="loadError"
+          style="padding-top: 100px;"
+      >
+        <a-button type="primary" @click="$router.push('/')">返回首页</a-button>
+      </a-empty>
+
+      <!-- 仅在加载成功后显示内容 -->
+      <div v-else-if="!loading" class="detail-layout">
         <!-- 左侧主内容区: 表单详情 -->
         <div class="main-content">
           <a-card title="表单内容">
@@ -123,7 +133,8 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted, computed } from 'vue';
+// 【核心修改】引入 defineAsyncComponent
+import { ref, reactive, onMounted, computed, defineAsyncComponent } from 'vue';
 // 【核心修改】引入 getWorkflowDiagram 和 FullscreenOutlined
 import { getSubmissionById, getFormById, getWorkflowHistory, downloadFile, getWorkflowDiagram } from '@/api';
 import { message } from 'ant-design-vue';
@@ -133,13 +144,15 @@ import { iconMap } from '@/utils/iconLibrary.js';
 import { useSystemStore } from '@/stores/system';
 // 【核心修改】引入新的流程图组件和模态框
 import ProcessDiagramViewer from '@/components/ProcessDiagramViewer.vue';
-import ProcessDiagramModal from '@/components/ProcessDiagramModal.vue';
+// 【核心修改】使用 defineAsyncComponent 动态加载流程图模态框
+const ProcessDiagramModal = defineAsyncComponent(() => import('@/components/ProcessDiagramModal.vue'));
 
 
 const props = defineProps({ submissionId: String });
 const systemStore = useSystemStore();
 
 const loading = ref(true);
+const loadError = ref(null); // 【核心新增】错误状态
 const submission = ref({});
 const formDefinition = ref({ schema: { fields: [] } });
 const formData = reactive({});
@@ -182,7 +195,9 @@ onMounted(async () => {
     }
 
   } catch (error) {
-    message.error('加载详情失败');
+    // 【核心修改】捕获错误并设置错误状态
+    loadError.value = '您访问的申请不存在或已被删除。';
+    console.error('加载详情失败:', error);
   } finally {
     loading.value = false;
   }

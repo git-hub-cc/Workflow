@@ -32,6 +32,7 @@ import org.springframework.context.ApplicationContext;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -131,6 +132,7 @@ public class WorkflowService {
                 })
                 .orElseGet(() -> {
                     String processDefinitionKey = "Process_Form_" + formId;
+                    // --- 【核心修改】更新默认的BPMN XML，加入归档服务任务 ---
                     String defaultXml = String.format("""
 <?xml version="1.0" encoding="UTF-8"?>
 <bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" xmlns:camunda="http://camunda.org/schema/1.0/bpmn" xmlns:di="http://www.omg.org/spec/DD/20100524/DI" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" id="Definitions_0zla03s" targetNamespace="http://bpmn.io/schema/bpmn" exporter="Camunda Modeler" exporterVersion="5.20.0">
@@ -155,21 +157,6 @@ public class WorkflowService {
       <bpmn:outgoing>Flow_110p3r9</bpmn:outgoing>
     </bpmn:exclusiveGateway>
     <bpmn:sequenceFlow id="Flow_0imfrb2" sourceRef="Activity_1xlcl7u" targetRef="Gateway_1pbw0x6" />
-    <bpmn:endEvent id="Event_0mtkumc">
-      <bpmn:incoming>Flow_0twujez</bpmn:incoming>
-    </bpmn:endEvent>
-    <bpmn:sequenceFlow id="Flow_0twujez" name="同意" sourceRef="Gateway_1pbw0x6" targetRef="Event_0mtkumc">
-      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">${taskOutcome == 'approved'}</bpmn:conditionExpression>
-    </bpmn:sequenceFlow>
-    <bpmn:endEvent id="Event_1agf6lw">
-      <bpmn:incoming>Flow_0omffa0</bpmn:incoming>
-    </bpmn:endEvent>
-    <bpmn:sequenceFlow id="Flow_0omffa0" name="拒绝" sourceRef="Gateway_1pbw0x6" targetRef="Event_1agf6lw">
-      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">${taskOutcome == 'rejected'}</bpmn:conditionExpression>
-    </bpmn:sequenceFlow>
-    <bpmn:sequenceFlow id="Flow_110p3r9" name="打回发起人" sourceRef="Gateway_1pbw0x6" targetRef="Activity_0bmvcuj">
-      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">${taskOutcome == 'returnToInitiator'}</bpmn:conditionExpression>
-    </bpmn:sequenceFlow>
     <bpmn:userTask id="Activity_0bmvcuj" name="发起" camunda:assignee="${initiator}">
       <bpmn:incoming>Flow_1p6l8ge</bpmn:incoming>
       <bpmn:incoming>Flow_110p3r9</bpmn:incoming>
@@ -185,6 +172,31 @@ public class WorkflowService {
     <bpmn:sequenceFlow id="Flow_0s8894b" name="终止" sourceRef="Gateway_0wgpc9l" targetRef="Event_0pvvl3v">
       <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">${preparationOutcome == 'terminate'}</bpmn:conditionExpression>
     </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_110p3r9" name="打回发起人" sourceRef="Gateway_1pbw0x6" targetRef="Activity_0bmvcuj">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">${taskOutcome == 'returnToInitiator'}</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_0twujez" name="同意" sourceRef="Gateway_1pbw0x6" targetRef="Activity_ArchiveApproved">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">${taskOutcome == 'approved'}</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_0omffa0" name="拒绝" sourceRef="Gateway_1pbw0x6" targetRef="Activity_ArchiveRejected">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">${taskOutcome == 'rejected'}</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:serviceTask id="Activity_ArchiveApproved" name="归档(通过)" camunda:delegateExpression="${archiveProcessDelegate}">
+      <bpmn:incoming>Flow_0twujez</bpmn:incoming>
+      <bpmn:outgoing>Flow_ToApprovedEnd</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:serviceTask id="Activity_ArchiveRejected" name="归档(拒绝)" camunda:delegateExpression="${rejectProcessDelegate}">
+      <bpmn:incoming>Flow_0omffa0</bpmn:incoming>
+      <bpmn:outgoing>Flow_ToRejectedEnd</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:sequenceFlow id="Flow_ToApprovedEnd" sourceRef="Activity_ArchiveApproved" targetRef="Event_ApprovedEnd" />
+    <bpmn:endEvent id="Event_ApprovedEnd" name="通过结束">
+      <bpmn:incoming>Flow_ToApprovedEnd</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:sequenceFlow id="Flow_ToRejectedEnd" sourceRef="Activity_ArchiveRejected" targetRef="Event_RejectedEnd" />
+    <bpmn:endEvent id="Event_RejectedEnd" name="拒绝结束">
+      <bpmn:incoming>Flow_ToRejectedEnd</bpmn:incoming>
+    </bpmn:endEvent>
   </bpmn:process>
   <bpmndi:BPMNDiagram id="BPMNDiagram_1">
     <bpmndi:BPMNPlane id="BPMNPlane_1" bpmnElement="%s">
@@ -199,12 +211,6 @@ public class WorkflowService {
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="Gateway_1pbw0x6_di" bpmnElement="Gateway_1pbw0x6" isMarkerVisible="true">
         <dc:Bounds x="685" y="95" width="50" height="50" />
-      </bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="Event_0mtkumc_di" bpmnElement="Event_0mtkumc">
-        <dc:Bounds x="792" y="102" width="36" height="36" />
-      </bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="Event_1agf6lw_di" bpmnElement="Event_1agf6lw">
-        <dc:Bounds x="792" y="212" width="36" height="36" />
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="Activity_18y6bq4_di" bpmnElement="Activity_0bmvcuj">
         <dc:Bounds x="270" y="80" width="100" height="80" />
@@ -236,21 +242,6 @@ public class WorkflowService {
         <di:waypoint x="630" y="120" />
         <di:waypoint x="685" y="120" />
       </bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="Flow_0twujez_di" bpmnElement="Flow_0twujez">
-        <di:waypoint x="735" y="120" />
-        <di:waypoint x="792" y="120" />
-        <bpmndi:BPMNLabel>
-          <dc:Bounds x="753" y="102" width="22" height="14" />
-        </bpmndi:BPMNLabel>
-      </bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="Flow_0omffa0_di" bpmnElement="Flow_0omffa0">
-        <di:waypoint x="710" y="145" />
-        <di:waypoint x="710" y="230" />
-        <di:waypoint x="792" y="230" />
-        <bpmndi:BPMNLabel>
-          <dc:Bounds x="714" y="185" width="22" height="14" />
-        </bpmndi:BPMNLabel>
-      </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="Flow_110p3r9_di" bpmnElement="Flow_110p3r9">
         <di:waypoint x="710" y="95" />
         <di:waypoint x="710" y="-30" />
@@ -268,10 +259,52 @@ public class WorkflowService {
           <dc:Bounds x="454" y="185" width="22" height="14" />
         </bpmndi:BPMNLabel>
       </bpmndi:BPMNEdge>
+      <bpmndi:BPMNShape id="Activity_169y5e7_di" bpmnElement="Activity_ArchiveApproved">
+        <dc:Bounds x="790" y="80" width="100" height="80" />
+        <bpmndi:BPMNLabel />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Event_037p55h_di" bpmnElement="Event_ApprovedEnd">
+        <dc:Bounds x="952" y="102" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="945" y="145" width="51" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="Flow_0twujez_di" bpmnElement="Flow_0twujez">
+        <di:waypoint x="735" y="120" />
+        <di:waypoint x="790" y="120" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="753" y="102" width="22" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_016r57n_di" bpmnElement="Flow_ToApprovedEnd">
+        <di:waypoint x="890" y="120" />
+        <di:waypoint x="952" y="120" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNShape id="Activity_1c9x7u1_di" bpmnElement="Activity_ArchiveRejected">
+        <dc:Bounds x="790" y="230" width="100" height="80" />
+        <bpmndi:BPMNLabel />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Event_1h4y6z1_di" bpmnElement="Event_RejectedEnd">
+        <dc:Bounds x="952" y="252" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="945" y="295" width="51" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="Flow_0omffa0_di" bpmnElement="Flow_0omffa0">
+        <di:waypoint x="710" y="145" />
+        <di:waypoint x="710" y="270" />
+        <di:waypoint x="790" y="270" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="714" y="205" width="22" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_1c7w1n8_di" bpmnElement="Flow_ToRejectedEnd">
+        <di:waypoint x="890" y="270" />
+        <di:waypoint x="952" y="270" />
+      </bpmndi:BPMNEdge>
     </bpmndi:BPMNPlane>
   </bpmndi:BPMNDiagram>
 </bpmn:definitions>
-
                         """, processDefinitionKey, processDefinitionKey);
 
                     WorkflowTemplateResponse dto = new WorkflowTemplateResponse();
@@ -296,12 +329,13 @@ public class WorkflowService {
                             .singleResult();
 
                     if (processDefinition == null) {
-                        log.warn("工作流模板存在 (form ID: {}), 但其流程定义 key '{}' 并未部署在 Camunda 引擎中。" +
-                                        "将跳过工作流启动 (submission ID: {}).",
-                                submission.getFormDefinition().getId(),
-                                template.getProcessDefinitionKey(),
-                                submission.getId());
-                        return;
+                        // 【核心修复】当找不到已部署的流程时，抛出明确的业务异常，而不是静默失败
+                        String errorMessage = String.format(
+                                "无法启动工作流：未找到与此表单关联的已部署流程定义 (Key: %s)。请先在流程设计器中部署该流程。",
+                                template.getProcessDefinitionKey()
+                        );
+                        log.error(errorMessage);
+                        throw new IllegalStateException(errorMessage);
                     }
 
                     Map<String, Object> variables = objectMapper.readValue(submission.getDataJson(), new TypeReference<>() {});
@@ -775,19 +809,12 @@ public class WorkflowService {
 
         List<HistoryActivityDto> historyList = new ArrayList<>();
 
-        historyList.add(HistoryActivityDto.builder()
-                .activityName("发起申请")
-                .activityType("startEvent")
-                .assigneeId(submission.getSubmitterId())
-                .assigneeName(userMap.getOrDefault(submission.getSubmitterId(), new User()).getName())
-                .startTime(submission.getCreatedAt())
-                .endTime(submission.getCreatedAt())
-                .build());
-
+        // 【核心修改】直接遍历所有返回的历史活动，不再手动添加“发起申请”
         for (HistoricActivityInstance activity : activityInstances) {
-            if (!activity.getActivityType().equals("userTask") && !activity.getActivityType().endsWith("EndEvent") && !activity.getActivityType().equals("serviceTask")) {
-                continue;
-            }
+            // --- 【核心修改】移除此处的if过滤条件 ---
+            // if (!activity.getActivityType().equals("userTask") && !activity.getActivityType().endsWith("EndEvent") && !activity.getActivityType().equals("serviceTask")) {
+            //     continue;
+            // }
 
             HistoryActivityDto.HistoryActivityDtoBuilder dtoBuilder = HistoryActivityDto.builder()
                     .activityId(activity.getId())
@@ -799,6 +826,12 @@ public class WorkflowService {
                     .endTime(Optional.ofNullable(activity.getEndTime()).map(d -> d.toInstant().atZone(ZoneId.systemDefault()).toLocalDateTime()).orElse(null))
                     .durationInMillis(activity.getDurationInMillis());
 
+            // 【核心修改】当节点是开始事件时，手动设置处理人为流程发起人
+            if ("startEvent".equals(activity.getActivityType())) {
+                dtoBuilder.assigneeId(submission.getSubmitterId());
+                dtoBuilder.assigneeName(userMap.getOrDefault(submission.getSubmitterId(), new User()).getName());
+            }
+
             if (activity.getActivityType().equals("userTask") && activity.getTaskId() != null) {
                 HistoricVariableInstance commentVar = taskComments.get(activity.getTaskId());
                 if (commentVar != null) {
@@ -806,15 +839,28 @@ public class WorkflowService {
                 }
             }
 
-            if(activity.getActivityType().endsWith("EndEvent")) {
-                Object approvedVar = processVariables.get("approved");
-                if (approvedVar instanceof Boolean) {
-                    dtoBuilder.decision(((Boolean) approvedVar) ? "APPROVED" : "REJECTED");
-                    dtoBuilder.activityName(((Boolean) approvedVar) ? "审批通过" : "审批拒绝");
-                } else {
-                    dtoBuilder.activityName("流程结束");
+            // --- 【核心重构：使用 FormSubmission 的最终状态来确定结束事件的显示】 ---
+            if (activity.getActivityType().endsWith("EndEvent")) {
+                switch (submission.getStatus()) {
+                    case APPROVED:
+                        dtoBuilder.decision("APPROVED");
+                        dtoBuilder.activityName("审批通过");
+                        break;
+                    case REJECTED:
+                        dtoBuilder.decision("REJECTED");
+                        dtoBuilder.activityName("审批拒绝");
+                        break;
+                    case TERMINATED:
+                        dtoBuilder.decision("TERMINATED");
+                        dtoBuilder.activityName("流程终止");
+                        break;
+                    default:
+                        // 如果状态是 DRAFT 或 PROCESSING，理论上不应该有结束事件，但作为保护
+                        dtoBuilder.activityName("流程结束");
+                        break;
                 }
             }
+            // --- 【重构结束】 ---
 
             historyList.add(dtoBuilder.build());
         }
@@ -836,6 +882,24 @@ public class WorkflowService {
 
         return new BpmnXmlDto(template.getBpmnXml());
     }
+
+    /**
+     * 【新增】通过流程实例ID获取流程图
+     * @param processInstanceId Camunda 流程实例 ID
+     * @return 包含BPMN XML的DTO
+     */
+    @Transactional(readOnly = true)
+    public BpmnXmlDto getWorkflowDiagramByInstanceId(String processInstanceId) {
+        WorkflowInstance instance = instanceRepository.findByProcessInstanceId(processInstanceId)
+                .orElseThrow(() -> new ResourceNotFoundException("未找到流程实例 ID: " + processInstanceId));
+
+        WorkflowTemplate template = instance.getTemplate();
+        if (template == null || !StringUtils.hasText(template.getBpmnXml())) {
+            throw new ResourceNotFoundException("未找到该工作流实例关联的流程图定义");
+        }
+        return new BpmnXmlDto(template.getBpmnXml());
+    }
+
 
     public boolean isTaskOwner(String camundaTaskId, String username) {
         if (!StringUtils.hasText(username)) {

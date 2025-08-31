@@ -57,7 +57,7 @@ const highlightActivities = () => {
   const canvas = viewer.get('canvas');
   const elementRegistry = viewer.get('elementRegistry');
 
-  // 【修复 3】健壮性改造：在清理标记前，确保 element 和 element.id 存在
+  // --- 【修复 3】健壮性改造：在应用新标记前，先清理所有旧的高亮标记 ---
   const allElements = elementRegistry.getAll();
   allElements.forEach(element => {
     if (element && element.id) {
@@ -67,6 +67,7 @@ const highlightActivities = () => {
     }
   });
 
+
   const completedActivities = new Set();
   const completedFlows = new Set();
   let currentActivities = new Set();
@@ -74,12 +75,13 @@ const highlightActivities = () => {
   props.historyActivities.forEach(activity => {
     if (!activity || !activity.activityId) return;
 
-    // 【修复 1】清理 Activity ID，移除 Camunda 7 附加的实例部分
+    // --- 【修复 1】清理 Activity ID，移除 Camunda 7 可能附加的实例部分 ---
     const cleanedId = activity.activityId.split(':')[0];
 
-    // 【修复 2】健壮性改造：在操作前检查元素是否存在于图表中
+    // --- 【修复 2】健壮性改造：在操作前检查元素是否存在于图表中 ---
     const element = elementRegistry.get(cleanedId);
     if (!element) {
+      // 在控制台静默忽略，因为某些历史活动（如子流程的容器）在图上没有对应元素是正常的
       // console.warn(`在流程图中未找到历史活动 ID: ${cleanedId}`);
       return;
     }

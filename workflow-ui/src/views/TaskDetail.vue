@@ -1,10 +1,19 @@
 <template>
   <div class="page-container">
-    <a-page-header :title="task.stepName" :sub-title="task.formName" @back="() => $router.push({ name: 'task-list' })" />
+    <a-page-header :title="task.stepName || '任务处理'" :sub-title="task.formName" @back="() => $router.push({ name: 'task-list' })" />
 
     <a-spin :spinning="loading" tip="正在加载任务详情...">
-      <div v-if="!loading" class="detail-layout">
-        <!-- 【最终修复】彻底移除编辑模式，只保留只读的表单详情 -->
+      <!-- 【核心修改】当加载失败时，显示错误提示 -->
+      <a-empty
+          v-if="loadError"
+          :description="loadError"
+          style="padding-top: 100px;"
+      >
+        <a-button type="primary" @click="$router.push('/tasks')">返回待办列表</a-button>
+      </a-empty>
+
+      <!-- 仅在加载成功后显示内容 -->
+      <div v-else-if="!loading" class="detail-layout">
         <div class="main-content">
           <a-card title="表单详情">
             <a-descriptions bordered :column="1">
@@ -133,7 +142,8 @@
 </template>
 
 <script setup>
-import { ref, onMounted, computed, reactive } from 'vue';
+// 【核心修改】引入 defineAsyncComponent
+import { ref, onMounted, computed, reactive, defineAsyncComponent } from 'vue';
 import { getTaskById, getSubmissionById, getFormById, completeTask, getWorkflowHistory, downloadFile, getWorkflowDiagram } from '@/api';
 import { message } from 'ant-design-vue';
 import { useRouter } from 'vue-router';
@@ -141,13 +151,15 @@ import { useUserStore } from '@/stores/user';
 import { flattenFields } from '@/utils/formUtils.js';
 import { PaperClipOutlined, DownOutlined, RollbackOutlined, UndoOutlined, FullscreenOutlined } from '@ant-design/icons-vue';
 import ProcessDiagramViewer from '@/components/ProcessDiagramViewer.vue';
-import ProcessDiagramModal from '@/components/ProcessDiagramModal.vue';
+// 【核心修改】使用 defineAsyncComponent 动态加载流程图模态框
+const ProcessDiagramModal = defineAsyncComponent(() => import('@/components/ProcessDiagramModal.vue'));
 
 const props = defineProps({ taskId: String });
 const router = useRouter();
 const userStore = useUserStore();
 
 const loading = ref(true);
+const loadError = ref(null); // 【核心新增】错误状态
 const submitting = ref(false);
 const task = ref({});
 const formSchema = ref({ fields: [] });
@@ -195,13 +207,14 @@ onMounted(async () => {
     }
 
   } catch (error) {
-    // 错误由全局拦截器处理
+    // 【核心修改】捕获错误并设置错误状态
+    loadError.value = '任务不存在、已被处理或您无权访问。';
+    console.error('加载任务详情失败:', error);
   } finally {
     loading.value = false;
   }
 });
 
-// --- 【最终修复】简化 handleAction，移除所有编辑相关的逻辑 ---
 const handleAction = async (action) => {
   const { decision } = action;
 

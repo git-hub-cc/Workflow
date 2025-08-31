@@ -30,18 +30,15 @@
             </a-list-item-meta>
           </a-list-item>
         </template>
-        <template #loadMore>
-          <div v-if="!loading && hasMore" class="load-more">
-            <a-button @click="loadMore" size="small">加载更多</a-button>
-          </div>
-        </template>
+        <!-- 【核心修改】移除加载更多按钮，因为这个面板只显示最新通知 -->
       </a-list>
       <a-empty v-else-if="!loading" description="暂无消息" />
     </a-spin>
 
     <div class="notification-footer">
       <a-button type="link" @click="handleMarkAllRead" :disabled="unreadCount === 0">全部已读</a-button>
-      <a-button type="link" @click="goToNotificationCenter">查看全部</a-button>
+      <!-- 【核心修改】按钮的点击事件 -->
+      <a-button type="link" @click="goToNotificationCenter">进入通知中心</a-button>
     </div>
   </div>
 </template>
@@ -67,23 +64,11 @@ const filteredNotifications = computed(() => {
   return store.notifications;
 });
 
-const hasMore = computed(() => store.pagination.total > store.notifications.length);
-
+// 【核心修改】简化逻辑，面板只加载一次最新数据
 onMounted(() => {
-  store.fetchNotifications(1, 10);
+  // 只加载第一页，即最新的5条通知
+  store.fetchNotifications(1, 5);
 });
-
-watch(activeTab, () => {
-  // 切换 tab 时，如果列表为空，则重新加载第一页
-  if (store.notifications.length === 0) {
-    store.fetchNotifications(1, 10);
-  }
-});
-
-const loadMore = () => {
-  const nextPage = store.pagination.current + 1;
-  store.fetchNotifications(nextPage, store.pagination.pageSize);
-};
 
 const handleItemClick = (item) => {
   if (!item.isRead) {
@@ -91,7 +76,7 @@ const handleItemClick = (item) => {
   }
   if (item.link) {
     router.push(item.link);
-    emit('close'); // 点击后关闭 Popover
+    emit('close');
   }
 };
 
@@ -99,9 +84,9 @@ const handleMarkAllRead = () => {
   store.markAllAsRead();
 };
 
+// 【核心修改】跳转到新的通知中心页面
 const goToNotificationCenter = () => {
-  // 未来可以跳转到独立的通知中心页面
-  // router.push('/notifications');
+  router.push({ name: 'notification-center' });
   emit('close');
 };
 

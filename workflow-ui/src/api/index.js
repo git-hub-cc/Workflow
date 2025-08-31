@@ -71,6 +71,10 @@ service.interceptors.response.use(
             case 403:
                 message.error(`权限不足: ${errorMessage}`);
                 break;
+            // 【新增】处理 404 Not Found
+            case 404:
+                message.error(`资源未找到: ${errorMessage}`);
+                break;
             case 500:
                 message.error(`服务器内部错误: ${errorMessage}`);
                 break;
@@ -108,6 +112,8 @@ export const importFromWord = (file) => {
 export const createDraft = (formId, data) => service.post(`/forms/${formId}/submissions/draft`, data);
 export const updateMyDraft = (submissionId, data) => service.put(`/forms/my-submissions/${submissionId}`, data);
 export const submitDraft = (submissionId, data) => service.put(`/forms/submissions/${submissionId}/submit`, data);
+// --- 【核心新增】删除草稿的 API ---
+export const deleteMyDraft = (submissionId) => service.delete(`/forms/my-submissions/${submissionId}`);
 
 
 // --- 文件 API ---
@@ -132,6 +138,8 @@ export const getUsersForPicker = (params) => service.get('/workflows/users', { p
 export const getMySubmissions = (params) => service.get('/workflows/my-submissions', { params });
 export const getWorkflowDiagram = (submissionId) => service.get(`/workflows/submission/${submissionId}/diagram`);
 export const getAvailableBeans = (params) => service.get('/workflows/designer/beans', { params });
+// 【新增】通过实例ID获取流程图
+export const getWorkflowDiagramByInstanceId = (instanceId) => service.get(`/workflows/instance/${instanceId}/diagram`);
 
 
 // --- 任务 API ---

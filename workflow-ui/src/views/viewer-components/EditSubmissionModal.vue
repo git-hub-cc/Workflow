@@ -31,11 +31,12 @@
 </template>
 
 <script setup>
-import { ref, reactive, watch } from 'vue';
+import { ref, reactive, watch, defineAsyncComponent } from 'vue';
 import { message } from 'ant-design-vue';
 import { getFormById, getSubmissionById, updateSubmission } from '@/api';
-import FormItemRenderer from '@/views/viewer-components/FormItemRenderer.vue';
 import { flattenFields } from '@/utils/formUtils.js';
+
+const FormItemRenderer = defineAsyncComponent(() => import('@/views/viewer-components/FormItemRenderer.vue'));
 
 const props = defineProps({
   open: Boolean,

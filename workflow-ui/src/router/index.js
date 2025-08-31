@@ -35,6 +35,14 @@ export const adminMenus = [
                 ]
             },
             { id: 'admin-settings', name: '系统设置', path: '/admin/settings', icon: 'BuildOutlined', type: 'DATA_LIST' },
+            // 【新增】报表菜单
+            {
+                id: 'admin-reports', name: '统计报表', icon: 'AreaChartOutlined', type: 'DIRECTORY',
+                children: [
+                    { id: 'report-completion', name: '流程完成数分布', path: '/reports/process_completion_stats', icon: 'PieChartOutlined', type: 'REPORT' },
+                    { id: 'report-trend', name: '月度提交趋势', path: '/reports/monthly_submission_trend', icon: 'LineChartOutlined', type: 'REPORT' },
+                ]
+            },
         ]
     }
 ];
@@ -57,6 +65,8 @@ const staticRoutes = [
             // 基础页面
             { path: '', name: 'home', component: () => import('../views/Home.vue'), meta: { title: '首页' } },
             { path: 'profile', name: 'profile', component: () => import('../views/Profile.vue'), meta: { title: '个人设置' } },
+            // 【新增】通知中心路由
+            { path: 'notifications', name: 'notification-center', component: () => import('../views/NotificationCenter.vue'), meta: { title: '通知中心' } },
             // 管理员专属的静态页面
             { path: 'admin/dashboard', name: 'admin-dashboard', component: () => import('../views/admin/Dashboard.vue'), meta: { title: '仪表盘', requiresAdmin: true } },
             { path: 'admin/forms', name: 'admin-forms', component: () => import('../views/admin/FormManagement.vue'), meta: { title: '表单管理', requiresAdmin: true } },
@@ -70,6 +80,23 @@ const staticRoutes = [
             { path: 'admin/logs/login', name: 'admin-login-log', component: () => import('../views/admin/LoginLog.vue'), meta: { title: '登录日志', requiresAdmin: true } },
             { path: 'admin/logs/operation', name: 'admin-operation-log', component: () => import('../views/admin/OperationLog.vue'), meta: { title: '操作日志', requiresAdmin: true } },
             { path: 'admin/settings', name: 'admin-settings', component: () => import('../views/admin/SystemSettings.vue'), meta: { title: '系统设置', requiresAdmin: true } },
+
+            // --- 【核心修复】在此处为静态报表菜单添加路由 ---
+            {
+                path: '/reports/process_completion_stats',
+                name: 'report-process-completion-stats',
+                component: () => import('../views/ReportViewer.vue'),
+                props: { reportKey: 'process_completion_stats' }, // 通过 props 传递 reportKey
+                meta: { title: '流程完成数分布', requiresAdmin: true }
+            },
+            {
+                path: '/reports/monthly_submission_trend',
+                name: 'report-monthly-submission-trend',
+                component: () => import('../views/ReportViewer.vue'),
+                props: { reportKey: 'monthly_submission_trend' }, // 通过 props 传递 reportKey
+                meta: { title: '月度提交趋势', requiresAdmin: true }
+            },
+            // --- 【修复结束】 ---
 
             {
                 path: 'form/builder',

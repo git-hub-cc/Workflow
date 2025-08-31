@@ -34,9 +34,10 @@
 </template>
 
 <script setup>
-import { reactive, watchEffect } from 'vue';
-import FormItemRenderer from '@/views/viewer-components/FormItemRenderer.vue';
+import { reactive, watchEffect, defineAsyncComponent } from 'vue';
 import { initFormData } from '@/utils/formUtils.js';
+
+const FormItemRenderer = defineAsyncComponent(() => import('@/views/viewer-components/FormItemRenderer.vue'));
 
 const props = defineProps({
   open: Boolean,

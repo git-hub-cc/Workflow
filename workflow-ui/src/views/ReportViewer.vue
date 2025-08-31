@@ -28,7 +28,8 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue';
+// --- 【核心修改】从 vue 导入 watch ---
+import { ref, onMounted, watch } from 'vue';
 import { useRoute } from 'vue-router';
 import { getReportData } from '@/api';
 import { message } from 'ant-design-vue';
@@ -74,6 +75,8 @@ const fetchReport = async () => {
     loading.value = false;
     return;
   }
+  // 【修复】每次获取数据前，都应该将 loading 设为 true
+  loading.value = true;
   try {
     reportData.value = await getReportData(props.reportKey);
   } catch (error) {
@@ -83,7 +86,16 @@ const fetchReport = async () => {
   }
 };
 
+// 1. 首次挂载时获取数据
 onMounted(fetchReport);
+
+// --- 【核心修复】使用 watch 监听 reportKey 的变化 ---
+// 2. 当 reportKey prop 发生变化时 (即路由切换时)，重新获取数据
+watch(() => props.reportKey, (newKey, oldKey) => {
+  if (newKey && newKey !== oldKey) {
+    fetchReport();
+  }
+});
 
 </script>
 

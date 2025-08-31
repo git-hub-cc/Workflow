@@ -47,7 +47,7 @@
           </div>
           <div class="user-actions">
             <a-space>
-              <a-popover v-model:open="notificationVisible" placement="bottomRight" trigger="click">
+              <a-popover v-model:open="notificationVisible" placement="bottomRight" trigger="click" overlayClassName="notification-popover-global">
                 <template #content>
                   <NotificationPanel @close="notificationVisible = false" />
                 </template>
@@ -95,23 +95,28 @@
 </template>
 
 <script setup>
-import { onMounted, ref, watch, computed, h } from 'vue';
+// 【核心修改】引入 defineAsyncComponent，用于异步加载组件
+import { onMounted, ref, watch, computed, h, defineAsyncComponent } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useUserStore } from '@/stores/user';
 import { useSystemStore } from '@/stores/system';
 import { useNotificationStore } from '@/stores/notification';
-// 【核心移除】不再需要直接调用 getPendingTasks API
 import { Modal, Menu } from "ant-design-vue";
-import {
-  DownOutlined, DashboardOutlined, TeamOutlined, SafetyCertificateOutlined, UsergroupAddOutlined,
-  ApartmentOutlined, NodeIndexOutlined, FileSearchOutlined, UserOutlined, LogoutOutlined,
-  SettingOutlined, MenuOutlined, TableOutlined,
-  CheckSquareOutlined, SendOutlined, ForkOutlined, BuildOutlined, BellOutlined,
-  FileDoneOutlined
-} from '@ant-design/icons-vue';
+
+// 【核心移除】不再需要静态导入大量图标，unplugin-vue-components 会自动处理
+// import {
+//   DownOutlined, DashboardOutlined, TeamOutlined, SafetyCertificateOutlined, UsergroupAddOutlined,
+//   ApartmentOutlined, NodeIndexOutlined, FileSearchOutlined, UserOutlined, LogoutOutlined,
+//   SettingOutlined, MenuOutlined, TableOutlined,
+//   CheckSquareOutlined, SendOutlined, ForkOutlined, BuildOutlined, BellOutlined,
+//   FileDoneOutlined
+// } from '@ant-design/icons-vue';
+
 import { iconMap } from '@/utils/iconLibrary.js';
-import NotificationPanel from '@/views/notifications/NotificationPanel.vue';
 import { adminMenus } from '@/router';
+
+// 【核心修改】使用 defineAsyncComponent 动态加载通知面板
+const NotificationPanel = defineAsyncComponent(() => import('@/views/notifications/NotificationPanel.vue'));
 
 
 const { Item: MenuItem, SubMenu } = Menu;
@@ -121,15 +126,12 @@ const notificationStore = useNotificationStore();
 const router = useRouter();
 const route = useRoute();
 
-// 【核心修改】移除本地的 pendingTasksCount 状态
 const collapsed = ref(false);
 const selectedKeys = ref([]);
 const openKeys = ref(['user-center']);
 
 const notificationVisible = ref(false);
 const unreadCount = computed(() => notificationStore.unreadCount);
-
-// 【核心修改】从 store 中获取待办任务数量
 const pendingTasksCount = computed(() => userStore.pendingTasksCount);
 
 
@@ -146,6 +148,7 @@ const MenuRenderer = {
   setup(props) {
     const renderMenuItems = (menuItems) => {
       return menuItems.map(menu => {
+        // 【核心优化】从 iconMap 动态获取图标组件
         const iconComponent = menu.icon ? (iconMap[menu.icon] || null) : null;
         const iconNode = iconComponent ? () => h(iconComponent) : null;
 
@@ -211,7 +214,6 @@ const handleMenuClick = ({ key }) => {
   }
 };
 
-// 【核心修改】此函数现在调用 store action
 const checkTasks = async () => {
   if (!userStore.isAuthenticated) return;
   await userStore.fetchPendingTasksCount();
@@ -236,6 +238,10 @@ const handleLogout = () => {
 </script>
 
 <style scoped>
+:global(.notification-popover-global) {
+  width: 360px;
+}
+/* --- 【修复结束】 --- */
 .header-content { display: flex; justify-content: space-between; align-items: center; }
 .header-left { display: flex; align-items: center; }
 .logo-sidebar { height: 32px; margin: 16px; display: flex; align-items: center; justify-content: center; cursor: pointer; overflow: hidden; }

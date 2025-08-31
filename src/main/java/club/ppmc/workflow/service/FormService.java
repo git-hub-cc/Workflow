@@ -205,6 +205,17 @@ public class FormService {
 
         // ⭐ 核心简化：此方法现在只处理需要立即启动工作流的场景
         if ("proceed".equals(action) || "terminate".equals(action)) {
+            // 【核心修复】在启动工作流前，检查是否存在已部署的流程模板
+            WorkflowTemplate template = workflowTemplateRepository.findByFormDefinitionId(formDefinitionId)
+                    .orElseThrow(() -> new IllegalStateException(
+                            "此表单未关联任何工作流，无法提交申请。请联系管理员。"));
+
+            if (!StringUtils.hasText(template.getCamundaDeploymentId())) {
+                throw new IllegalStateException(
+                        "此表单关联的工作流尚未部署，无法提交申请。请联系管理员完成流程部署。");
+            }
+            // 【修复结束】
+
             submission.setStatus(FormSubmission.SubmissionStatus.PROCESSING);
             FormSubmission savedSubmission = formSubmissionRepository.save(submission);
             workflowService.startWorkflow(savedSubmission, action);
@@ -249,6 +260,17 @@ public class FormService {
         submission.setDataJson(request.getDataJson());
         updateAttachments(submission, request.getAttachmentIds());
 
+        // 【核心修复】在启动工作流前，检查是否存在已部署的流程模板
+        WorkflowTemplate template = workflowTemplateRepository.findByFormDefinitionId(submission.getFormDefinition().getId())
+                .orElseThrow(() -> new IllegalStateException(
+                        "此表单未关联任何工作流，无法提交申请。请联系管理员。"));
+
+        if (!StringUtils.hasText(template.getCamundaDeploymentId())) {
+            throw new IllegalStateException(
+                    "此表单关联的工作流尚未部署，无法提交申请。请联系管理员完成流程部署。");
+        }
+        // 【修复结束】
+
         workflowService.startWorkflow(submission, request.getInitialAction());
 
         submission.setStatus(FormSubmission.SubmissionStatus.PROCESSING);
@@ -276,6 +298,23 @@ public class FormService {
 
         if (submission.getWorkflowInstance() != null && submission.getWorkflowInstance().getStatus() == WorkflowInstance.Status.PROCESSING) {
             throw new ResourceInUseException("无法删除：该记录关联的流程正在进行中。");
+        }
+
+        formSubmissionRepository.delete(submission);
+    }
+
+    // --- 【核心新增】删除草稿的业务逻辑 ---
+    @LogOperation(module = "我的申请", action = "删除草稿", targetIdExpression = "#submissionId")
+    public void deleteDraft(Long submissionId, String deleterId) {
+        FormSubmission submission = formSubmissionRepository.findById(submissionId)
+                .orElseThrow(() -> new ResourceNotFoundException("未找到提交记录 ID: " + submissionId));
+
+        // 双重校验：确保操作者是所有者，且记录状态是草稿
+        if (!submission.getSubmitterId().equals(deleterId)) {
+            throw new UnauthorizedException("您没有权限删除此草稿");
+        }
+        if (submission.getStatus() != FormSubmission.SubmissionStatus.DRAFT) {
+            throw new IllegalStateException("只能删除草稿状态的申请");
         }
 
         formSubmissionRepository.delete(submission);

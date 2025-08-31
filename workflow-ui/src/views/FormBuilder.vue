@@ -100,16 +100,18 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted } from 'vue';
+import { ref, reactive, computed, onMounted, defineAsyncComponent } from 'vue';
 import { useRouter } from 'vue-router';
 import { message, Modal } from 'ant-design-vue';
 // 【核心修改】引入 updateForm 和 getFormById
 import { createForm, updateForm, getFormById, importFromWord } from '@/api';
 import { v4 as uuidv4 } from 'uuid';
-import DraggableItem from './builder-components/DraggableItem.vue';
 import PropertiesPanel from './builder-components/PropertiesPanel.vue';
-import FormPreviewModal from '@/components/FormPreviewModal.vue';
+// 【核心修改】使用 defineAsyncComponent 动态加载预览模态框
+const FormPreviewModal = defineAsyncComponent(() => import('@/components/FormPreviewModal.vue'));
 import { EyeOutlined, UploadOutlined, DownloadOutlined, FileWordOutlined } from "@ant-design/icons-vue";
+
+const DraggableItem = defineAsyncComponent(() => import('./builder-components/DraggableItem.vue'));
 
 // --- 【核心修改】接收路由参数 ---
 const props = defineProps({

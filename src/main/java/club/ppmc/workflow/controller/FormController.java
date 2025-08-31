@@ -121,6 +121,19 @@ public class FormController {
         return ResponseEntity.ok(response);
     }
 
+    // --- 【核心新增】用户删除自己的草稿 ---
+    /**
+     * API: 用户删除自己的草稿
+     * 权限: 仅限草稿的所有者
+     */
+    @DeleteMapping("/my-submissions/{submissionId}")
+    @PreAuthorize("@appFormService.isOwner(#submissionId, principal.username)")
+    public ResponseEntity<Void> deleteMySubmission(@PathVariable Long submissionId, Principal principal) {
+        formService.deleteDraft(submissionId, principal.getName());
+        return ResponseEntity.noContent().build();
+    }
+    // --- 【新增结束】 ---
+
     @PutMapping("/submissions/{submissionId}/submit")
     @PreAuthorize("@appFormService.isOwner(#submissionId, principal.username)")
     public ResponseEntity<FormSubmissionResponse> submitDraft(
