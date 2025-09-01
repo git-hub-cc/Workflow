@@ -162,8 +162,15 @@ public class FormController {
         return ResponseEntity.ok(responses);
     }
 
+    /**
+     * API: 获取单个申请详情
+     * 权限: 【P2 核心修复】增强权限校验，防止数据泄露。
+     * 只有申请人、历史或当前处理人、或管理员才能查看。
+     */
     @GetMapping("/submissions/{submissionId}")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("@workflowService.isSubmissionOwner(#submissionId, principal.username) " +
+            "or @workflowService.isTaskAssigneeForSubmission(#submissionId, principal.username) " +
+            "or hasRole('ADMIN')")
     public ResponseEntity<FormSubmissionResponse> getSubmissionById(@PathVariable Long submissionId) {
         FormSubmission submission = formSubmissionRepository.findById(submissionId)
                 .orElseThrow(() -> new ResourceNotFoundException("未找到提交记录 ID: " + submissionId));

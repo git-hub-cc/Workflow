@@ -22,7 +22,6 @@ import org.camunda.bpm.engine.repository.ProcessDefinition;
 import org.camunda.bpm.engine.runtime.ProcessInstance;
 import org.camunda.bpm.engine.task.Task;
 import org.camunda.bpm.engine.task.TaskQuery;
-// --- 【核心新增】引入 Camunda Model API 和 Regex 相关包 ---
 import org.camunda.bpm.model.bpmn.BpmnModelInstance;
 import org.camunda.bpm.model.bpmn.instance.ConditionExpression;
 import org.camunda.bpm.model.bpmn.instance.ExclusiveGateway;
@@ -32,7 +31,6 @@ import org.springframework.context.ApplicationContext;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
-import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -71,10 +69,8 @@ public class WorkflowService {
 
     private final ObjectMapper objectMapper;
 
-    // --- 【核心新增】注入 Spring 上下文 ---
     private final ApplicationContext applicationContext;
 
-    // ... (deployWorkflow, updateWorkflowTemplate, getOrCreateWorkflowTemplate 方法保持不变)
     @LogOperation(module = "流程管理", action = "部署流程", targetIdExpression = "#request.processDefinitionKey")
     public void deployWorkflow(DeployWorkflowRequest request) {
         FormDefinition formDef = formDefinitionRepository.findById(request.getFormDefinitionId())
@@ -132,7 +128,6 @@ public class WorkflowService {
                 })
                 .orElseGet(() -> {
                     String processDefinitionKey = "Process_Form_" + formId;
-                    // --- 【核心修改】更新默认的BPMN XML，加入归档服务任务 ---
                     String defaultXml = String.format("""
 <?xml version="1.0" encoding="UTF-8"?>
 <bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" xmlns:camunda="http://camunda.org/schema/1.0/bpmn" xmlns:di="http://www.omg.org/spec/DD/20100524/DI" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" id="Definitions_0zla03s" targetNamespace="http://bpmn.io/schema/bpmn" exporter="Camunda Modeler" exporterVersion="5.20.0">
@@ -315,9 +310,6 @@ public class WorkflowService {
                 });
     }
 
-    /**
-     * 【核心修改】重载 startWorkflow 方法，增加 initialAction 参数
-     */
     public void startWorkflow(FormSubmission submission, String initialAction) {
         try {
             identityService.setAuthenticatedUserId(submission.getSubmitterId());
@@ -329,7 +321,6 @@ public class WorkflowService {
                             .singleResult();
 
                     if (processDefinition == null) {
-                        // 【核心修复】当找不到已部署的流程时，抛出明确的业务异常，而不是静默失败
                         String errorMessage = String.format(
                                 "无法启动工作流：未找到与此表单关联的已部署流程定义 (Key: %s)。请先在流程设计器中部署该流程。",
                                 template.getProcessDefinitionKey()
@@ -347,7 +338,7 @@ public class WorkflowService {
                     variables.put("submitterName", submitter.getName());
                     variables.put("formName", submission.getFormDefinition().getName());
                     variables.put("formSubmissionId", submission.getId());
-                    variables.put("initiator", submitter.getId()); // Camunda specific variable
+                    variables.put("initiator", submitter.getId());
 
                     if (submitter.getManager() != null) {
                         String managerId = submitter.getManager().getId();
@@ -375,11 +366,9 @@ public class WorkflowService {
                     instanceRepository.save(localInstance);
                     submission.setWorkflowInstance(localInstance);
 
-                    // --- 【核心新增逻辑】自动完成第一个任务 ---
                     if (StringUtils.hasText(initialAction)) {
                         autoCompleteFirstTask(camundaInstance.getId(), submission.getSubmitterId(), initialAction);
                     }
-                    // --- 【新增逻辑结束】 ---
 
                 } catch (JsonProcessingException e) {
                     throw new RuntimeException("解析表单数据以启动工作流失败", e);
@@ -390,16 +379,10 @@ public class WorkflowService {
         }
     }
 
-    /**
-     * 【重载】为了兼容旧的调用，保留一个不带 initialAction 的版本
-     */
     public void startWorkflow(FormSubmission submission) {
         startWorkflow(submission, null);
     }
 
-    /**
-     * 【新增】自动完成流程的第一个任务
-     */
     private void autoCompleteFirstTask(String processInstanceId, String submitterId, String action) {
         Task firstTask = taskService.createTaskQuery()
                 .processInstanceId(processInstanceId)
@@ -409,30 +392,19 @@ public class WorkflowService {
         if (firstTask != null) {
             log.info("找到流程实例 {} 的第一个任务 {}，准备以动作 '{}' 自动完成。", processInstanceId, firstTask.getId(), action);
             CompleteTaskRequest request = new CompleteTaskRequest();
-            // 假设第一个任务后的网关是基于 preparationOutcome
             request.setPreparationOutcome(action);
-            // 默认决策是 APPROVED，因为这个动作只是为了驱动流程，而不是真正的审批
             request.setDecision(CompleteTaskRequest.Decision.APPROVED);
-
-            // 直接调用内部方法完成任务
             completeUserTaskInternal(firstTask.getId(), request);
         } else {
             log.warn("无法为流程实例 {} 找到分配给 {} 的初始任务，无法自动完成。", processInstanceId, submitterId);
         }
     }
 
-
-    /**
-     * 【核心重构】将 completeUserTask 拆分为外部接口和内部实现
-     */
     @LogOperation(module = "任务处理", action = "完成任务", targetIdExpression = "#camundaTaskId")
     public void completeUserTask(String camundaTaskId, CompleteTaskRequest request) {
         completeUserTaskInternal(camundaTaskId, request);
     }
 
-    /**
-     * 内部任务完成逻辑，不带日志注解，以便被其他Service方法调用
-     */
     private void completeUserTaskInternal(String camundaTaskId, CompleteTaskRequest request) {
         Task task = taskService.createTaskQuery().taskId(camundaTaskId).singleResult();
         if (task == null) {
@@ -494,9 +466,6 @@ public class WorkflowService {
 
         Map<String, Object> variables = new HashMap<>();
 
-        // --- 【核心修改】开始 ---
-
-        // 1. 设置通用的 `taskOutcome`，用于驱动流程离开当前任务节点
         if (request.getDecision() != null) {
             String outcome = switch (request.getDecision()) {
                 case APPROVED -> "approved";
@@ -507,21 +476,14 @@ public class WorkflowService {
             variables.put("taskOutcome", outcome);
         }
 
-        // 2. 检查并设置新的、独立的 `preparationOutcome` 变量
         if (request.getPreparationOutcome() != null && !request.getPreparationOutcome().isBlank()) {
             variables.put("preparationOutcome", request.getPreparationOutcome());
             log.info("为流程实例 {} 设置准备阶段决策变量: {}", processInstanceId, request.getPreparationOutcome());
         }
 
-        // --- 【核心修改】结束 ---
-
-
-        // 兼容旧流程可能需要的变量
         if (request.getDecision() != null) {
             boolean isApproved = request.getDecision().equals(CompleteTaskRequest.Decision.APPROVED);
             variables.put("approved", isApproved);
-            variables.put("passed", isApproved);
-            variables.put("qc_passed", isApproved);
         }
 
         taskService.complete(camundaTaskId, variables);
@@ -544,19 +506,15 @@ public class WorkflowService {
         if (!userGroupIds.isEmpty()) {
             orQuery.taskCandidateGroupIn(userGroupIds);
         }
-
         query = orQuery.endOr();
-
 
         if (StringUtils.hasText(keyword)) {
             query.processVariableValueLike("formName", "%" + keyword + "%");
         }
 
         long total = query.count();
-
         List<Task> camundaTasks = query.orderByTaskCreateTime().desc()
                 .listPage((int) pageable.getOffset(), pageable.getPageSize());
-
         List<TaskDto> taskDtos = camundaTasks.stream()
                 .map(this::convertCamundaTaskToDto)
                 .collect(Collectors.toList());
@@ -575,7 +533,6 @@ public class WorkflowService {
         }
 
         long total = query.count();
-
         List<HistoricTaskInstance> historicTasks = query.orderByHistoricTaskInstanceEndTime().desc()
                 .listPage((int) pageable.getOffset(), pageable.getPageSize());
 
@@ -606,7 +563,6 @@ public class WorkflowService {
                 .map(task -> {
                     Map<String, Object> pVars = processVariablesMap.getOrDefault(task.getProcessInstanceId(), Collections.emptyMap());
 
-                    // --- 【核心修改】优先从 taskOutcome 获取决策，并提供更详细的决策信息 ---
                     String decision = "UNKNOWN";
                     Object taskOutcomeObj = pVars.get("taskOutcome");
                     if (taskOutcomeObj instanceof String) {
@@ -619,13 +575,11 @@ public class WorkflowService {
                             default -> outcome.toUpperCase();
                         };
                     } else {
-                        // 兼容旧流程
                         Object approvedVar = pVars.get("approved");
                         if (approvedVar instanceof Boolean) {
                             decision = (Boolean) approvedVar ? "APPROVED" : "REJECTED";
                         }
                     }
-                    // --- 【修改结束】 ---
 
                     return CompletedTaskDto.builder()
                             .camundaTaskId(task.getId())
@@ -644,7 +598,6 @@ public class WorkflowService {
 
         return new PageImpl<>(dtos, pageable, total);
     }
-
 
     @Transactional(readOnly = true)
     public TaskDto getTaskDetails(String camundaTaskId) {
@@ -667,14 +620,11 @@ public class WorkflowService {
         if (formSubmissionIdObj instanceof Number) {
             Long submissionId = ((Number) formSubmissionIdObj).longValue();
             dto.setFormSubmissionId(submissionId);
-
-            // --- 【阶段一核心修改】根据 submissionId 查找并设置 formDefinitionId ---
             formSubmissionRepository.findById(submissionId).ifPresent(submission -> {
                 if (submission.getFormDefinition() != null) {
                     dto.setFormDefinitionId(submission.getFormDefinition().getId());
                 }
             });
-            // --- 【修改结束】 ---
         }
 
         dto.setSubmitterName((String) variables.getOrDefault("submitterName", "未知"));
@@ -684,9 +634,7 @@ public class WorkflowService {
         try {
             BpmnModelInstance modelInstance = repositoryService.getBpmnModelInstance(camundaTask.getProcessDefinitionId());
             FlowNode taskNode = modelInstance.getModelElementById(camundaTask.getTaskDefinitionKey());
-
             Collection<SequenceFlow> decisionFlows = findDecisionFlows(taskNode, 0);
-
             Pattern pattern = Pattern.compile("\\$\\{taskOutcome\\s*==\\s*'([^']*)'\\}");
 
             for (SequenceFlow flow : decisionFlows) {
@@ -716,46 +664,29 @@ public class WorkflowService {
         return dto;
     }
 
-    /**
-     * 【核心新增】递归辅助方法，用于查找流程中的决策点。
-     * 它会沿着单一、无条件的路径前进，直到找到一个排他网关或一个有多个条件分支的节点。
-     * @param currentNode 当前开始查找的节点
-     * @param depth 递归深度，防止无限循环
-     * @return 决策点的出口连线集合
-     */
     private Collection<SequenceFlow> findDecisionFlows(FlowNode currentNode, int depth) {
-        if (depth > 10) { // 防止无限循环的保护机制
+        if (depth > 10) {
             log.warn("查找决策点时递归深度超过10，已中止。节点ID: {}", currentNode.getId());
             return Collections.emptyList();
         }
 
         Collection<SequenceFlow> outgoingFlows = currentNode.getOutgoing();
-
-        // 情况1: 当前节点本身就是决策点 (有多个出口，或只有一个但带条件)
         if (outgoingFlows.size() > 1 || (outgoingFlows.size() == 1 && outgoingFlows.iterator().next().getConditionExpression() != null)) {
             return outgoingFlows;
         }
 
-        // 情况2: 当前节点有一个无条件的出口
         if (outgoingFlows.size() == 1) {
             SequenceFlow singleFlow = outgoingFlows.iterator().next();
             FlowNode targetNode = singleFlow.getTarget();
-
-            // 目标是排他网关，这是最常见的决策点
             if (targetNode instanceof ExclusiveGateway) {
                 return targetNode.getOutgoing();
             }
-
-            // 目标是其他类型的节点，则继续递归查找
             if (targetNode != null) {
                 return findDecisionFlows(targetNode, depth + 1);
             }
         }
-
-        // 情况3: 找不到决策点（例如，流程在此处结束）
         return Collections.emptyList();
     }
-    // --- 【核心重构】结束 ---
 
     @Transactional(readOnly = true)
     public List<HistoryActivityDto> getWorkflowHistoryBySubmissionId(Long submissionId) {
@@ -809,13 +740,7 @@ public class WorkflowService {
 
         List<HistoryActivityDto> historyList = new ArrayList<>();
 
-        // 【核心修改】直接遍历所有返回的历史活动，不再手动添加“发起申请”
         for (HistoricActivityInstance activity : activityInstances) {
-            // --- 【核心修改】移除此处的if过滤条件 ---
-            // if (!activity.getActivityType().equals("userTask") && !activity.getActivityType().endsWith("EndEvent") && !activity.getActivityType().equals("serviceTask")) {
-            //     continue;
-            // }
-
             HistoryActivityDto.HistoryActivityDtoBuilder dtoBuilder = HistoryActivityDto.builder()
                     .activityId(activity.getId())
                     .activityName(activity.getActivityName())
@@ -826,7 +751,6 @@ public class WorkflowService {
                     .endTime(Optional.ofNullable(activity.getEndTime()).map(d -> d.toInstant().atZone(ZoneId.systemDefault()).toLocalDateTime()).orElse(null))
                     .durationInMillis(activity.getDurationInMillis());
 
-            // 【核心修改】当节点是开始事件时，手动设置处理人为流程发起人
             if ("startEvent".equals(activity.getActivityType())) {
                 dtoBuilder.assigneeId(submission.getSubmitterId());
                 dtoBuilder.assigneeName(userMap.getOrDefault(submission.getSubmitterId(), new User()).getName());
@@ -839,7 +763,6 @@ public class WorkflowService {
                 }
             }
 
-            // --- 【核心重构：使用 FormSubmission 的最终状态来确定结束事件的显示】 ---
             if (activity.getActivityType().endsWith("EndEvent")) {
                 switch (submission.getStatus()) {
                     case APPROVED:
@@ -855,12 +778,10 @@ public class WorkflowService {
                         dtoBuilder.activityName("流程终止");
                         break;
                     default:
-                        // 如果状态是 DRAFT 或 PROCESSING，理论上不应该有结束事件，但作为保护
                         dtoBuilder.activityName("流程结束");
                         break;
                 }
             }
-            // --- 【重构结束】 ---
 
             historyList.add(dtoBuilder.build());
         }
@@ -883,11 +804,6 @@ public class WorkflowService {
         return new BpmnXmlDto(template.getBpmnXml());
     }
 
-    /**
-     * 【新增】通过流程实例ID获取流程图
-     * @param processInstanceId Camunda 流程实例 ID
-     * @return 包含BPMN XML的DTO
-     */
     @Transactional(readOnly = true)
     public BpmnXmlDto getWorkflowDiagramByInstanceId(String processInstanceId) {
         WorkflowInstance instance = instanceRepository.findByProcessInstanceId(processInstanceId)
@@ -899,7 +815,6 @@ public class WorkflowService {
         }
         return new BpmnXmlDto(template.getBpmnXml());
     }
-
 
     public boolean isTaskOwner(String camundaTaskId, String username) {
         if (!StringUtils.hasText(username)) {
@@ -973,7 +888,6 @@ public class WorkflowService {
             return true;
         }
 
-
         long historicTaskCount = historyService.createHistoricTaskInstanceQuery()
                 .processInstanceId(processInstanceId)
                 .taskAssignee(username)
@@ -989,16 +903,23 @@ public class WorkflowService {
         return false;
     }
 
-    // --- 【核心新增】获取设计器可用的 Spring Bean ---
     @Transactional(readOnly = true)
     public List<DelegateInfoDTO> getAvailableBeans(String type) {
         List<DelegateInfoDTO> beans = new ArrayList<>();
 
         if (type == null || "delegate".equalsIgnoreCase(type)) {
             Map<String, JavaDelegate> delegateBeans = applicationContext.getBeansOfType(JavaDelegate.class);
-            delegateBeans.forEach((name, bean) ->
-                    beans.add(new DelegateInfoDTO(name, "JavaDelegate", "这是一个Java Delegate Bean"))
-            );
+            delegateBeans.forEach((name, bean) -> {
+                String description = "这是一个Java Delegate Bean";
+                if ("taskInAppNotificationDelegate".equals(name)) {
+                    description = "发送任务超时应用内通知 (非中断)";
+                } else if ("taskEmailNotificationDelegate".equals(name)) {
+                    description = "发送任务超时邮件通知 (非中断)";
+                } else if ("taskEscalationDelegate".equals(name)) {
+                    description = "任务超时后升级给上级处理";
+                }
+                beans.add(new DelegateInfoDTO(name, "JavaDelegate", description));
+            });
         }
 
         if (type == null || "listener".equalsIgnoreCase(type)) {
@@ -1007,9 +928,6 @@ public class WorkflowService {
                     beans.add(new DelegateInfoDTO(name, "TaskListener", "这是一个任务监听器 Bean"))
             );
         }
-
-        return beans.stream()
-                .sorted(Comparator.comparing(DelegateInfoDTO::getName))
-                .collect(Collectors.toList());
+        return beans;
     }
 }
