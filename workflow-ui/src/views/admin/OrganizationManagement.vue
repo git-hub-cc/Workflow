@@ -40,6 +40,7 @@
                   <component :is="dataRef.type === 'department' ? ApartmentOutlined : UserOutlined" style="margin-right: 8px;" />
                   {{ title }}
                 </span>
+                <!-- 【核心修改】将操作按钮始终可见，而不是依赖 hover -->
                 <a-space v-if="dataRef.type === 'department'" class="node-actions" @click.stop>
                   <a-tooltip title="新增子部门">
                     <a-button type="text" size="small" @click="showModal('create-sub', dataRef)">
@@ -84,7 +85,6 @@
           />
         </a-form-item>
         <a-form-item label="部门负责人" name="managerId">
-          <!-- 【已修复】使用本地 allUsers 状态填充下拉框 -->
           <a-select
               v-model:value="formState.managerId"
               :options="allUsers.map(u => ({ label: `${u.name} (${u.id})`, value: u.id }))"
@@ -105,7 +105,6 @@
 
 <script setup>
 import { ref, onMounted, reactive, computed } from 'vue';
-// 【已修复】引入 getAllUsers API
 import { getOrganizationTree, updateUser, getAllUsers, createDepartment, updateDepartment, deleteDepartment } from '@/api';
 import { message, Modal } from 'ant-design-vue';
 import {
@@ -121,24 +120,21 @@ import {
 const loading = ref(true);
 const treeData = ref([]);
 const expandedKeys = ref([]);
-// 【已修复】创建本地 ref 存储用户列表
 const allUsers = ref([]);
 const usersCache = ref(new Map());
 
 const fetchData = async () => {
   loading.value = true;
   try {
-    // 【已修复】并行获取组织树和全量用户数据
     const [orgTree, usersResponse] = await Promise.all([
       getOrganizationTree(),
-      getAllUsers({ page: 0, size: 1000 }) // 获取足够多的用户用于下拉选择
+      getAllUsers({ page: 0, size: 1000 })
     ]);
 
     treeData.value = orgTree;
     expandedKeys.value = orgTree.map(dept => dept.key);
     allUsers.value = usersResponse.content;
 
-    // 填充用于拖拽逻辑的用户缓存
     usersCache.value.clear();
     allUsers.value.forEach(u => usersCache.value.set(u.id, u));
 
@@ -151,7 +147,6 @@ const fetchData = async () => {
 
 onMounted(fetchData);
 
-// --- 员工拖拽逻辑 ---
 const handleDragStart = ({ event, node }) => {
   if (node.dataRef.type !== 'user') {
     event.preventDefault();
@@ -198,7 +193,6 @@ const handleDrop = async ({ event, node, dragNode }) => {
 };
 
 
-// --- 部门管理 Modal 逻辑 ---
 const modalVisible = ref(false);
 const modalConfirmLoading = ref(false);
 const isEditing = ref(false);
@@ -272,7 +266,6 @@ const handleOk = async () => {
     modalVisible.value = false;
     await fetchData();
   } catch (error) {
-    // Error handled by global interceptor
   } finally {
     modalConfirmLoading.value = false;
   }
@@ -283,9 +276,7 @@ const handleDelete = async (dataRef) => {
     await deleteDepartment(dataRef.value);
     message.success(`部门 “${dataRef.title}” 删除成功！`);
     await fetchData();
-  } catch (error) {
-    // Error handled by global interceptor
-  }
+  } catch (error) {}
 };
 </script>
 
@@ -316,14 +307,22 @@ const handleDelete = async (dataRef) => {
   font-weight: normal;
 }
 
+/* 【核心修改】调整为始终显示，并优化触摸设备上的体验 */
 .node-actions {
-  display: none;
-}
-
-:deep(.ant-tree-treenode-selected) .node-actions,
-:deep(.ant-tree-treenode:hover) .node-actions {
   display: inline-flex;
 }
+@media (hover: hover) and (pointer: fine) {
+  .node-actions {
+    display: none;
+  }
+  :deep(.ant-tree-treenode:hover) .node-actions {
+    display: inline-flex;
+  }
+}
+:deep(.ant-tree-treenode-selected) .node-actions {
+  display: inline-flex;
+}
+
 
 :deep(.ant-tree-node-content-wrapper) {
   padding: 5px 8px !important;

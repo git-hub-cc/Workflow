@@ -1,7 +1,7 @@
 <template>
   <div class="page-container">
     <a-page-header title="仪表盘" sub-title="系统关键指标概览" />
-    <div style="padding: 24px;">
+    <div class="content-padding">
       <a-spin :spinning="loading">
         <a-row :gutter="[24, 24]">
           <!-- 指标卡片 -->
@@ -29,7 +29,6 @@
           <!-- ECharts 图表 -->
           <a-col :span="24">
             <a-card title="任务耗时 TOP 5 (瓶颈分析)">
-              <!-- 3. 将 Ant Design Chart 的 <Column> 替换为 ECharts 的 <v-chart> -->
               <v-chart class="chart" :option="chartOption" autoresize />
             </a-card>
           </a-col>
@@ -44,7 +43,6 @@ import { ref, onMounted, computed } from 'vue';
 import { getDashboardStats } from '@/api';
 import { message } from 'ant-design-vue';
 
-// --- 1. 引入 vue-echarts 和 ECharts 核心模块 ---
 import { use } from 'echarts/core';
 import { CanvasRenderer } from 'echarts/renderers';
 import { BarChart } from 'echarts/charts';
@@ -56,7 +54,6 @@ import {
 } from 'echarts/components';
 import VChart from 'vue-echarts';
 
-// 2. 注册 ECharts 组件
 use([
   CanvasRenderer,
   BarChart,
@@ -82,7 +79,6 @@ const fetchStats = async () => {
 
 onMounted(fetchStats);
 
-// 4. 创建一个 computed 属性来生成 ECharts 需要的 option 对象
 const chartOption = computed(() => {
   if (!stats.value?.taskBottlenecks) {
     return {};
@@ -94,7 +90,7 @@ const chartOption = computed(() => {
       axisPointer: {
         type: 'shadow',
       },
-      formatter: '{b}: {c} 分钟' // 提示框格式
+      formatter: '{b}: {c} 分钟'
     },
     grid: {
       left: '3%',
@@ -104,10 +100,10 @@ const chartOption = computed(() => {
     },
     xAxis: {
       type: 'category',
-      data: sourceData.map(item => `${item.taskName}\n(${item.processDefinitionKey.split(':')[0]})`), // X轴：任务名 + 流程名
+      data: sourceData.map(item => `${item.taskName}\n(${item.processDefinitionKey.split(':')[0]})`),
       axisLabel: {
-        interval: 0, // 强制显示所有标签
-        rotate: 15   // 轻微旋转以防重叠
+        interval: 0,
+        rotate: 15
       }
     },
     yAxis: {
@@ -119,7 +115,7 @@ const chartOption = computed(() => {
         name: '耗时',
         type: 'bar',
         barWidth: '60%',
-        data: sourceData.map(item => parseFloat((item.durationMillis / 1000 / 60).toFixed(2))), // Y轴：转换为分钟
+        data: sourceData.map(item => parseFloat((item.durationMillis / 1000 / 60).toFixed(2))),
         itemStyle: {
           color: '#5470C6'
         }
@@ -141,5 +137,14 @@ const chartOption = computed(() => {
 }
 .chart {
   height: 400px;
+}
+/* 【核心新增】响应式 padding */
+.content-padding {
+  padding: 24px;
+}
+@media (max-width: 768px) {
+  .content-padding {
+    padding: 16px;
+  }
 }
 </style>

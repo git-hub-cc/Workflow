@@ -3,7 +3,7 @@
       :open="open"
       :title="`编辑: ${formDefinition.name || '记录'}`"
       @update:open="(val) => emit('update:open', val)"
-      width="800px"
+      :width="isMobile ? '95%' : '800px'"
       :confirm-loading="saving"
       @ok="handleSave"
       destroyOnClose
@@ -31,7 +31,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, watch, defineAsyncComponent } from 'vue';
+import { ref, reactive, watch, defineAsyncComponent, onMounted, onBeforeUnmount } from 'vue';
 import { message } from 'ant-design-vue';
 import { getFormById, getSubmissionById, updateSubmission } from '@/api';
 import { flattenFields } from '@/utils/formUtils.js';
@@ -50,7 +50,14 @@ const formRef = ref();
 const formDefinition = ref({ schema: { fields: [] } });
 const formData = reactive({});
 
-// 监听弹窗打开状态，打开时加载数据
+// --- 【核心新增】响应式断点逻辑 ---
+const isMobile = ref(window.innerWidth < 768);
+const handleResize = () => { isMobile.value = window.innerWidth < 768; };
+onMounted(() => { window.addEventListener('resize', handleResize); });
+onBeforeUnmount(() => { window.removeEventListener('resize', handleResize); });
+// --- 响应式逻辑结束 ---
+
+
 watch(() => props.open, (newVal) => {
   if (newVal && props.submissionId) {
     loadData();
@@ -66,11 +73,9 @@ const loadData = async () => {
     formDef.schema = JSON.parse(formDef.schemaJson);
     formDefinition.value = formDef;
 
-    // 清空旧数据并填充新数据
     Object.keys(formData).forEach(key => delete formData[key]);
     Object.assign(formData, JSON.parse(submission.dataJson));
 
-    // 如果有附件，需要特殊处理
     if (submission.attachments) {
       const fileUploadField = flattenFields(formDef.schema.fields).find(f => f.type === 'FileUpload');
       if (fileUploadField) {
@@ -112,8 +117,6 @@ const handleSave = async () => {
   } catch (errorInfo) {
     if (errorInfo && errorInfo.errorFields) {
       message.warn('请填写所有必填项');
-    } else {
-      // 错误已由API拦截器处理
     }
   } finally {
     saving.value = false;

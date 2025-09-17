@@ -55,6 +55,7 @@
             :row-selection="{ selectedRowKeys: selectedRowKeys, onChange: onSelectChange }"
             row-key="processInstanceId"
             @change="handleTableChange"
+            :scroll="{ x: 'max-content' }"
         >
           <template #bodyCell="{ column, record }">
             <template v-if="column.key === 'businessKey'">
@@ -91,7 +92,6 @@
                   <a-menu @click="({ key }) => handleMenuClick(key, record)">
                     <a-menu-item key="variables"><PartitionOutlined /> 管理变量</a-menu-item>
                     <a-menu-item key="diagram"><ApartmentOutlined /> 查看图表</a-menu-item>
-                    <!-- 【新增】转办菜单项，仅对运行中实例显示 -->
                     <a-menu-item key="reassign" v-if="record.state === 'RUNNING'"><UserSwitchOutlined /> 转办</a-menu-item>
                     <a-menu-divider />
                     <a-menu-item key="suspend" v-if="!record.suspended && record.state === 'RUNNING'"><PauseCircleOutlined /> 挂起</a-menu-item>
@@ -106,20 +106,17 @@
       </a-card>
     </div>
 
-    <!-- 流程变量管理弹窗 -->
     <ProcessVariablesModal
         v-if="variablesModalVisible"
         v-model:open="variablesModalVisible"
         :instance-id="currentInstanceId"
     />
-    <!-- 【新增】流程图弹窗 -->
     <ProcessDiagramModal
         v-if="diagramModalVisible"
         v-model:open="diagramModalVisible"
         :bpmn-xml="bpmnXml"
         :history-activities="[]"
     />
-    <!-- 【新增】转办任务弹窗 -->
     <a-modal
         v-model:open="reassignModalVisible"
         title="转办任务"
@@ -149,7 +146,6 @@
 
 <script setup>
 import { ref, onMounted, h, computed, defineAsyncComponent } from 'vue';
-// --- 【核心修改】引入新API和图标 ---
 import {
   getProcessInstances, terminateInstance, suspendInstance, activateInstance,
   batchSuspendInstances, batchActivateInstances, batchTerminateInstances,
@@ -162,7 +158,6 @@ import {
   PauseCircleOutlined, PlayCircleOutlined, StopOutlined, PartitionOutlined, ApartmentOutlined, UserSwitchOutlined
 } from '@ant-design/icons-vue';
 import ProcessVariablesModal from './components/ProcessVariablesModal.vue';
-// --- 【核心修改】使用异步组件加载流程图模态框 ---
 const ProcessDiagramModal = defineAsyncComponent(() => import('@/components/ProcessDiagramModal.vue'));
 
 const {
@@ -170,14 +165,12 @@ const {
   handleTableChange, handleSearch, handleReset, fetchData
 } = usePaginatedFetch(getProcessInstances, { state: 'RUNNING', businessKey: '', startUser: '' });
 
-// 弹窗状态
 const variablesModalVisible = ref(false);
 const diagramModalVisible = ref(false);
 const reassignModalVisible = ref(false);
 const currentInstanceId = ref(null);
 const bpmnXml = ref(null);
 
-// 批量操作状态
 const selectedRowKeys = ref([]);
 const hasSelected = computed(() => selectedRowKeys.value.length > 0);
 const onSelectChange = keys => {
@@ -193,12 +186,11 @@ const columns = [
   { title: '开始时间', dataIndex: 'startTime', key: 'startTime', width: 180 },
   { title: '当前节点', dataIndex: 'currentActivityName', key: 'currentActivityName', ellipsis: true },
   { title: '持续时间', key: 'duration', align: 'center', width: 150 },
-  { title: '操作', key: 'actions', align: 'center', width: 100 },
+  { title: '操作', key: 'actions', align: 'center', width: 100, fixed: 'right' },
 ];
 
 onMounted(fetchData);
 
-// --- 【核心修改】菜单和按钮处理 ---
 const handleMenuClick = async (key, record) => {
   currentInstanceId.value = record.processInstanceId;
   switch (key) {
@@ -210,7 +202,7 @@ const handleMenuClick = async (key, record) => {
         const res = await getWorkflowDiagramByInstanceId(record.processInstanceId);
         bpmnXml.value = res.bpmnXml;
         diagramModalVisible.value = true;
-      } catch (err) { /* 全局处理器已处理 */ }
+      } catch (err) {}
       break;
     case 'reassign':
       await showReassignModal(record.processInstanceId);
@@ -227,10 +219,9 @@ const handleMenuClick = async (key, record) => {
   }
 };
 
-// --- 【核心新增】转办逻辑 ---
 const reassignLoading = ref(false);
 const newAssigneeId = ref(null);
-const currentTaskId = ref(null); // 存储要转办的任务ID
+const currentTaskId = ref(null);
 const userPickerOptions = ref([]);
 const userSearchLoading = ref(false);
 let searchTimeout;
@@ -242,7 +233,6 @@ const showReassignModal = async (instanceId) => {
       message.warn("该流程实例当前没有待处理的任务可转办。");
       return;
     }
-    // 简化处理：默认转办第一个待办任务
     currentTaskId.value = tasks.content[0].camundaTaskId;
     newAssigneeId.value = null;
     userPickerOptions.value = [];
@@ -286,13 +276,12 @@ const handleReassignOk = async () => {
 };
 
 
-// --- 单个实例操作与批量操作 (无重大变化) ---
 const handleSingleAction = async (apiFunc, instanceId, actionName) => {
   try {
     await apiFunc(instanceId);
     message.success(`流程实例已${actionName}`);
     await fetchData();
-  } catch (err) { /* 全局处理器已处理 */ }
+  } catch (err) {}
 };
 
 const handleTerminate = (record) => {
@@ -348,7 +337,6 @@ const handleBatchTerminate = () => {
   });
 };
 
-// --- 辅助函数 (无变化) ---
 const getStateColor = (state, suspended) => {
   if (suspended) return 'orange';
   switch (state) {
@@ -390,5 +378,10 @@ const formatDuration = (ms) => {
 .page-container {
   background-color: #fff;
   border-radius: 4px;
+}
+@media (max-width: 768px) {
+  :deep(.ant-form-inline .ant-form-item) {
+    margin-bottom: 16px;
+  }
 }
 </style>

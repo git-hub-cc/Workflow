@@ -2,7 +2,7 @@
   <a-modal
       :open="open"
       title="选择图标"
-      width="800px"
+      :width="isMobile ? '95%' : '800px'"
       @update:open="(val) => emit('update:open', val)"
       :footer="null"
   >
@@ -30,8 +30,7 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue';
-// 【修复】从新的图标库文件导入精选的图标列表
+import { ref, computed, onMounted, onBeforeUnmount } from 'vue';
 import { iconList } from '@/utils/iconLibrary.js';
 
 const props = defineProps({ open: Boolean });
@@ -39,13 +38,18 @@ const emit = defineEmits(['update:open', 'select']);
 
 const searchQuery = ref('');
 
+// --- 【核心新增】响应式断点逻辑 ---
+const isMobile = ref(window.innerWidth < 768);
+const handleResize = () => { isMobile.value = window.innerWidth < 768; };
+onMounted(() => { window.addEventListener('resize', handleResize); });
+onBeforeUnmount(() => { window.removeEventListener('resize', handleResize); });
+// --- 响应式逻辑结束 ---
+
 const filteredIconList = computed(() => {
   if (!searchQuery.value) {
-    // 直接使用导入的列表
     return iconList;
   }
   const query = searchQuery.value.toLowerCase();
-  // 在精选列表中进行过滤
   return iconList.filter(icon => icon.name.toLowerCase().includes(query));
 });
 
@@ -55,7 +59,7 @@ const selectIcon = (iconName) => {
 };
 
 const filterIcons = () => {
-  // computed 属性会自动更新，此方法仅用于触发搜索
+  // computed property handles filtering
 };
 </script>
 
@@ -81,7 +85,6 @@ const filterIcons = () => {
   transition: all 0.2s;
 }
 .icon-item:hover {
-  /* 【核心修改】使用 CSS 变量来应用主题色 */
   border-color: var(--ant-primary-color);
   color: var(--ant-primary-color);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);

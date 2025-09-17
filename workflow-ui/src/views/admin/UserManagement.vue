@@ -10,7 +10,6 @@
     </a-page-header>
 
     <div style="padding: 24px;">
-      <!-- 【阶段二新增】筛选区域 -->
       <a-card :bordered="false" style="margin-bottom: 24px;">
         <a-form :model="filterState" layout="inline">
           <a-form-item label="关键字">
@@ -38,6 +37,7 @@
           :pagination="pagination"
           row-key="id"
           @change="handleTableChange"
+          :scroll="{ x: 'max-content' }"
       >
         <template #bodyCell="{ column, record }">
           <template v-if="column.key === 'roleNames'">
@@ -97,39 +97,38 @@
       </a-table>
     </div>
 
-    <!-- 新增/编辑用户的弹窗 -->
     <a-modal
         :title="isEditing ? '编辑用户' : '新增用户'"
         v-model:open="modalVisible"
         :confirm-loading="modalConfirmLoading"
         @ok="handleOk"
         @cancel="handleCancel"
-        width="800px"
+        :width="isMobile ? '95%' : '800px'"
         destroyOnClose
     >
       <a-form :model="formState" :rules="rules" ref="formRef" layout="vertical">
         <a-row :gutter="16">
-          <a-col :span="12">
+          <a-col :xs="24" :sm="12">
             <a-form-item label="用户ID (登录名)" name="id">
               <a-input v-model:value="formState.id" :disabled="isEditing" />
             </a-form-item>
           </a-col>
-          <a-col :span="12">
+          <a-col :xs="24" :sm="12">
             <a-form-item label="用户姓名" name="name">
               <a-input v-model:value="formState.name" />
             </a-form-item>
           </a-col>
-          <a-col :span="12">
+          <a-col :xs="24" :sm="12">
             <a-form-item label="邮箱" name="email">
               <a-input v-model:value="formState.email" />
             </a-form-item>
           </a-col>
-          <a-col :span="12">
+          <a-col :xs="24" :sm="12">
             <a-form-item label="手机号" name="phoneNumber">
               <a-input v-model:value="formState.phoneNumber" />
             </a-form-item>
           </a-col>
-          <a-col :span="12">
+          <a-col :xs="24" :sm="12">
             <a-form-item label="部门" name="departmentId">
               <a-tree-select
                   v-model:value="formState.departmentId"
@@ -141,7 +140,7 @@
             </a-form-item>
           </a-col>
 
-          <a-col :span="12">
+          <a-col :xs="24" :sm="12">
             <a-form-item label="直属上级" name="managerId">
               <a-tree-select
                   v-model:value="formState.managerId"
@@ -157,7 +156,7 @@
               />
             </a-form-item>
           </a-col>
-          <a-col :span="12">
+          <a-col :xs="24" :sm="12">
             <a-form-item label="角色" name="roleNames">
               <a-select
                   v-model:value="formState.roleNames"
@@ -167,7 +166,7 @@
               />
             </a-form-item>
           </a-col>
-          <a-col :span="12">
+          <a-col :xs="24" :sm="12">
             <a-form-item label="用户组" name="groupNames">
               <a-select
                   v-model:value="formState.groupNames"
@@ -185,7 +184,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted, computed } from 'vue';
+import { ref, reactive, onMounted, computed, onBeforeUnmount } from 'vue';
 import { useUserStore } from '@/stores/user';
 import {
   createUser, updateUser, disableUser, enableUser, resetPassword,
@@ -213,11 +212,16 @@ const {
     { defaultSort: 'id,asc' }
 );
 
-
 const orgTreeData = ref([]);
 const departmentTree = ref([]);
 const allRoles = ref([]);
 const allGroups = ref([]);
+
+// --- 【核心新增】响应式断点逻辑 ---
+const isMobile = ref(window.innerWidth < 768);
+const handleResize = () => { isMobile.value = window.innerWidth < 768; };
+onBeforeUnmount(() => { window.removeEventListener('resize', handleResize); });
+// --- 响应式逻辑结束 ---
 
 const fetchAuxiliaryData = async () => {
   try {
@@ -234,6 +238,7 @@ const fetchAuxiliaryData = async () => {
 };
 
 onMounted(() => {
+  window.addEventListener('resize', handleResize);
   fetchData();
   fetchAuxiliaryData();
 });
@@ -266,14 +271,14 @@ const orgTreeDataForSelector = computed(() => {
 
 
 const columns = [
-  { title: '用户ID', dataIndex: 'id', key: 'id', sorter: true },
-  { title: '姓名', dataIndex: 'name', key: 'name', sorter: true },
+  { title: '用户ID', dataIndex: 'id', key: 'id', sorter: true, width: 120 },
+  { title: '姓名', dataIndex: 'name', key: 'name', sorter: true, width: 120 },
   { title: '部门', dataIndex: 'departmentName', key: 'departmentName' },
   { title: '角色', dataIndex: 'roleNames', key: 'roleNames' },
   { title: '用户组', dataIndex: 'groupNames', key: 'groupNames' },
-  { title: '状态', dataIndex: 'status', key: 'status', align: 'center' },
+  { title: '状态', dataIndex: 'status', key: 'status', align: 'center', width: 100 },
   { title: '直属上级', dataIndex: 'managerId', key: 'managerName', align: 'center' },
-  { title: '操作', key: 'actions', align: 'center' },
+  { title: '操作', key: 'actions', align: 'center', fixed: 'right', width: 200 },
 ];
 
 const getRoleColor = (role) => (role === 'ADMIN' ? 'gold' : 'purple');
@@ -390,5 +395,10 @@ const handleResetPassword = (userId) => {
 .page-container {
   background-color: #fff;
   border-radius: 4px;
+}
+@media (max-width: 768px) {
+  :deep(.ant-form-inline .ant-form-item) {
+    margin-bottom: 16px;
+  }
 }
 </style>

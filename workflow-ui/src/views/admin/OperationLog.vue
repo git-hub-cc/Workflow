@@ -47,6 +47,7 @@
           :pagination="pagination"
           row-key="id"
           @change="handleTableChange"
+          :scroll="{ x: 'max-content' }"
       >
         <template #bodyCell="{ column, record }">
           <template v-if="column.key === 'operationTime'">
@@ -75,10 +76,8 @@
 import { ref, onMounted, computed } from 'vue';
 import { getOperationLogs } from '@/api';
 import { SearchOutlined, ReloadOutlined } from '@ant-design/icons-vue';
-// --- 【核心修改】引入 usePaginatedFetch hook ---
 import { usePaginatedFetch } from '@/composables/usePaginatedFetch.js';
 
-// --- 【核心修改】使用 hook 管理表格数据和状态 ---
 const {
   loading,
   dataSource,
@@ -90,7 +89,7 @@ const {
   fetchData,
 } = usePaginatedFetch(
     getOperationLogs,
-    { operatorId: '', module: undefined, dateRange: [] }, // 初始筛选条件
+    { operatorId: '', module: undefined, dateRange: [] },
     { defaultSort: 'operationTime,desc' }
 );
 
@@ -107,7 +106,6 @@ const columns = [
 
 onMounted(fetchData);
 
-// Details Modal
 const detailsModalVisible = ref(false);
 const currentDetails = ref('');
 const formattedDetails = computed(() => {
@@ -128,5 +126,10 @@ const showDetailsModal = (details) => {
 .page-container {
   background-color: #fff;
   border-radius: 4px;
+}
+@media (max-width: 768px) {
+  :deep(.ant-form-inline .ant-form-item) {
+    margin-bottom: 16px;
+  }
 }
 </style>

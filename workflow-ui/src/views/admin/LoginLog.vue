@@ -40,6 +40,7 @@
           :pagination="pagination"
           row-key="id"
           @change="handleTableChange"
+          :scroll="{ x: 'max-content' }"
       >
         <template #bodyCell="{ column, record }">
           <template v-if="column.key === 'status'">
@@ -60,10 +61,8 @@
 import { onMounted } from 'vue';
 import { getLoginLogs } from '@/api';
 import { SearchOutlined, ReloadOutlined } from '@ant-design/icons-vue';
-// --- 【核心修改】引入 usePaginatedFetch hook ---
 import { usePaginatedFetch } from '@/composables/usePaginatedFetch.js';
 
-// --- 【核心修改】使用 hook 管理表格数据和状态 ---
 const {
   loading,
   dataSource,
@@ -75,16 +74,16 @@ const {
   fetchData,
 } = usePaginatedFetch(
     getLoginLogs,
-    { userId: '', status: undefined, dateRange: [] }, // 初始筛选条件
+    { userId: '', status: undefined, dateRange: [] },
     { defaultSort: 'loginTime,desc' }
 );
 
 const columns = [
   { title: 'ID', dataIndex: 'id', key: 'id', width: 80 },
   { title: '用户ID', dataIndex: 'userId', key: 'userId', sorter: true },
-  { title: '登录时间', dataIndex: 'loginTime', key: 'loginTime', sorter: true },
+  { title: '登录时间', dataIndex: 'loginTime', key: 'loginTime', sorter: true, width: 200 },
   { title: 'IP地址', dataIndex: 'ipAddress', key: 'ipAddress' },
-  { title: '登录状态', dataIndex: 'status', key: 'status', align: 'center', sorter: true },
+  { title: '登录状态', dataIndex: 'status', key: 'status', align: 'center', sorter: true, width: 100 },
   { title: '失败原因', dataIndex: 'failureReason', key: 'failureReason', ellipsis: true },
   { title: 'User Agent', dataIndex: 'userAgent', key: 'userAgent', ellipsis: true },
 ];
@@ -97,5 +96,10 @@ onMounted(fetchData);
 .page-container {
   background-color: #fff;
   border-radius: 4px;
+}
+@media (max-width: 768px) {
+  :deep(.ant-form-inline .ant-form-item) {
+    margin-bottom: 16px;
+  }
 }
 </style>

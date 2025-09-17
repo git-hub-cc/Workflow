@@ -10,7 +10,6 @@
           </a-form-item>
           <a-form-item label="申请状态">
             <a-select v-model:value="filterState.status" placeholder="请选择状态" style="width: 150px" allow-clear>
-              <!-- 【核心修改】使用后端 FormSubmission.SubmissionStatus 枚举 -->
               <a-select-option value="DRAFT">草稿</a-select-option>
               <a-select-option value="PROCESSING">审批中</a-select-option>
               <a-select-option value="APPROVED">已通过</a-select-option>
@@ -40,19 +39,18 @@
           :pagination="pagination"
           row-key="id"
           @change="handleTableChange"
+          :scroll="{ x: 'max-content' }"
       >
         <template #bodyCell="{ column, record }">
           <template v-if="column.key === 'createdAt'">
             {{ new Date(record.createdAt).toLocaleString() }}
           </template>
           <template v-else-if="column.key === 'workflowStatus'">
-            <!-- 【核心修改】使用 record.workflowStatus 来显示业务状态文本 -->
             <a-tag :color="getStatusColor(record.submissionStatus)">
               {{ record.workflowStatus }}
             </a-tag>
           </template>
           <template v-else-if="column.key === 'actions'">
-            <!-- 【核心修改】根据 submissionStatus 动态显示操作按钮 -->
             <a-button
                 v-if="record.submissionStatus === 'DRAFT'"
                 type="link"
@@ -110,7 +108,6 @@ const columns = [
 
 onMounted(fetchData);
 
-// 【核心修改】使用 submissionStatus 来决定颜色
 const getStatusColor = (status) => {
   const colorMap = {
     'DRAFT': 'default',
@@ -126,12 +123,11 @@ const goToDetail = (submissionId) => {
   router.push({ name: 'submission-detail', params: { submissionId } });
 };
 
-// --- 【核心新增】处理编辑草稿的跳转 ---
 const handleEditDraft = (record) => {
   router.push({
     name: 'form-viewer',
     params: { formId: record.formDefinitionId },
-    query: { submissionId: record.id } // 通过 query 参数传递草稿ID
+    query: { submissionId: record.id }
   });
 };
 </script>
@@ -140,5 +136,10 @@ const handleEditDraft = (record) => {
 .page-container {
   background-color: #fff;
   border-radius: 4px;
+}
+@media (max-width: 768px) {
+  :deep(.ant-form-inline .ant-form-item) {
+    margin-bottom: 16px;
+  }
 }
 </style>

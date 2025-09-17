@@ -3,7 +3,6 @@
     <a-page-header :title="task.stepName || '任务处理'" :sub-title="task.formName" @back="() => $router.push({ name: 'task-list' })" />
 
     <a-spin :spinning="loading" tip="正在加载任务详情...">
-      <!-- 【核心修改】当加载失败时，显示错误提示 -->
       <a-empty
           v-if="loadError"
           :description="loadError"
@@ -12,9 +11,9 @@
         <a-button type="primary" @click="$router.push('/tasks')">返回待办列表</a-button>
       </a-empty>
 
-      <!-- 仅在加载成功后显示内容 -->
-      <div v-else-if="!loading" class="detail-layout">
-        <div class="main-content">
+      <!-- 【核心修改】使用 a-row 和 a-col 实现响应式布局 -->
+      <a-row v-else-if="!loading" :gutter="[24, 24]" class="detail-layout">
+        <a-col :xs="24" :lg="16" class="main-content">
           <a-card title="表单详情">
             <a-descriptions bordered :column="1">
               <template v-for="field in flattenedFields" :key="field.id">
@@ -86,10 +85,10 @@
               </a-form-item>
             </a-form>
           </a-card>
-        </div>
+        </a-col>
 
         <!-- 右侧辅助信息区: 流程历史 -->
-        <div class="side-content">
+        <a-col :xs="24" :lg="8" class="side-content">
           <a-card>
             <a-tabs v-model:activeKey="activeTabKey">
               <a-tab-pane key="historyList" tab="历史列表">
@@ -128,8 +127,8 @@
               </a-tab-pane>
             </a-tabs>
           </a-card>
-        </div>
-      </div>
+        </a-col>
+      </a-row>
     </a-spin>
 
     <ProcessDiagramModal
@@ -142,7 +141,6 @@
 </template>
 
 <script setup>
-// 【核心修改】引入 defineAsyncComponent
 import { ref, onMounted, computed, reactive, defineAsyncComponent } from 'vue';
 import { getTaskById, getSubmissionById, getFormById, completeTask, getWorkflowHistory, downloadFile, getWorkflowDiagram } from '@/api';
 import { message } from 'ant-design-vue';
@@ -151,7 +149,6 @@ import { useUserStore } from '@/stores/user';
 import { flattenFields } from '@/utils/formUtils.js';
 import { PaperClipOutlined, DownOutlined, RollbackOutlined, UndoOutlined, FullscreenOutlined } from '@ant-design/icons-vue';
 import ProcessDiagramViewer from '@/components/ProcessDiagramViewer.vue';
-// 【核心修改】使用 defineAsyncComponent 动态加载流程图模态框
 const ProcessDiagramModal = defineAsyncComponent(() => import('@/components/ProcessDiagramModal.vue'));
 
 const props = defineProps({ taskId: String });
@@ -159,7 +156,7 @@ const router = useRouter();
 const userStore = useUserStore();
 
 const loading = ref(true);
-const loadError = ref(null); // 【核心新增】错误状态
+const loadError = ref(null);
 const submitting = ref(false);
 const task = ref({});
 const formSchema = ref({ fields: [] });
@@ -207,7 +204,6 @@ onMounted(async () => {
     }
 
   } catch (error) {
-    // 【核心修改】捕获错误并设置错误状态
     loadError.value = '任务不存在、已被处理或您无权访问。';
     console.error('加载任务详情失败:', error);
   } finally {
@@ -235,14 +231,12 @@ const handleAction = async (action) => {
     message.success('任务处理成功！');
     router.push({ name: 'task-list' });
   } catch (error) {
-    // 错误由全局拦截器处理
   } finally {
     submitting.value = false;
   }
 };
 
 
-// --- 辅助函数 ---
 const getTimelineColor = (item) => {
   if (item.activityType.endsWith('EndEvent')) {
     return item.decision === 'REJECTED' ? 'red' : 'green';
@@ -303,9 +297,16 @@ const getReadonlyDisplayValue = (field, value) => {
 </script>
 
 <style scoped>
-.detail-layout { display: flex; gap: 24px; padding: 24px; align-items: flex-start; }
-.main-content { flex: 2; min-width: 0; }
-.side-content { flex: 1; min-width: 0; }
+/* 【核心修改】移除旧的 flex 布局，改为 padding */
+.detail-layout {
+  padding: 24px;
+}
+@media (max-width: 768px) {
+  .detail-layout {
+    padding: 16px;
+  }
+}
+.main-content, .side-content { min-width: 0; }
 .approval-comment { background-color: #fafafa; border: 1px solid #f0f0f0; padding: 8px 12px; border-radius: 4px; margin-top: 8px; font-size: 14px; color: #595959; word-wrap: break-word; }
 .approval-comment strong { color: #262626; margin-right: 8px; }
 .readonly-richtext :deep(img) { max-width: 100%; height: auto; }

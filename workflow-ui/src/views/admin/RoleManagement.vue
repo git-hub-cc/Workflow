@@ -10,7 +10,6 @@
     </a-page-header>
 
     <div style="padding: 24px;">
-      <!-- 【阶段二新增】筛选区域 -->
       <a-card :bordered="false" style="margin-bottom: 24px;">
         <a-form :model="filterState" layout="inline">
           <a-form-item label="角色名称">
@@ -38,6 +37,7 @@
           :pagination="pagination"
           row-key="id"
           @change="handleTableChange"
+          :scroll="{ x: 'max-content' }"
       >
         <template #bodyCell="{ column, record }">
           <template v-if="column.key === 'name'">
@@ -60,7 +60,6 @@
       </a-table>
     </div>
 
-    <!-- 新增/编辑角色的弹窗 -->
     <a-modal
         :title="isEditing ? '编辑角色' : '新增角色'"
         v-model:open="modalVisible"
@@ -88,7 +87,6 @@ import { usePaginatedFetch } from '@/composables/usePaginatedFetch';
 import { message } from 'ant-design-vue';
 import { PlusOutlined, SearchOutlined, ReloadOutlined } from '@ant-design/icons-vue';
 
-// --- 【阶段二修改】使用 usePaginatedFetch Hook ---
 const {
   loading,
   dataSource,
@@ -113,7 +111,6 @@ const columns = [
   { title: '操作', key: 'actions', align: 'center', width: 150 },
 ];
 
-// Modal state
 const modalVisible = ref(false);
 const modalConfirmLoading = ref(false);
 const isEditing = ref(false);
@@ -157,7 +154,7 @@ const handleOk = async () => {
       message.success('角色创建成功！');
     }
     modalVisible.value = false;
-    await fetchData(); // 【阶段二修改】刷新数据
+    await fetchData();
   } catch (error) {
     console.error('Form validation/submission failed:', error);
   } finally {
@@ -179,10 +176,8 @@ const handleDelete = async (roleId) => {
   try {
     await deleteRole(roleId);
     message.success('角色删除成功！');
-    await fetchData(); // 【阶段二修改】刷新数据
-  } catch (error) {
-    // API 错误已全局处理
-  }
+    await fetchData();
+  } catch (error) {}
 };
 </script>
 
@@ -190,5 +185,10 @@ const handleDelete = async (roleId) => {
 .page-container {
   background-color: #fff;
   border-radius: 4px;
+}
+@media (max-width: 768px) {
+  :deep(.ant-form-inline .ant-form-item) {
+    margin-bottom: 16px;
+  }
 }
 </style>

@@ -23,7 +23,6 @@ const props = defineProps({
     type: Object,
     default: null,
   },
-  // 【核心新增】接收 modeler 实例
   modeler: {
     type: Object,
     default: null,
@@ -40,7 +39,6 @@ const props = defineProps({
 
 defineEmits(['update']);
 
-// 根据选中节点的类型，计算应显示的标题
 const panelTitle = computed(() => {
   if (!props.selectedElement) return '属性面板';
   const typeMap = {
@@ -56,7 +54,6 @@ const panelTitle = computed(() => {
   return typeMap[props.selectedElement.type] || '属性配置';
 });
 
-// 根据选中节点的类型，动态加载对应的属性配置组件
 const propertiesComponent = computed(() => {
   if (!props.selectedElement) {
     return defineAsyncComponent(() => import('./components/props/EmptyProps.vue'));
@@ -64,7 +61,6 @@ const propertiesComponent = computed(() => {
 
   const type = props.selectedElement.type;
 
-  // 【核心修改】增加对新节点类型的支持
   switch (type) {
     case 'bpmn:UserTask':
       return defineAsyncComponent(() => import('./components/props/UserTaskProps.vue'));
@@ -106,5 +102,11 @@ const propertiesComponent = computed(() => {
   flex-grow: 1;
   overflow-y: auto;
   padding: 12px;
+}
+/* 【核心新增】移动端样式 */
+@media (max-width: 768px) {
+  .simple-properties-panel {
+    width: 100%;
+  }
 }
 </style>

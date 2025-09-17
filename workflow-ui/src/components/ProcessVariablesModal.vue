@@ -2,7 +2,7 @@
   <a-modal
       :open="open"
       title="管理流程变量"
-      width="800px"
+      :width="isMobile ? '95%' : '800px'"
       :footer="null"
       @update:open="(val) => $emit('update:open', val)"
       destroyOnClose
@@ -78,7 +78,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted } from 'vue';
+import { ref, reactive, onMounted, onBeforeUnmount } from 'vue';
 import { getProcessVariables, updateProcessVariable } from '@/api';
 import { message } from 'ant-design-vue';
 import { cloneDeep } from 'lodash-es';
@@ -95,6 +95,12 @@ defineEmits(['update:open']);
 const loading = ref(true);
 const variables = ref([]);
 const editableData = reactive({});
+
+// --- 【核心新增】响应式断点逻辑 ---
+const isMobile = ref(window.innerWidth < 768);
+const handleResize = () => { isMobile.value = window.innerWidth < 768; };
+onBeforeUnmount(() => { window.removeEventListener('resize', handleResize); });
+// --- 响应式逻辑结束 ---
 
 const columns = [
   { title: '变量名', dataIndex: 'name', key: 'name', width: '25%' },
@@ -113,22 +119,22 @@ const fetchVariables = async () => {
   }
 };
 
-onMounted(fetchVariables);
+onMounted(() => {
+  fetchVariables();
+  window.addEventListener('resize', handleResize);
+});
 
 const isNumeric = (type) => ['integer', 'long', 'double', 'short'].includes(type.toLowerCase());
 
 const formatJson = (value) => {
   if (value === null || value === undefined) return '';
   try {
-    // 如果值本身就是对象或数组，直接格式化
     if (typeof value === 'object') {
       return JSON.stringify(value, null, 2);
     }
-    // 如果是字符串，尝试解析为JSON再格式化
     const obj = JSON.parse(value.toString());
     return JSON.stringify(obj, null, 2);
   } catch (e) {
-    // 如果解析失败，说明它可能不是一个有效的JSON字符串，直接返回原值
     return value.toString();
   }
 };
@@ -137,7 +143,6 @@ const edit = (key) => {
   const target = variables.value.find(item => key === item.name);
   if (target) {
     const clonedTarget = cloneDeep(target);
-    // 对于JSON/Object类型，在编辑时格式化一下，方便阅读和修改
     if (clonedTarget.type === 'json' || clonedTarget.type === 'object') {
       clonedTarget.value = formatJson(clonedTarget.value);
     }
@@ -150,7 +155,6 @@ const save = async (key) => {
   const editedData = editableData[key];
   const payload = { ...editedData };
 
-  // 在发送前，对于 boolean 类型，确保它的值是 true/false 而不是 1/0
   if (payload.type === 'boolean') {
     payload.value = !!payload.value;
   }

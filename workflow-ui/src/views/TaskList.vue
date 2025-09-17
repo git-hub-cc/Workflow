@@ -31,10 +31,10 @@
           :pagination="pagination"
           row-key="camundaTaskId"
           @change="handleTableChange"
+          :scroll="{ x: 'max-content' }"
       >
         <template #bodyCell="{ column, record }">
           <template v-if="column.key === 'taskName'">
-            <!-- 【最终修复】点击时调用智能导航方法 -->
             <a @click="handleTaskClick(record)">{{ record.formName }} - {{ record.stepName }}</a>
           </template>
           <template v-else-if="column.key === 'createdAt'">
@@ -45,7 +45,6 @@
             <a-tag v-else color="processing">待处理</a-tag>
           </template>
           <template v-else-if="column.key === 'actions'">
-            <!-- 【最终修复】点击时调用智能导航方法 -->
             <a-button type="primary" @click="handleTaskClick(record)">去处理</a-button>
           </template>
         </template>
@@ -87,29 +86,23 @@ const columns = [
 
 onMounted(fetchData);
 
-// --- 【最终修复】增强判断逻辑，使其更健壮 ---
 const isModificationTask = (task) => {
   const taskName = (task.stepName || '').trim();
-  // 增加更多可能的关键字，如 “发起”、“申请”，以兼容旧的或不同的流程定义
   const modificationKeywords = ['修改', '调整', '重新', '发起', '申请'];
-  // 检查任务名称是否包含任何一个关键字
   return modificationKeywords.some(keyword => taskName.includes(keyword));
 };
 
-// --- 【最终修复】智能导航逻辑 ---
 const handleTaskClick = (record) => {
   if (isModificationTask(record)) {
-    // 如果是“修改任务”，则跳转到 FormViewer 进行编辑
     router.push({
       name: 'form-viewer',
-      params: { formId: record.formDefinitionId }, // 使用后端返回的 formDefinitionId
+      params: { formId: record.formDefinitionId },
       query: {
         submissionId: record.formSubmissionId,
-        taskId: record.camundaTaskId, // 关键：传递任务ID
+        taskId: record.camundaTaskId,
       },
     });
   } else {
-    // 如果是“审批任务”，则跳转到 TaskDetail 查看详情和审批
     router.push({ name: 'task-detail', params: { taskId: record.camundaTaskId } });
   }
 };
@@ -119,5 +112,10 @@ const handleTaskClick = (record) => {
 .page-container {
   background-color: #fff;
   border-radius: 4px;
+}
+@media (max-width: 768px) {
+  :deep(.ant-form-inline .ant-form-item) {
+    margin-bottom: 16px;
+  }
 }
 </style>

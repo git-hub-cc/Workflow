@@ -72,7 +72,6 @@ const router = useRouter();
 
 const activeTab = ref('profile');
 
-// --- 个人资料状态 ---
 const profileLoading = ref(true);
 const profileFormRef = ref();
 const profileState = reactive({
@@ -81,7 +80,6 @@ const profileState = reactive({
   phoneNumber: '',
 });
 
-// --- 修改密码状态 ---
 const passwordLoading = ref(false);
 const passwordFormRef = ref();
 const passwordState = reactive({
@@ -107,12 +105,10 @@ const passwordRules = {
 };
 
 onMounted(async () => {
-  // 如果需要强制修改密码，则默认打开密码修改页
   if (userStore.passwordChangeRequired) {
     activeTab.value = 'password';
   }
 
-  // 加载个人资料
   try {
     const profileData = await getMyProfile();
     Object.assign(profileState, profileData);
@@ -128,7 +124,6 @@ const handleUpdateProfile = async () => {
     await profileFormRef.value.validate();
     profileLoading.value = true;
     const updatedProfile = await updateMyProfile(profileState);
-    // 【核心修改】调用 store action 来更新全局用户信息
     userStore.updateCurrentUser(updatedProfile);
     message.success('个人资料更新成功！');
   } catch (error) {
@@ -147,10 +142,8 @@ const handleChangePassword = async () => {
       newPassword: passwordState.newPassword,
     });
     message.success('密码修改成功，请重新登录！');
-    // 修改密码成功后强制登出
     userStore.logout();
   } catch (error) {
-    // API 错误已在拦截器中处理
     console.error('Password change failed:', error);
   } finally {
     passwordLoading.value = false;
@@ -168,5 +161,15 @@ const handleChangePassword = async () => {
 }
 :deep(.ant-tabs-nav) {
   margin-bottom: 32px !important;
+}
+
+/* 【核心新增】移动端样式调整 */
+@media (max-width: 768px) {
+  .page-container {
+    padding: 12px;
+  }
+  .tab-content {
+    margin: 16px 0;
+  }
 }
 </style>

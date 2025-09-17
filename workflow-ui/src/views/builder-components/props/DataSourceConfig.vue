@@ -22,7 +22,8 @@
       <a-tree-select v-model:value="localField.dataSource.departmentId" :tree-data="departmentTree" placeholder="请选择部门" tree-default-expand-all />
     </a-form-item>
     <a-form-item v-if="localField.dataSource.type === 'system-users-role'" label="选择角色">
-      <a-select v-model:value="localField.dataSource.roleName" :options="userStore.allRoles.map(r => ({label: r.description, value: r.name}))" placeholder="请选择角色" />
+      <!-- 【核心修复】绑定到本地的 allRoles，而不是 userStore.allRoles -->
+      <a-select v-model:value="localField.dataSource.roleName" :options="allRoles.map(r => ({label: r.description, value: r.name}))" placeholder="请选择角色" />
     </a-form-item>
 
     <!-- 静态数据配置 -->
@@ -90,8 +91,8 @@
 import { ref, computed, watch, onMounted } from 'vue';
 import { DeleteOutlined, PlusOutlined } from '@ant-design/icons-vue';
 import { message } from "ant-design-vue";
-import { useUserStore } from '@/stores/user';
-import { getDepartmentTree } from '@/api';
+// 【核心修复】移除不再使用的 useUserStore
+import { getDepartmentTree, getRoles } from '@/api'; // 【核心修复】引入 getRoles API
 import { flattenFields } from '@/utils/formUtils.js';
 
 const props = defineProps({
@@ -100,8 +101,9 @@ const props = defineProps({
 });
 const emit = defineEmits(['update:field']);
 
-const userStore = useUserStore();
+// 【核心修复】移除 userStore 实例
 const departmentTree = ref([]);
+const allRoles = ref([]); // 【核心修复】创建本地 state 用于存储角色
 
 const localField = computed({
   get: () => props.field,
@@ -109,11 +111,17 @@ const localField = computed({
 });
 
 onMounted(async () => {
-  if (userStore.allRoles.length === 0) userStore.fetchAllRoles();
+  // 【核心修复】组件自己获取角色和部门数据
   try {
-    const data = await getDepartmentTree();
-    departmentTree.value = transformDeptTree(data);
-  } catch (e) {}
+    const [rolesRes, deptData] = await Promise.all([
+      getRoles({ page: 0, size: 1000 }),
+      getDepartmentTree()
+    ]);
+    allRoles.value = rolesRes.content;
+    departmentTree.value = transformDeptTree(deptData);
+  } catch (e) {
+    message.error("加载配置所需数据失败");
+  }
 });
 
 const transformDeptTree = (nodes) => {
@@ -124,7 +132,6 @@ const transformDeptTree = (nodes) => {
   }));
 };
 
-// 【核心新增】为级联提供可选的父字段
 const parentFieldsForCascading = computed(() => {
   return flattenFields(props.allFields).filter(f =>
       f.id !== props.field.id && ['Select', 'TreeSelect', 'RadioGroup'].includes(f.type)

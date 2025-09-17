@@ -12,7 +12,7 @@
 </template>
 
 <script setup>
-import { ref, watch, computed, defineAsyncComponent, nextTick } from 'vue';
+import { ref, watch, computed, defineAsyncComponent } from 'vue';
 
 const props = defineProps(['selectedField', 'allFields']);
 const emit = defineEmits(['update:field']);
@@ -66,13 +66,12 @@ const propertiesComponent = computed(() => {
     case 'IconPicker':
       return defineAsyncComponent(() => import('./props/IconPickerProps.vue'));
     case 'TreeSelect':
-    case 'RadioGroup': // 【核心新增】
+    case 'RadioGroup':
       return defineAsyncComponent(() => import('./props/GenericProps.vue'));
     case 'StaticText':
       return defineAsyncComponent(() => import('./props/StaticTextProps.vue'));
     case 'RichText':
       return defineAsyncComponent(() => import('./props/RichTextProps.vue'));
-      // 【核心新增】
     case 'Divider':
       return defineAsyncComponent(() => import('./props/DividerProps.vue'));
     default:
@@ -105,5 +104,13 @@ const propertiesComponent = computed(() => {
   color: #aaa;
   text-align: center;
   padding-top: 24px;
+}
+
+/* 【核心新增】在移动端，属性面板可能在 Drawer 中，需要确保它能填满空间 */
+@media (max-width: 768px) {
+  .properties {
+    width: 100%;
+    height: 100%;
+  }
 }
 </style>

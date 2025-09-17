@@ -13,13 +13,13 @@
       </template>
     </a-page-header>
 
-    <!-- 工具栏 -->
-    <div class="toolbar">
+    <!-- 工具栏 (桌面端) -->
+    <div class="toolbar" v-if="!isMobile">
       <a-space>
         <a-tooltip title="撤销 (Ctrl+Z)">
           <a-button @click="handleUndo" :disabled="!canUndo"><UndoOutlined /></a-button>
         </a-tooltip>
-        <a-tooltip title="重做 (Ctrl+Y / Ctrl+Shift+Z)">
+        <a-tooltip title="重做 (Ctrl+Y)">
           <a-button @click="handleRedo" :disabled="!canRedo"><RedoOutlined /></a-button>
         </a-tooltip>
         <a-divider type="vertical" />
@@ -35,7 +35,7 @@
         <a-divider type="vertical" />
         <input type="file" ref="fileInputRef" @change="handleFileImport" style="display: none" accept=".bpmn, .xml" />
         <a-tooltip title="从本地文件导入">
-          <a-button @click="triggerImport"><UploadOutlined /> 导入 BPMN</a-button>
+          <a-button @click="triggerImport"><UploadOutlined /> 导入</a-button>
         </a-tooltip>
         <a-tooltip title="下载为 BPMN 文件">
           <a-button @click="downloadBpmn"><DownloadOutlined /> BPMN</a-button>
@@ -49,8 +49,8 @@
     <!-- 设计器区域 -->
     <div class="designer-container" v-show="!loading">
       <div id="canvas" ref="canvasRef" class="canvas"></div>
-      <!-- 【核心修改】将 modeler 实例通过 prop 传递下去 -->
       <SimplePropertiesPanel
+          v-if="!isMobile"
           class="properties-panel"
           :selected-element="selectedElement"
           :modeler="modeler"
@@ -62,34 +62,53 @@
     <div v-if="loading" class="loading-container">
       <a-spin size="large" tip="正在加载设计器..." />
     </div>
+
+    <!-- 【核心新增】移动端悬浮操作按钮 -->
+    <div v-if="isMobile" class="mobile-fab-group">
+      <a-button type="primary" shape="circle" size="large" @click="propertiesDrawerVisible = true" :disabled="!selectedElement">
+        <SettingOutlined />
+      </a-button>
+    </div>
+
+    <!-- 【核心新增】移动端属性面板抽屉 -->
+    <a-drawer
+        v-if="isMobile"
+        v-model:open="propertiesDrawerVisible"
+        title="属性配置"
+        placement="bottom"
+        :height="'80%'"
+    >
+      <SimplePropertiesPanel
+          :selected-element="selectedElement"
+          :modeler="modeler"
+          :form-fields="formFields"
+          :user-groups="availableGroups"
+          @update="handlePropertiesUpdate"
+      />
+    </a-drawer>
   </div>
 </template>
 
 <script setup>
-// 【核心修复】从 vue 中导入 markRaw
 import { ref, onMounted, onBeforeUnmount, watch, nextTick, markRaw } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { message, Modal } from 'ant-design-vue';
 import { getFormById, deployWorkflow, getWorkflowTemplate, updateWorkflowTemplate, getGroupsForWorkflow } from '@/api';
 import {
   UndoOutlined, RedoOutlined, ZoomInOutlined, ZoomOutOutlined,
-  FullscreenOutlined, DownloadOutlined, FileImageOutlined, UploadOutlined
+  FullscreenOutlined, DownloadOutlined, FileImageOutlined, UploadOutlined,
+  SettingOutlined, // 【核心新增】
 } from '@ant-design/icons-vue';
 import { flattenFields } from '@/utils/formUtils.js';
 
-// BPMN.js 相关导入
 import BpmnModeler from 'bpmn-js/lib/Modeler.js';
 import 'bpmn-js/dist/assets/diagram-js.css';
 import 'bpmn-js/dist/assets/bpmn-js.css';
 import 'bpmn-js/dist/assets/bpmn-font/css/bpmn.css';
-// 【核心修改】移除旧属性面板相关导入
 import camundaModdleDescriptors from 'camunda-bpmn-moddle/resources/camunda.json';
 import customTranslateModule from '@/utils/customTranslate';
-
-// 【核心修改】导入新的简化版属性面板组件
 import SimplePropertiesPanel from './workflow/SimplePropertiesPanel.vue';
 
-// --- 路由与状态 ---
 const route = useRoute();
 const router = useRouter();
 const formId = route.params.formId;
@@ -105,11 +124,16 @@ let modeler = null;
 const canUndo = ref(false);
 const canRedo = ref(false);
 
-// --- 面板所需数据 ---
 const availableGroups = ref([]);
 const formFields = ref([]);
-// 【核心新增】用于存储当前选中的BPMN节点
 const selectedElement = ref(null);
+
+// --- 【核心新增】响应式断点 ---
+const isMobile = ref(window.innerWidth < 768);
+const propertiesDrawerVisible = ref(false);
+const handleResize = () => { isMobile.value = window.innerWidth < 768; };
+onBeforeUnmount(() => window.removeEventListener('resize', handleResize));
+// ---
 
 watch(loading, async (val) => {
   if (!val) {
@@ -122,29 +146,25 @@ async function initModeler() {
   try {
     modeler = new BpmnModeler({
       container: canvasRef.value,
-      // 【核心修改】移除旧的 propertiesPanel 配置
-      additionalModules: [
-        // 【核心修改】移除旧的属性面板模块
-        customTranslateModule
-      ],
+      additionalModules: [ customTranslateModule ],
       moddleExtensions: { camunda: camundaModdleDescriptors },
     });
 
     const eventBus = modeler.get('eventBus');
 
-    // 监听命令栈变化，更新撤销/重做按钮状态
     eventBus.on('commandStack.changed', () => {
       canUndo.value = modeler.get('commandStack').canUndo();
       canRedo.value = modeler.get('commandStack').canRedo();
     });
 
-    // 【核心修复】监听节点选择事件，并使用 markRaw 防止 Vue 将其转换为响应式对象
     eventBus.on('selection.changed', (event) => {
       const { newSelection } = event;
       selectedElement.value = newSelection && newSelection.length > 0 ? markRaw(newSelection[0]) : null;
+      if (isMobile.value && selectedElement.value) {
+        propertiesDrawerVisible.value = true;
+      }
     });
 
-    // 【核心修复】监听节点属性变化事件，同样使用 markRaw
     eventBus.on('element.changed', (event) => {
       const { element } = event;
       if (selectedElement.value && selectedElement.value.id === element.id) {
@@ -161,33 +181,14 @@ async function initModeler() {
   }
 }
 
-// 【核心新增】处理来自新属性面板的更新请求
 const handlePropertiesUpdate = (propertiesToUpdate) => {
   if (!selectedElement.value) return;
   const modeling = modeler.get('modeling');
   modeling.updateProperties(selectedElement.value, propertiesToUpdate);
 };
 
-
-const handleKeyDown = (event) => {
-  if (!modeler) return;
-  const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
-  const isCtrlOrCmd = isMac ? event.metaKey : event.ctrlKey;
-
-  if (isCtrlOrCmd && event.key.toLowerCase() === 'z') {
-    event.preventDefault();
-    if (event.shiftKey) {
-      if (canRedo.value) handleRedo();
-    } else {
-      if (canUndo.value) handleUndo();
-    }
-  } else if (isCtrlOrCmd && event.key.toLowerCase() === 'y') {
-    event.preventDefault();
-    if (canRedo.value) handleRedo();
-  }
-};
-
 onMounted(async () => {
+  window.addEventListener('resize', handleResize);
   try {
     const [form, groups] = await Promise.all([
       getFormById(formId),
@@ -202,11 +203,8 @@ onMounted(async () => {
         .filter(f => !['GridRow', 'GridCol', 'Collapse', 'CollapsePanel', 'StaticText', 'DescriptionList', 'Divider'].includes(f.type))
         .map(f => ({ id: f.id, label: f.label || f.id, type: f.type }));
 
-    window.addEventListener('keydown', handleKeyDown);
-
   } catch (err) {
     message.error('获取基础信息失败');
-    console.error(err);
   } finally {
     loading.value = false;
   }
@@ -217,7 +215,6 @@ onBeforeUnmount(() => {
     modeler.destroy();
     modeler = null;
   }
-  window.removeEventListener('keydown', handleKeyDown);
 });
 
 async function getModelerContent() {
@@ -234,10 +231,7 @@ const handleSaveDraft = async () => {
   saving.value = true;
   try {
     const { xml, processDefinitionKey } = await getModelerContent();
-    const payload = {
-      bpmnXml: xml,
-      processDefinitionKey: processDefinitionKey,
-    };
+    const payload = { bpmnXml: xml, processDefinitionKey };
     await updateWorkflowTemplate(formId, payload);
     message.success('流程草稿保存成功！');
   } catch (error) {
@@ -259,7 +253,7 @@ const handleDeploy = () => {
         const payload = {
           formDefinitionId: Number(formId),
           bpmnXml: xml,
-          processDefinitionKey: processDefinitionKey,
+          processDefinitionKey,
         };
         await deployWorkflow(payload);
         message.success('流程部署成功！');
@@ -290,41 +284,33 @@ const handleFileImport = (event) => {
     let xmlContent = e.target.result;
     const expectedProcessId = `Process_Form_${formId}`;
 
-    // 用于查找 <bpmn:process id="..."> 并提取 ID 的正则表达式
     const processIdRegex = /(<bpmn:process[^>]*id=")([^"]+)(")/;
     const match = xmlContent.match(processIdRegex);
 
-    // 如果找到了流程ID，并且它与当前表单预期的ID不符，则进行替换
     if (match && match[2] && match[2] !== expectedProcessId) {
       const oldProcessId = match[2];
-      // 对旧的流程ID进行转义，以便在新的正则表达式中使用，防止特殊字符导致匹配失败
       const escapedOldProcessId = oldProcessId.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-      // 创建一个专门用于替换 BPMNPlane 中 bpmnElement 属性的正则表达式
       const planeElementRegexForReplace = new RegExp(`(<bpmndi:BPMNPlane[^>]*bpmnElement=")` + escapedOldProcessId + `(")`);
 
-      // 1. 替换 <bpmn:process> 标签中的 id
       xmlContent = xmlContent.replace(processIdRegex, `$1${expectedProcessId}$3`);
-      // 2. 替换 <bpmndi:BPMNPlane> 标签中的 bpmnElement
       xmlContent = xmlContent.replace(planeElementRegexForReplace, `$1${expectedProcessId}$2`);
 
-      message.info(`导入的流程ID "${oldProcessId}" 已自动更新为 "${expectedProcessId}" 以匹配当前表单。`, 5);
+      message.info(`导入的流程ID "${oldProcessId}" 已自动更新为 "${expectedProcessId}"`, 5);
     }
 
     modeler.importXML(xmlContent)
         .then(({ warnings }) => {
-          if (warnings.length) {
-            console.warn('BPMN 导入警告:', warnings);
-          }
+          if (warnings.length) console.warn('BPMN Import Warnings:', warnings);
           message.success('BPMN 文件导入成功！');
-          handleFitViewport(); // 导入后自动适应屏幕
+          handleFitViewport();
         })
         .catch(err => {
-          console.error('BPMN 导入错误:', err);
-          message.error(`导入失败: ${err.message || '请检查文件格式是否正确。'}`);
+          console.error('BPMN Import Error:', err);
+          message.error(`导入失败: ${err.message || '请检查文件格式。'}`);
         });
   };
   reader.readAsText(file);
-  event.target.value = ''; // 重置文件输入框，以便可以再次选择同一个文件
+  event.target.value = '';
 };
 
 function downloadFile(filename, data, type) {
@@ -363,7 +349,7 @@ const downloadSvg = async () => {
   padding: 0;
   display: flex;
   flex-direction: column;
-  height: calc(100vh - 64px - 48px); /* 减去 Header 和 Footer 的高度 */
+  height: calc(100vh - 64px - 48px);
   background-color: #fff;
 }
 .toolbar {
@@ -381,7 +367,6 @@ const downloadSvg = async () => {
   flex-grow: 1;
   background-color: #f9f9f9;
 }
-/* 【核心新增】新属性面板的样式 */
 .properties-panel {
   width: 320px;
   flex-shrink: 0;
@@ -404,5 +389,11 @@ const downloadSvg = async () => {
 :deep(.djs-palette) {
   top: 20px;
   left: 20px;
+}
+.mobile-fab-group {
+  position: fixed;
+  bottom: 80px;
+  right: 24px;
+  z-index: 100;
 }
 </style>

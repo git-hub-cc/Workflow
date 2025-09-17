@@ -7,7 +7,6 @@
     />
 
     <a-spin :spinning="loading" tip="正在加载详情...">
-      <!-- 【核心修改】当加载失败时，显示错误提示 -->
       <a-empty
           v-if="loadError"
           :description="loadError"
@@ -16,41 +15,35 @@
         <a-button type="primary" @click="$router.push('/')">返回首页</a-button>
       </a-empty>
 
-      <!-- 仅在加载成功后显示内容 -->
-      <div v-else-if="!loading" class="detail-layout">
+      <!-- 【核心修改】使用 a-row 和 a-col 实现响应式布局 -->
+      <a-row v-else-if="!loading" :gutter="[24, 24]" class="detail-layout">
         <!-- 左侧主内容区: 表单详情 -->
-        <div class="main-content">
+        <a-col :xs="24" :lg="16" class="main-content">
           <a-card title="表单内容">
             <a-descriptions bordered :column="1">
               <template v-for="field in flattenedFields" :key="field.id">
-                <!-- 1. 富文本 -->
                 <a-descriptions-item v-if="field.type === 'RichText'" :label="field.label" :span="1">
                   <div v-html="formData[field.id]" class="readonly-richtext"></div>
                 </a-descriptions-item>
 
-                <!-- 2. 子表单 -->
                 <a-descriptions-item v-else-if="field.type === 'Subform'" :label="field.label" :span="1">
                   <a-table :columns="getSubformColumns(field)" :data-source="formData[field.id]" :pagination="false" bordered size="small" />
                 </a-descriptions-item>
 
-                <!-- 3. 键值对 -->
                 <a-descriptions-item v-else-if="field.type === 'KeyValue'" :label="field.label" :span="1">
                   <a-descriptions :column="1" size="small" bordered>
                     <a-descriptions-item v-for="(item, idx) in formData[field.id]" :key="idx" :label="item.key">{{ item.value }}</a-descriptions-item>
                   </a-descriptions>
                 </a-descriptions-item>
 
-                <!-- 4. 图标选择器 -->
                 <a-descriptions-item v-else-if="field.type === 'IconPicker'" :label="field.label">
                   <component v-if="formData[field.id]" :is="iconMap[formData[field.id]]" style="font-size: 24px;" />
                   <span v-else>(未选择)</span>
                 </a-descriptions-item>
 
-                <!-- 5. 【核心优化】文件上传字段：直接渲染附件列表 -->
                 <a-descriptions-item v-else-if="field.type === 'FileUpload'" :label="field.label">
                   <div v-if="formData[field.id] && formData[field.id].length > 0" class="attachments-list">
                     <div v-for="file in formData[field.id]" :key="file.id" class="attachment-item">
-                      <!-- 图片预览 -->
                       <div v-if="isImage(file)" class="image-preview-container">
                         <a-image :width="80" :height="80" :src="`/api/files/${file.id}`" />
                         <div class="file-info">
@@ -58,7 +51,6 @@
                           <a @click.prevent="handleDownload(file.id, file.originalFilename)" href="#" class="download-action">下载</a>
                         </div>
                       </div>
-                      <!-- 非图片文件卡片 -->
                       <a v-else @click.prevent="handleDownload(file.id, file.originalFilename)" href="#" class="file-link">
                         <PaperClipOutlined />
                         <span :title="file.originalFilename">{{ file.originalFilename }}</span>
@@ -68,17 +60,16 @@
                   <span v-else>(无附件)</span>
                 </a-descriptions-item>
 
-                <!-- 6. 其他普通字段 -->
                 <a-descriptions-item v-else :label="field.label">
                   {{ formatDisplayValue(field, formData[field.id]) }}
                 </a-descriptions-item>
               </template>
             </a-descriptions>
           </a-card>
-        </div>
+        </a-col>
 
         <!-- 右侧辅助信息区: 流程历史 -->
-        <div class="side-content">
+        <a-col :xs="24" :lg="8" class="side-content">
           <a-card>
             <a-tabs v-model:activeKey="activeTabKey">
               <a-tab-pane key="historyList" tab="历史列表">
@@ -96,7 +87,6 @@
                 </a-timeline>
               </a-tab-pane>
               <a-tab-pane key="diagram" tab="流程图">
-                <!-- 【核心修改】增加包裹容器和放大按钮 -->
                 <div class="diagram-preview-wrapper">
                   <ProcessDiagramViewer
                       v-if="bpmnXml"
@@ -118,11 +108,10 @@
               </a-tab-pane>
             </a-tabs>
           </a-card>
-        </div>
-      </div>
+        </a-col>
+      </a-row>
     </a-spin>
 
-    <!-- 【核心新增】流程图模态框 -->
     <ProcessDiagramModal
         v-if="isDiagramModalVisible"
         v-model:open="isDiagramModalVisible"
@@ -133,18 +122,14 @@
 </template>
 
 <script setup>
-// 【核心修改】引入 defineAsyncComponent
 import { ref, reactive, onMounted, computed, defineAsyncComponent } from 'vue';
-// 【核心修改】引入 getWorkflowDiagram 和 FullscreenOutlined
 import { getSubmissionById, getFormById, getWorkflowHistory, downloadFile, getWorkflowDiagram } from '@/api';
 import { message } from 'ant-design-vue';
 import { PaperClipOutlined, FullscreenOutlined } from '@ant-design/icons-vue';
 import { flattenFields } from '@/utils/formUtils.js';
 import { iconMap } from '@/utils/iconLibrary.js';
 import { useSystemStore } from '@/stores/system';
-// 【核心修改】引入新的流程图组件和模态框
 import ProcessDiagramViewer from '@/components/ProcessDiagramViewer.vue';
-// 【核心修改】使用 defineAsyncComponent 动态加载流程图模态框
 const ProcessDiagramModal = defineAsyncComponent(() => import('@/components/ProcessDiagramModal.vue'));
 
 
@@ -152,14 +137,13 @@ const props = defineProps({ submissionId: String });
 const systemStore = useSystemStore();
 
 const loading = ref(true);
-const loadError = ref(null); // 【核心新增】错误状态
+const loadError = ref(null);
 const submission = ref({});
 const formDefinition = ref({ schema: { fields: [] } });
 const formData = reactive({});
 const history = ref([]);
 const bpmnXml = ref(null);
 const activeTabKey = ref('historyList');
-// --- 【核心新增】模态框状态 ---
 const isDiagramModalVisible = ref(false);
 
 
@@ -195,16 +179,12 @@ onMounted(async () => {
     }
 
   } catch (error) {
-    // 【核心修改】捕获错误并设置错误状态
     loadError.value = '您访问的申请不存在或已被删除。';
     console.error('加载详情失败:', error);
   } finally {
     loading.value = false;
   }
 });
-
-
-// --- 用于显示和格式化的辅助函数 (无变化) ---
 
 const isImage = (file) => {
   if (!file || !file.originalFilename) return false;
@@ -286,14 +266,21 @@ const formatDuration = (ms) => {
 </script>
 
 <style scoped>
-.detail-layout { display: flex; gap: 24px; padding: 24px; align-items: flex-start; }
-.main-content { flex: 2; min-width: 0; }
-.side-content { flex: 1; min-width: 0; }
+/* 【核心修改】移除旧的 flex 布局，改为 padding */
+.detail-layout {
+  padding: 24px;
+}
+@media (max-width: 768px) {
+  .detail-layout {
+    padding: 16px;
+  }
+}
+
+.main-content, .side-content { min-width: 0; }
 .approval-comment { background-color: #fafafa; border: 1px solid #f0f0f0; padding: 8px 12px; border-radius: 4px; margin-top: 8px; font-size: 14px; color: #595959; word-wrap: break-word; }
 .approval-comment strong { color: #262626; margin-right: 8px; }
 .readonly-richtext :deep(img) { max-width: 100%; height: auto; }
 
-/* --- 【核心优化】附件列表样式 --- */
 .attachments-list { display: flex; flex-wrap: wrap; gap: 16px; }
 .image-preview-container { display: flex; flex-direction: column; align-items: center; gap: 8px; width: 100px; text-align: center; }
 .image-preview-container :deep(.ant-image) { flex-shrink: 0; }
@@ -308,12 +295,11 @@ const formatDuration = (ms) => {
 .file-link .anticon { font-size: 28px; }
 .file-link span { font-size: 12px; word-break: break-all; line-height: 1.2; }
 
-/* --- 【核心新增】流程图预览容器样式 --- */
 .diagram-preview-wrapper {
   position: relative;
 }
 .diagram-preview-wrapper :deep(.diagram-container) {
-  height: 400px; /* 限制预览区域的高度 */
+  height: 400px;
 }
 .fullscreen-btn {
   position: absolute;

@@ -19,6 +19,7 @@
           :pagination="false"
           :default-expand-all-rows="true"
           :custom-row="customRow"
+          :scroll="{ x: 'max-content' }"
       >
         <template #bodyCell="{ column, record }">
           <template v-if="column.key === 'name'">
@@ -44,16 +45,15 @@
       </a-table>
     </div>
 
-    <!-- 新增/编辑弹窗 -->
-    <a-modal v-model:open="modalVisible" :title="modalTitle" width="600px" @ok="handleOk" :confirm-loading="confirmLoading">
+    <a-modal v-model:open="modalVisible" :title="modalTitle" :width="isMobile ? '95%' : '600px'" @ok="handleOk" :confirm-loading="confirmLoading">
       <a-form :model="formState" :rules="rules" ref="formRef" layout="vertical">
         <a-row :gutter="16">
-          <a-col :span="12">
+          <a-col :xs="24" :sm="12">
             <a-form-item label="上级菜单" name="parentId">
               <a-tree-select v-model:value="formState.parentId" :tree-data="menuTreeForSelect" placeholder="不选则为顶级菜单" tree-default-expand-all allow-clear />
             </a-form-item>
           </a-col>
-          <a-col :span="12">
+          <a-col :xs="24" :sm="12">
             <a-form-item label="菜单类型" name="type">
               <a-select v-model:value="formState.type" @change="onMenuTypeChange">
                 <a-select-option value="DIRECTORY">目录</a-select-option>
@@ -64,10 +64,10 @@
               </a-select>
             </a-form-item>
           </a-col>
-          <a-col :span="12">
+          <a-col :xs="24" :sm="12">
             <a-form-item label="菜单名称" name="name"><a-input v-model:value="formState.name" /></a-form-item>
           </a-col>
-          <a-col :span="12">
+          <a-col :xs="24" :sm="12">
             <a-form-item label="菜单图标" name="icon">
               <a-input v-model:value="formState.icon" placeholder="点击选择图标" readonly @click="showIconPicker = true">
                 <template #addonAfter>
@@ -77,12 +77,12 @@
             </a-form-item>
           </a-col>
           <template v-if="formState.type !== 'DIRECTORY'">
-            <a-col :span="12">
+            <a-col :xs="24" :sm="12">
               <a-form-item :label="formState.type === 'EXTERNAL_LINK' ? '链接地址' : '路由路径'" name="path" :help="formState.type === 'EXTERNAL_LINK' ? '例如: https://www.google.com' : '例如: /wms/inbound'">
                 <a-input v-model:value="formState.path" />
               </a-form-item>
             </a-col>
-            <a-col :span="12" v-if="['FORM_ENTRY', 'DATA_LIST'].includes(formState.type)">
+            <a-col :xs="24" :sm="12" v-if="['FORM_ENTRY', 'DATA_LIST'].includes(formState.type)">
               <a-form-item label="关联表单" name="formDefinitionId">
                 <a-select v-model:value="formState.formDefinitionId" :options="allForms" :field-names="{label: 'name', value: 'id'}" show-search option-filter-prop="name" />
               </a-form-item>
@@ -100,15 +100,14 @@
             </a-form-item>
           </a-col>
 
-          <a-col :span="12">
+          <a-col :xs="24" :sm="12">
             <a-form-item label="排序号" name="orderNum"><a-input-number v-model:value="formState.orderNum" style="width: 100%;"/></a-form-item>
           </a-col>
-          <a-col :span="12">
+          <a-col :xs="24" :sm="12">
             <a-form-item label="是否可见" name="visible"><a-switch v-model:checked="formState.visible" /></a-form-item>
           </a-col>
           <a-col :span="24">
             <a-form-item label="授权角色" name="roleNames">
-              <!-- 【已修复】下拉框现在可以从本地 allRoles ref 获取数据 -->
               <a-select v-model:value="formState.roleNames" mode="multiple" placeholder="选择可以访问此菜单的角色" :options="allRoles.map(r => ({label: r.description, value: r.name}))" />
             </a-form-item>
           </a-col>
@@ -120,8 +119,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, reactive, computed } from 'vue';
-// 【已修复】引入 getRoles API
+import { ref, onMounted, reactive, computed, onBeforeUnmount } from 'vue';
 import { getMenuTree, createMenu, updateMenu, deleteMenu, getForms, updateMenuTree, getRoles } from '@/api';
 import { message } from 'ant-design-vue';
 import { PlusOutlined } from '@ant-design/icons-vue';
@@ -132,24 +130,29 @@ import { cloneDeep } from 'lodash-es';
 const loading = ref(true);
 const menuTree = ref([]);
 const allForms = ref([]);
-// 【已修复】创建本地 ref 来存储角色列表
 const allRoles = ref([]);
 let draggedNode = null;
 
+// --- 【核心新增】响应式断点逻辑 ---
+const isMobile = ref(window.innerWidth < 768);
+const handleResize = () => { isMobile.value = window.innerWidth < 768; };
+onBeforeUnmount(() => { window.removeEventListener('resize', handleResize); });
+// --- 响应式逻辑结束 ---
+
 const columns = [
-  { title: '菜单名称', key: 'name', dataIndex: 'name' },
+  { title: '菜单名称', key: 'name', dataIndex: 'name', width: 200 },
   { title: '路由路径', key: 'path', dataIndex: 'path' },
   { title: '类型', key: 'type', dataIndex: 'type', align: 'center' },
   { title: '可见', key: 'visible', dataIndex: 'visible', align: 'center' },
   { title: '排序', key: 'orderNum', dataIndex: 'orderNum', align: 'center' },
-  { title: '操作', key: 'actions', width: 220, align: 'center' },
+  { title: '操作', key: 'actions', width: 220, align: 'center', fixed: 'right' },
 ];
 
 const fetchMenus = async () => {
   loading.value = true;
   try {
     menuTree.value = await getMenuTree();
-  } catch (e) { /* error handled globally */ } finally {
+  } catch (e) {} finally {
     loading.value = false;
   }
 };
@@ -161,7 +164,6 @@ const fetchForms = async () => {
   } catch (e) {}
 };
 
-// 【已修复】创建获取角色的函数
 const fetchRoles = async () => {
   try {
     const response = await getRoles({ page: 0, size: 1000 });
@@ -170,12 +172,12 @@ const fetchRoles = async () => {
 };
 
 onMounted(() => {
+  window.addEventListener('resize', handleResize);
   fetchMenus();
   fetchForms();
-  fetchRoles(); // 【已修复】在 onMounted 中调用
+  fetchRoles();
 });
 
-// --- 拖拽排序逻辑 ---
 const findNodeAndParent = (key, tree, parent = null) => {
   for (let i = 0; i < tree.length; i++) {
     const node = tree[i];
@@ -222,9 +224,7 @@ const customRow = (record) => ({
       await updateMenuTree(newTree);
       message.success('菜单顺序已更新！');
       await fetchMenus();
-    } catch(err) {
-      // global handler
-    } finally {
+    } catch(err) {} finally {
       loading.value = false;
       draggedNode = null;
     }
@@ -232,7 +232,6 @@ const customRow = (record) => ({
 });
 
 
-// Modal state
 const modalVisible = ref(false);
 const confirmLoading = ref(false);
 const isEditing = ref(false);

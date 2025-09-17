@@ -31,6 +31,7 @@
           :pagination="pagination"
           row-key="camundaTaskId"
           @change="handleTableChange"
+          :scroll="{ x: 'max-content' }"
       >
         <template #bodyCell="{ column, record }">
           <template v-if="column.key === 'taskName'">
@@ -98,7 +99,6 @@ const formatDuration = (ms) => {
   return `${hours > 0 ? hours + 'h ' : ''}${minutes > 0 ? minutes + 'm ' : ''}${seconds}s`;
 };
 
-// --- 【核心修改】增加对打回状态的支持 ---
 const getDecisionColor = (decision) => {
   switch (decision) {
     case 'APPROVED':
@@ -127,7 +127,6 @@ const getDecisionText = (decision) => {
       return '未知';
   }
 };
-// --- 【修改结束】 ---
 
 const goToDetail = (submissionId) => {
   if (!submissionId) return;
@@ -139,5 +138,10 @@ const goToDetail = (submissionId) => {
 .page-container {
   background-color: #fff;
   border-radius: 4px;
+}
+@media (max-width: 768px) {
+  :deep(.ant-form-inline .ant-form-item) {
+    margin-bottom: 16px;
+  }
 }
 </style>

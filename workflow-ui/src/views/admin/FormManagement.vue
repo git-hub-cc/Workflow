@@ -10,7 +10,6 @@
     </a-page-header>
 
     <div style="padding: 24px;">
-      <!-- 【阶段二新增】筛选区域 -->
       <a-card :bordered="false" style="margin-bottom: 24px;">
         <a-form :model="filterState" layout="inline">
           <a-form-item label="表单名称">
@@ -38,6 +37,7 @@
           :pagination="pagination"
           row-key="id"
           @change="handleTableChange"
+          :scroll="{ x: 'max-content' }"
       >
         <template #bodyCell="{ column, record }">
           <template v-if="column.key === 'createdAt' || column.key === 'updatedAt'">
@@ -61,7 +61,6 @@
       </a-table>
     </div>
 
-    <!-- 删除确认与依赖展示模态框 -->
     <a-modal
         v-model:open="deleteModalInfo.visible"
         :title="`删除确认：${deleteModalInfo.formName}`"
@@ -117,7 +116,6 @@
 <script setup>
 import {ref, onMounted, reactive, h} from 'vue';
 import { useRouter } from 'vue-router';
-// --- 【阶段二修改】引入 usePaginatedFetch 和新的图标 ---
 import { getForms, deleteForm, getFormDependencies } from '@/api';
 import { usePaginatedFetch } from '@/composables/usePaginatedFetch';
 import { message, Modal } from 'ant-design-vue';
@@ -133,7 +131,6 @@ import {
 
 const router = useRouter();
 
-// --- 【阶段二修改】使用 usePaginatedFetch Hook ---
 const {
   loading,
   dataSource,
@@ -145,26 +142,24 @@ const {
   fetchData,
 } = usePaginatedFetch(
     getForms,
-    { name: '' }, // 初始筛选条件
-    { defaultSort: 'updatedAt,desc' } // 默认排序
+    { name: '' },
+    { defaultSort: 'updatedAt,desc' }
 );
 
 const columns = [
-  { title: 'ID', dataIndex: 'id', key: 'id', width: 80 },
+  { title: 'ID', dataIndex: 'id', key: 'id', width: 80, fixed: 'left' },
   { title: '表单名称', dataIndex: 'name', key: 'name', sorter: true },
   { title: '创建时间', dataIndex: 'createdAt', key: 'createdAt', width: 200, sorter: true },
   { title: '更新时间', dataIndex: 'updatedAt', key: 'updatedAt', width: 200, sorter: true },
-  { title: '操作', key: 'actions', align: 'center', width: 320 },
+  { title: '操作', key: 'actions', align: 'center', width: 320, fixed: 'right' },
 ];
 
-onMounted(fetchData); // 首次加载数据
+onMounted(fetchData);
 
 const goToBuilder = (formId) => router.push({ name: 'form-builder-edit', params: { formId } });
 const goToDesigner = (formId) => router.push({ name: 'workflow-designer', params: { formId } });
 const viewSubmissions = (formId) => router.push({ name: 'form-submissions', params: { formId } });
 
-
-// --- 删除模态框相关逻辑 (保持不变) ---
 const deleteModalInfo = reactive({
   visible: false,
   loading: false,
@@ -206,7 +201,7 @@ const confirmSimpleDelete = (record) => {
       try {
         await deleteForm(record.id, false);
         message.success('表单删除成功！');
-        await fetchData(); // 【阶段二修改】刷新数据
+        await fetchData();
       } catch (error) {}
     },
   });
@@ -218,7 +213,7 @@ const handleCascadeDelete = async () => {
     await deleteForm(deleteModalInfo.formId, true);
     message.success(`表单 “${deleteModalInfo.formName}” 及其关联数据已成功删除！`);
     closeDeleteModal();
-    await fetchData(); // 【阶段二修改】刷新数据
+    await fetchData();
   } catch (error) {
   } finally {
     deleteModalInfo.loading = false;
@@ -232,7 +227,6 @@ const closeDeleteModal = () => {
   cascadeDeleteConfirmed.value = false;
 };
 
-// --- 依赖项显示辅助函数 (保持不变) ---
 const getDependencyIcon = (type) => {
   const map = { WORKFLOW: ForkOutlined, MENU: MenuOutlined, SUBMISSION: DatabaseOutlined };
   return map[type];
@@ -262,5 +256,12 @@ const navigateToDependency = (item) => {
 .page-container {
   background-color: #fff;
   border-radius: 4px;
+}
+
+/* 【核心新增】移动端内联表单换行 */
+@media (max-width: 768px) {
+  :deep(.ant-form-inline .ant-form-item) {
+    margin-bottom: 16px;
+  }
 }
 </style>

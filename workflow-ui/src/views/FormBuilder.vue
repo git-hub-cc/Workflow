@@ -1,54 +1,54 @@
 <template>
   <div class="page-container">
-    <!-- 【核心修改】页面头部，标题动态化，返回按钮指向列表页 -->
     <a-page-header :title="pageTitle" @back="() => $router.push({ name: 'admin-forms' })">
       <template #extra>
         <a-space>
           <a-button @click="showPreviewModal">
             <template #icon><EyeOutlined /></template>
-            预览
+            <!-- 【核心修改】移动端只显示图标 -->
+            <span v-if="!isMobile">预览</span>
           </a-button>
 
-          <input type="file" ref="wordFileInputRef" @change="handleWordImport" style="display: none" accept=".docx" />
-          <a-button @click="triggerWordImport" :loading="importingWord">
-            <template #icon><FileWordOutlined /></template>
-            从Word导入
-          </a-button>
-
-          <input type="file" ref="jsonFileInputRef" @change="handleJsonImport" style="display: none" accept=".json" />
-          <a-button @click="triggerJsonImport">
-            <template #icon><UploadOutlined /></template>
-            导入 JSON
-          </a-button>
-
-          <a-button @click="handleExport">
-            <template #icon><DownloadOutlined /></template>
-            导出
-          </a-button>
+          <!-- 【核心新增】移动端将导入/导出收到一个菜单里 -->
+          <a-dropdown v-if="!isMobile">
+            <template #overlay>
+              <a-menu>
+                <a-menu-item key="import-word" @click="triggerWordImport" :loading="importingWord">
+                  <FileWordOutlined /> 从Word导入
+                </a-menu-item>
+                <a-menu-item key="import-json" @click="triggerJsonImport">
+                  <UploadOutlined /> 导入 JSON
+                </a-menu-item>
+                <a-menu-item key="export" @click="handleExport">
+                  <DownloadOutlined /> 导出
+                </a-menu-item>
+              </a-menu>
+            </template>
+            <a-button>
+              导入/导出 <DownOutlined />
+            </a-button>
+          </a-dropdown>
 
           <a-divider type="vertical" />
 
           <a-button @click="$router.push({ name: 'admin-forms' })">取消</a-button>
-          <a-button type="primary" @click="saveForm" :loading="saving || loading">保存表单</a-button>
+          <a-button type="primary" @click="saveForm" :loading="saving || loading">保存</a-button>
         </a-space>
       </template>
     </a-page-header>
 
-    <!-- 【核心修改】增加加载状态 -->
     <a-spin :spinning="loading" tip="正在加载表单定义...">
-      <!-- 表单名称输入框 -->
-      <a-row :gutter="16" style="padding: 24px;">
+      <a-row :gutter="16" style="padding: 16px;">
         <a-col :span="24">
-          <a-form-item label="表单名称" :label-col="{ span: 2 }" :wrapper-col="{ span: 10 }">
+          <a-form-item label="表单名称" :label-col="{ span: isMobile ? 24 : 2 }" :wrapper-col="{ span: isMobile ? 24 : 10 }">
             <a-input v-model:value="formDefinition.name" placeholder="例如：请假申请单" />
           </a-form-item>
         </a-col>
       </a-row>
 
-      <!-- 设计器主容器 -->
       <div class="builder-container">
-        <!-- 左侧: 组件面板 -->
-        <div class="palette">
+        <!-- 左侧: 组件面板 (桌面端) -->
+        <div v-if="!isMobile" class="palette">
           <a-card title="布局组件" size="small">
             <div v-for="item in paletteItems.layout" :key="item.label" class="palette-item" draggable="true" @dragstart="handleDragStart(item)">{{ item.label }}</div>
           </a-card>
@@ -60,28 +60,31 @@
           </a-card>
         </div>
 
-        <!-- 中间: 画布，所有组件的拖放区域 -->
+        <!-- 中间: 画布 -->
         <div class="canvas" @dragover.prevent @drop.prevent.stop="handleCanvasDrop($event)">
           <a-form layout="vertical">
             <div v-if="formDefinition.schema.fields.length === 0" class="canvas-placeholder">
-              从左侧拖拽组件到这里，或从顶部导入Word/JSON文件
+              {{ isMobile ? '点击右下角按钮添加组件' : '从左侧拖拽组件到这里' }}
             </div>
-            <draggable-item
+            <DraggableItem
                 v-for="(field, index) in formDefinition.schema.fields"
                 :key="field.id || index"
                 :field="field"
                 :index="index"
                 :fields="formDefinition.schema.fields"
                 :selected-field-id="selectedFieldId"
+                :is-mobile="isMobile"
                 @select="selectField"
                 @delete="deleteField"
                 @component-dropped="handleComponentDrop"
+                @move="moveField"
             />
           </a-form>
         </div>
 
-        <!-- 右侧: 属性配置面板 -->
+        <!-- 右侧: 属性配置面板 (桌面端) -->
         <properties-panel
+            v-if="!isMobile"
             :selected-field="selectedField"
             :all-fields="formDefinition.schema.fields"
             @update:field="handleFieldUpdate"
@@ -96,49 +99,99 @@
         :form-definition="formDefinition"
     />
 
+    <!-- 【核心新增】移动端悬浮操作按钮 -->
+    <div v-if="isMobile" class="mobile-fab-group">
+      <a-button type="primary" shape="circle" size="large" @click="paletteDrawerVisible = true">
+        <PlusOutlined />
+      </a-button>
+    </div>
+
+    <!-- 【核心新增】移动端组件面板抽屉 -->
+    <a-drawer
+        v-if="isMobile"
+        v-model:open="paletteDrawerVisible"
+        title="添加组件"
+        placement="bottom"
+        :height="'80%'"
+    >
+      <a-list item-layout="horizontal">
+        <a-list-item>
+          <a-tag color="blue">布局组件</a-tag>
+          <a-space wrap>
+            <a-button v-for="item in paletteItems.layout" :key="item.label" @click="addComponent(item)">{{ item.label }}</a-button>
+          </a-space>
+        </a-list-item>
+        <a-list-item>
+          <a-tag color="green">基础组件</a-tag>
+          <a-space wrap>
+            <a-button v-for="item in paletteItems.basic" :key="item.label" @click="addComponent(item)">{{ item.label }}</a-button>
+          </a-space>
+        </a-list-item>
+        <a-list-item>
+          <a-tag color="purple">高级组件</a-tag>
+          <a-space wrap>
+            <a-button v-for="item in paletteItems.advanced" :key="item.label" @click="addComponent(item)">{{ item.label }}</a-button>
+          </a-space>
+        </a-list-item>
+      </a-list>
+    </a-drawer>
+
+    <!-- 【核心新增】移动端属性面板抽屉 -->
+    <a-drawer
+        v-if="isMobile"
+        v-model:open="propertiesDrawerVisible"
+        title="属性配置"
+        placement="right"
+        width="85%"
+        :body-style="{ padding: '16px' }"
+    >
+      <properties-panel
+          :selected-field="selectedField"
+          :all-fields="formDefinition.schema.fields"
+          @update:field="handleFieldUpdate"
+      />
+    </a-drawer>
+
+    <!-- 隐藏的 input 用于文件导入 -->
+    <input type="file" ref="wordFileInputRef" @change="handleWordImport" style="display: none" accept=".docx" />
+    <input type="file" ref="jsonFileInputRef" @change="handleJsonImport" style="display: none" accept=".json" />
   </div>
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted, defineAsyncComponent } from 'vue';
+import { ref, reactive, computed, onMounted, defineAsyncComponent, onBeforeUnmount } from 'vue';
 import { useRouter } from 'vue-router';
 import { message, Modal } from 'ant-design-vue';
-// 【核心修改】引入 updateForm 和 getFormById
 import { createForm, updateForm, getFormById, importFromWord } from '@/api';
 import { v4 as uuidv4 } from 'uuid';
 import PropertiesPanel from './builder-components/PropertiesPanel.vue';
-// 【核心修改】使用 defineAsyncComponent 动态加载预览模态框
 const FormPreviewModal = defineAsyncComponent(() => import('@/components/FormPreviewModal.vue'));
-import { EyeOutlined, UploadOutlined, DownloadOutlined, FileWordOutlined } from "@ant-design/icons-vue";
+import { EyeOutlined, UploadOutlined, DownloadOutlined, FileWordOutlined, DownOutlined, PlusOutlined } from "@ant-design/icons-vue";
 
 const DraggableItem = defineAsyncComponent(() => import('./builder-components/DraggableItem.vue'));
 
-// --- 【核心修改】接收路由参数 ---
 const props = defineProps({
-  formId: {
-    type: [String, Number],
-    required: false,
-  }
+  formId: { type: [String, Number], required: false }
 });
 
-// --- Vue Router 和状态管理 ---
 const router = useRouter();
-const loading = ref(false); // 页面加载状态（仅编辑模式）
+const loading = ref(false);
 const saving = ref(false);
 
-// --- 【核心修改】判断当前模式 ---
-const isEditMode = computed(() => !!props.formId);
-const pageTitle = computed(() => isEditMode.value ? `编辑表单: ${formDefinition.name || '...'}` : '新建表单');
+// --- 【核心新增】响应式断点 ---
+const isMobile = ref(window.innerWidth < 768);
+const handleResize = () => { isMobile.value = window.innerWidth < 768; };
+onMounted(() => window.addEventListener('resize', handleResize));
+onBeforeUnmount(() => window.removeEventListener('resize', handleResize));
 
-// --- 核心数据结构: 表单定义 ---
+const isEditMode = computed(() => !!props.formId);
+const pageTitle = computed(() => isEditMode.value ? `编辑表单` : '新建表单');
+
 const formDefinition = reactive({
   name: '',
-  schema: {
-    fields: [],
-  },
+  schema: { fields: [] },
 });
 
-// --- 【核心修改】加载已有表单数据 ---
 onMounted(() => {
   if (isEditMode.value) {
     loading.value = true;
@@ -147,26 +200,24 @@ onMounted(() => {
           formDefinition.name = res.name;
           formDefinition.schema = JSON.parse(res.schemaJson);
         })
-        .catch(err => {
-          message.error("加载表单数据失败，请返回重试");
-        })
-        .finally(() => {
-          loading.value = false;
-        });
+        .catch(err => message.error("加载表单数据失败"))
+        .finally(() => { loading.value = false; });
   }
 });
 
-// --- 设计器状态 ---
 const selectedFieldId = ref(null);
 const previewModalVisible = ref(false);
 const jsonFileInputRef = ref(null);
 const wordFileInputRef = ref(null);
 const importingWord = ref(false);
 
-// --- 【核心修改】组件面板定义 ---
+// --- 【核心新增】移动端抽屉状态 ---
+const paletteDrawerVisible = ref(false);
+const propertiesDrawerVisible = ref(false);
+
 const paletteItems = {
   layout: [
-    { type: 'GridRow', label: '栅格布局', options: { spans: [12, 12] } },
+    { type: 'GridRow', label: '栅格', options: { spans: [12, 12] } },
     { type: 'Collapse', label: '折叠面板' },
     { type: 'DescriptionList', label: '描述列表' },
     { type: 'StaticText', label: '静态文本' },
@@ -174,22 +225,21 @@ const paletteItems = {
   ],
   basic: [
     { type: 'Input', label: '单行文本' }, { type: 'Textarea', label: '多行文本' },
-    { type: 'InputNumber', label: '数字输入框' }, { type: 'DatePicker', label: '日期选择' },
-    { type: 'Select', label: '下拉选择' }, { type: 'RadioGroup', label: '单选框组' },
+    { type: 'InputNumber', label: '数字' }, { type: 'DatePicker', label: '日期' },
+    { type: 'Select', label: '下拉选择' }, { type: 'RadioGroup', label: '单选框' },
     { type: 'Checkbox', label: '复选框' }, { type: 'Switch', label: '开关' },
-    { type: 'UserPicker', label: '人员选择器' }, { type: 'TreeSelect', label: '树形选择器' },
+    { type: 'UserPicker', label: '人员选择' }, { type: 'TreeSelect', label: '树形选择' },
   ],
   advanced: [
-    { type: 'FileUpload', label: '文件上传' }, { type: 'RichText', label: '富文本编辑器' },
-    { type: 'DataPicker', label: '数据选择器' }, { type: 'Subform', label: '子表单/明细' },
-    { type: 'KeyValue', label: '键值对' }, { type: 'IconPicker', label: '图标选择器' },
+    { type: 'FileUpload', label: '文件上传' }, { type: 'RichText', label: '富文本' },
+    { type: 'DataPicker', label: '数据选择' }, { type: 'Subform', label: '子表单' },
+    { type: 'KeyValue', label: '键值对' }, { type: 'IconPicker', label: '图标选择' },
     { type: 'Slider', label: '滑块' }, { type: 'Rate', label: '评分' },
   ]
 };
 
 let draggedItem = null;
 
-// --- 拖拽与放置 (Drag & Drop) 逻辑 (保持不变) ---
 const handleDragStart = (item) => { draggedItem = item; };
 const handleCanvasDrop = (event) => {
   const targetList = formDefinition.schema.fields;
@@ -197,12 +247,12 @@ const handleCanvasDrop = (event) => {
   handleDrop(event, targetList, targetIndex);
 };
 const handleComponentDrop = ({ event, targetList, index }) => { handleDrop(event, targetList, index); };
+
 function findAndRemoveField(fieldId, list = formDefinition.schema.fields) {
   for (let i = 0; i < list.length; i++) {
     const field = list[i];
     if (field.id === fieldId || field === fieldId) {
-      const [removedField] = list.splice(i, 1);
-      return removedField;
+      return list.splice(i, 1)[0];
     }
     if (field.type === 'GridRow' && field.columns) {
       for (const col of field.columns) {
@@ -218,7 +268,9 @@ function findAndRemoveField(fieldId, list = formDefinition.schema.fields) {
   }
   return null;
 }
+
 const handleDrop = (event, targetList, index) => {
+  if (isMobile.value) return; // 移动端禁用拖拽
   const moveData = event.dataTransfer.getData('text/plain');
   if (moveData) {
     try {
@@ -232,7 +284,7 @@ const handleDrop = (event, targetList, index) => {
         draggedItem = null;
         return;
       }
-    } catch (e) { /* 不是移动操作, 忽略 */ }
+    } catch (e) { /* not a move op, ignore */ }
   }
   if (draggedItem) {
     const newField = createNewField(draggedItem);
@@ -242,7 +294,19 @@ const handleDrop = (event, targetList, index) => {
   }
 };
 
-// --- 【核心修改】创建新字段的初始化逻辑 ---
+// 【核心新增】移动端点击添加组件
+const addComponent = (item) => {
+  const newField = createNewField(item);
+  let targetList = formDefinition.schema.fields;
+  if (selectedField.value) {
+    const container = findContainerList(selectedField.value.id);
+    if (container) targetList = container;
+  }
+  targetList.push(newField);
+  selectField(newField);
+  paletteDrawerVisible.value = false;
+};
+
 const createNewField = (item) => {
   const { type, label, options = {} } = item;
   const fieldId = type.toLowerCase() + '_' + uuidv4().substring(0, 4);
@@ -317,12 +381,53 @@ const createNewField = (item) => {
   return baseField;
 };
 
-// --- 字段选择、删除与更新 (保持不变) ---
-const selectField = (field) => { selectedFieldId.value = field?.id || field || null; };
+// --- 【核心新增】移动端上下移动 ---
+const moveField = (direction, index, list) => {
+  const targetIndex = direction === 'up' ? index - 1 : index + 1;
+  if (targetIndex < 0 || targetIndex >= list.length) return;
+  const item = list.splice(index, 1)[0];
+  list.splice(targetIndex, 0, item);
+};
+
+const selectField = (field) => {
+  selectedFieldId.value = field?.id || field || null;
+  if (isMobile.value && field) {
+    propertiesDrawerVisible.value = true;
+  }
+};
 const deleteField = (index, list) => {
-  if (selectedFieldId.value === list[index].id) { selectedFieldId.value = null; }
+  if (selectedFieldId.value === list[index].id) {
+    selectedFieldId.value = null;
+    if (isMobile.value) propertiesDrawerVisible.value = false;
+  }
   list.splice(index, 1);
 };
+const findContainerList = (fieldId) => {
+  function find(fields) {
+    for (const field of fields) {
+      if (field.id === fieldId && (field.type === 'GridCol' || field.type === 'CollapsePanel')) {
+        return field.fields;
+      }
+      if (field.type === 'GridRow') {
+        for (const col of field.columns) {
+          const found = find(col.fields);
+          if (found) return found;
+          if (col.id === fieldId) return col.fields;
+        }
+      }
+      if (field.type === 'Collapse') {
+        for (const panel of field.panels) {
+          const found = find(panel.fields);
+          if (found) return found;
+          if (panel.id === fieldId) return panel.fields;
+        }
+      }
+    }
+    return null;
+  }
+  return find(formDefinition.schema.fields);
+};
+
 const selectedField = computed(() => {
   function findField(fields, id) {
     for (const field of fields) {
@@ -381,10 +486,9 @@ const handleFieldUpdate = (updatedField) => {
   findAndReplaceField(formDefinition.schema.fields, updatedField);
 };
 
-// --- 【核心修改】表单保存、预览、导入/导出 ---
 const saveForm = async () => {
   if (!formDefinition.name.trim()) { message.error('请输入表单名称！'); return; }
-  if (formDefinition.schema.fields.length === 0) { message.error('表单不能为空，请至少添加一个组件！'); return; }
+  if (formDefinition.schema.fields.length === 0) { message.error('表单不能为空！'); return; }
   saving.value = true;
   try {
     const payload = { name: formDefinition.name, schemaJson: JSON.stringify(formDefinition.schema) };
@@ -395,17 +499,14 @@ const saveForm = async () => {
       await createForm(payload);
       message.success('表单保存成功！');
     }
-    router.push({ name: 'admin-forms' }); // 跳转到列表页
-  } catch (error) {
-    // 全局拦截器会处理来自后端的具体错误信息
-  } finally {
+    router.push({ name: 'admin-forms' });
+  } catch (error) {} finally {
     saving.value = false;
   }
 };
 
 const showPreviewModal = () => { previewModalVisible.value = true; };
 
-// 导入/导出逻辑 (保持不变)
 const handleExport = () => {
   if (!formDefinition.name && formDefinition.schema.fields.length === 0) { message.warn('表单为空，无法导出。'); return; }
   try {
@@ -448,8 +549,6 @@ const handleWordImport = async (event) => {
   Modal.confirm({
     title: '确认导入',
     content: '从Word导入将会覆盖当前画布上的所有内容，确定要继续吗？',
-    okText: '确认',
-    cancelText: '取消',
     onOk: async () => {
       importingWord.value = true;
       try {
@@ -460,7 +559,6 @@ const handleWordImport = async (event) => {
         selectedFieldId.value = null;
         message.success(`从 "${file.name}" 导入成功！请检查并调整自动生成的表单。`);
       } catch (error) {
-        console.error("Word import failed:", error);
       } finally {
         importingWord.value = false;
         event.target.value = '';
@@ -480,7 +578,7 @@ const handleWordImport = async (event) => {
 .builder-container {
   display: flex;
   gap: 16px;
-  padding: 0 24px 24px;
+  padding: 0 16px 16px;
   flex-grow: 1;
   min-height: 0;
 }
@@ -508,5 +606,14 @@ const handleWordImport = async (event) => {
   text-align: center;
   color: #aaa;
   padding: 64px 0;
+}
+.mobile-fab-group {
+  position: fixed;
+  bottom: 80px;
+  right: 24px;
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
 }
 </style>

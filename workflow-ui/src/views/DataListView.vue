@@ -10,7 +10,6 @@
     </a-page-header>
 
     <div style="padding: 24px;">
-      <!-- 【核心修改】当加载失败或无表单定义时，显示Empty状态 -->
       <a-empty
           v-if="loadError"
           :description="loadError"
@@ -20,7 +19,6 @@
       </a-empty>
 
       <template v-else>
-        <!-- 筛选区域动态生成 -->
         <a-card :bordered="false" style="margin-bottom: 24px;">
           <a-form :model="filterState" layout="inline">
             <a-form-item v-for="filter in filterableFields" :key="filter.id" :label="filter.label">
@@ -47,7 +45,6 @@
           </a-form>
         </a-card>
 
-        <!-- 表格区域 -->
         <a-table
             :columns="columns"
             :data-source="dataSource"
@@ -55,6 +52,7 @@
             :pagination="pagination"
             row-key="id"
             @change="handleTableChange"
+            :scroll="{ x: 'max-content' }"
         >
           <template #bodyCell="{ column, record }">
             <template v-if="column.key === 'workflowStatus'">
@@ -84,7 +82,6 @@
       </template>
     </div>
 
-    <!-- 编辑模态框 -->
     <EditSubmissionModal
         v-model:open="editModalVisible"
         :submission-id="currentEditingId"
@@ -108,7 +105,7 @@ const router = useRouter();
 const pageTitle = ref('');
 const formId = ref(null);
 const menuId = ref(null);
-const loadError = ref(null); // 【核心新增】用于记录加载错误信息
+const loadError = ref(null);
 
 const formDefinition = ref(null);
 const filterableFields = ref([]);
@@ -153,7 +150,7 @@ const columns = computed(() => {
 });
 
 const initialize = async () => {
-  loadError.value = null; // 重置错误状态
+  loadError.value = null;
   pageTitle.value = route.meta.title || '数据列表';
   formId.value = route.meta.formId;
   menuId.value = route.meta.menuId;
@@ -176,7 +173,6 @@ const initialize = async () => {
 
     await fetchData();
   } catch (error) {
-    // 【核心修改】捕获API错误，设置错误信息
     loadError.value = `无法加载表单定义 (ID: ${formId.value})，该表单可能已被删除。`;
     console.error("初始化页面失败:", error);
   } finally {
@@ -209,9 +205,7 @@ const handleDelete = async (record) => {
     await deleteSubmission(record.id);
     message.success("删除成功！");
     await fetchData();
-  } catch (error) {
-    // error handled by interceptor
-  }
+  } catch (error) {}
 };
 
 const goToDetail = (submissionId) => {
@@ -226,5 +220,10 @@ const getStatusColor = (status) => ({ '审批中': 'processing', '已通过': 's
 <style scoped>
 .page-container {
   background-color: #fff;
+}
+@media (max-width: 768px) {
+  :deep(.ant-form-inline .ant-form-item) {
+    margin-bottom: 16px;
+  }
 }
 </style>

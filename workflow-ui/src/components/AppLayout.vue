@@ -1,7 +1,8 @@
 <template>
   <a-layout style="min-height: 100vh">
-    <a-layout-sider v-model:collapsed="collapsed" collapsible>
-      <div class="logo-sidebar" @click="$router.push('/')">
+    <!-- 在非移动端显示 Sider -->
+    <a-layout-sider v-if="!isMobile" v-model:collapsed="collapsed" collapsible>
+      <div class="logo-sidebar" @click="navigateTo('/')">
         <img :src="systemStore.iconBlobUrl || '/logo.svg'" alt="logo" />
         <h1 v-if="!collapsed">{{ systemStore.settings.SYSTEM_NAME || '工作流引擎' }}</h1>
       </div>
@@ -17,7 +18,6 @@
           <a-menu-item key="/tasks">
             <template #icon><CheckSquareOutlined /></template>
             <span>我的待办</span>
-            <!-- 【核心修改】直接绑定 store 中的待办数量 -->
             <a-badge :count="pendingTasksCount" :offset="[10, 0]" />
           </a-menu-item>
           <a-menu-item key="/my-submissions">
@@ -35,9 +35,14 @@
     </a-layout-sider>
 
     <a-layout>
-      <a-layout-header :style="{ background: '#fff', padding: '0 24px', borderBottom: '1px solid #f0f0f0' }">
+      <a-layout-header :style="{ background: '#fff', padding: '0 16px', borderBottom: '1px solid #f0f0f0' }">
         <div class="header-content">
           <div class="header-left">
+            <!-- 在移动端显示汉堡包菜单按钮 -->
+            <a-button v-if="isMobile" type="text" @click="drawerVisible = true" style="font-size: 20px; margin-right: 8px;">
+              <MenuOutlined />
+            </a-button>
+
             <a-breadcrumb>
               <a-breadcrumb-item v-for="item in breadcrumbs" :key="item.path">
                 <router-link v-if="item.path" :to="item.path">{{ item.title }}</router-link>
@@ -63,7 +68,7 @@
                   <a-avatar :style="{ backgroundColor: systemStore.settings.THEME_COLOR, marginRight: '8px' }">
                     {{ userStore.currentUser.name.charAt(0) }}
                   </a-avatar>
-                  {{ userStore.currentUser.name }}
+                  <span v-if="!isMobile">{{ userStore.currentUser.name }}</span>
                   <DownOutlined />
                 </a>
                 <template #overlay>
@@ -86,38 +91,78 @@
             </transition>
           </router-view>
         </div>
-        <a-layout-footer style="text-align: center; padding: 12px 50px; flex-shrink: 0;">
+        <a-layout-footer style="text-align: center; padding: 12px 24px; flex-shrink: 0;">
           {{ systemStore.settings.FOOTER_INFO || '© 2025 PPMC Workflow' }}
         </a-layout-footer>
       </a-layout-content>
     </a-layout>
+
+    <!-- 移动端抽屉导航 -->
+    <a-drawer
+        v-if="isMobile"
+        v-model:open="drawerVisible"
+        placement="left"
+        :closable="false"
+        width="250px"
+    :body-style="{ padding: 0, backgroundColor: '#001529' }"
+    >
+    <div class="logo-sidebar" @click="navigateTo('/')">
+      <img :src="systemStore.iconBlobUrl || '/logo.svg'" alt="logo" />
+      <h1>{{ systemStore.settings.SYSTEM_NAME || '工作流引擎' }}</h1>
+    </div>
+    <a-menu
+        v-model:selectedKeys="selectedKeys"
+        theme="dark"
+        mode="inline"
+        @click="handleMenuClick"
+    >
+      <a-sub-menu key="user-center">
+        <template #icon><UserOutlined /></template>
+        <template #title>个人中心</template>
+        <a-menu-item key="/tasks">
+          <template #icon><CheckSquareOutlined /></template>
+          <span>我的待办</span>
+          <a-badge :count="pendingTasksCount" :offset="[10, 0]" />
+        </a-menu-item>
+        <a-menu-item key="/my-submissions">
+          <template #icon><SendOutlined /></template>
+          <span>我的申请</span>
+        </a-menu-item>
+        <a-menu-item key="/completed-tasks">
+          <template #icon><FileDoneOutlined /></template>
+          <span>我的已办</span>
+        </a-menu-item>
+      </a-sub-menu>
+
+      <MenuRenderer :menus="displayMenus" />
+    </a-menu>
+    </a-drawer>
   </a-layout>
 </template>
 
 <script setup>
-// 【核心修改】引入 defineAsyncComponent，用于异步加载组件
-import { onMounted, ref, watch, computed, h, defineAsyncComponent } from 'vue';
+import { onMounted, ref, watch, computed, h, defineAsyncComponent, onBeforeUnmount } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useUserStore } from '@/stores/user';
 import { useSystemStore } from '@/stores/system';
 import { useNotificationStore } from '@/stores/notification';
 import { Modal, Menu } from "ant-design-vue";
-
-// 【核心移除】不再需要静态导入大量图标，unplugin-vue-components 会自动处理
-// import {
-//   DownOutlined, DashboardOutlined, TeamOutlined, SafetyCertificateOutlined, UsergroupAddOutlined,
-//   ApartmentOutlined, NodeIndexOutlined, FileSearchOutlined, UserOutlined, LogoutOutlined,
-//   SettingOutlined, MenuOutlined, TableOutlined,
-//   CheckSquareOutlined, SendOutlined, ForkOutlined, BuildOutlined, BellOutlined,
-//   FileDoneOutlined
-// } from '@ant-design/icons-vue';
+import {
+  DownOutlined,
+  UserOutlined,
+  LogoutOutlined,
+  SettingOutlined,
+  CheckSquareOutlined,
+  SendOutlined,
+  FileDoneOutlined,
+  BellOutlined,
+  MenuOutlined,
+} from '@ant-design/icons-vue';
 
 import { iconMap } from '@/utils/iconLibrary.js';
 import { adminMenus } from '@/router';
 
-// 【核心修改】使用 defineAsyncComponent 动态加载通知面板
 const NotificationPanel = defineAsyncComponent(() => import('@/views/notifications/NotificationPanel.vue'));
-
 
 const { Item: MenuItem, SubMenu } = Menu;
 const userStore = useUserStore();
@@ -128,12 +173,24 @@ const route = useRoute();
 
 const collapsed = ref(false);
 const selectedKeys = ref([]);
-const openKeys = ref(['user-center']);
 
 const notificationVisible = ref(false);
 const unreadCount = computed(() => notificationStore.unreadCount);
 const pendingTasksCount = computed(() => userStore.pendingTasksCount);
 
+const isMobile = ref(window.innerWidth < 768);
+const drawerVisible = ref(false);
+
+const handleResize = () => {
+  isMobile.value = window.innerWidth < 768;
+  if (!isMobile.value) {
+    drawerVisible.value = false;
+  }
+};
+
+onBeforeUnmount(() => {
+  window.removeEventListener('resize', handleResize);
+});
 
 const displayMenus = computed(() => {
   if (userStore.isAdmin) {
@@ -148,7 +205,6 @@ const MenuRenderer = {
   setup(props) {
     const renderMenuItems = (menuItems) => {
       return menuItems.map(menu => {
-        // 【核心优化】从 iconMap 动态获取图标组件
         const iconComponent = menu.icon ? (iconMap[menu.icon] || null) : null;
         const iconNode = iconComponent ? () => h(iconComponent) : null;
 
@@ -211,6 +267,16 @@ watch(route, (newRoute) => {
 const handleMenuClick = ({ key }) => {
   if (key && typeof key === 'string' && key.startsWith('/')) {
     router.push(key);
+    if (isMobile.value) {
+      drawerVisible.value = false;
+    }
+  }
+};
+
+const navigateTo = (path) => {
+  router.push(path);
+  if (isMobile.value) {
+    drawerVisible.value = false;
   }
 };
 
@@ -220,6 +286,7 @@ const checkTasks = async () => {
 };
 
 onMounted(() => {
+  window.addEventListener('resize', handleResize);
   if (userStore.isAuthenticated) {
     checkTasks();
     notificationStore.fetchUnreadCount();
@@ -241,7 +308,6 @@ const handleLogout = () => {
 :global(.notification-popover-global) {
   width: 360px;
 }
-/* --- 【修复结束】 --- */
 .header-content { display: flex; justify-content: space-between; align-items: center; }
 .header-left { display: flex; align-items: center; }
 .logo-sidebar { height: 32px; margin: 16px; display: flex; align-items: center; justify-content: center; cursor: pointer; overflow: hidden; }
@@ -251,4 +317,8 @@ const handleLogout = () => {
 .fade-enter-from, .fade-leave-to { opacity: 0; }
 .ant-menu-item .anticon, .ant-sub-menu-title .anticon { margin-right: 8px; }
 .ant-menu-item { display: flex; align-items: center; }
+
+.ant-dropdown-link span {
+  display: inline-block;
+}
 </style>
