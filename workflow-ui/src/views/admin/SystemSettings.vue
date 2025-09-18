@@ -3,10 +3,10 @@
     <a-page-header title="系统设置" sub-title="自定义系统外观和基本信息" />
     <div style="padding: 24px;">
       <a-spin :spinning="loading">
+        <!-- 【核心修复】移除 max-width 和 margin: auto 样式，使其与其他管理页面布局一致 -->
         <a-form
             :model="formState"
             layout="vertical"
-            style="max-width: 800px; margin: auto;"
         >
           <a-card title="基础信息">
             <a-row :gutter="16">
@@ -84,9 +84,6 @@ import { UploadOutlined, PlusOutlined } from '@ant-design/icons-vue';
 const systemStore = useSystemStore();
 const loading = ref(true);
 const formState = reactive({
-  // 【修复】为 formState 提供初始默认值，
-  // 特别是为 THEME_COLOR 设置一个有效的十六进制颜色，
-  // 以防止在从API加载数据前，<input type="color"> 因绑定空值而报错。
   SYSTEM_NAME: '',
   THEME_COLOR: '#1890ff',
   FOOTER_INFO: '',
@@ -99,8 +96,6 @@ const generatePreviewUrl = async (fileId) => {
   if (!fileId) return null;
   try {
     const response = await downloadFile(fileId);
-    // --- [FIX] The 'downloadFile' API returns the full axios response object for blobs.
-    // We need to access the '.data' property which contains the actual Blob.
     return URL.createObjectURL(response.data);
   } catch (error) {
     console.error("Failed to generate preview URL for file:", fileId, error);

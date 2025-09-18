@@ -157,7 +157,8 @@ import {
   DownOutlined, SearchOutlined, ReloadOutlined, ExclamationCircleOutlined,
   PauseCircleOutlined, PlayCircleOutlined, StopOutlined, PartitionOutlined, ApartmentOutlined, UserSwitchOutlined
 } from '@ant-design/icons-vue';
-import ProcessVariablesModal from './components/ProcessVariablesModal.vue';
+// 【核心修复】修正组件的导入路径
+import ProcessVariablesModal from '@/components/ProcessVariablesModal.vue';
 const ProcessDiagramModal = defineAsyncComponent(() => import('@/components/ProcessDiagramModal.vue'));
 
 const {

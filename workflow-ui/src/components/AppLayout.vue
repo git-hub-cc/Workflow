@@ -1,6 +1,8 @@
 <template>
-  <a-layout style="min-height: 100vh">
-    <a-layout-sider v-if="!isMobile" v-model:collapsed="collapsed" collapsible>
+  <!-- 【核心修复 1】将 min-height 改为 height，固定整体布局高度，防止 body 滚动 -->
+  <a-layout style="height: 100vh">
+    <!-- 【核心修复 3】为 Sider 添加 class，使其在菜单过长时内部滚动 -->
+    <a-layout-sider v-if="!isMobile" v-model:collapsed="collapsed" collapsible class="scrollable-sider">
       <div class="logo-sidebar" @click="navigateTo('/')">
         <img :src="systemStore.iconBlobUrl || '/logo.svg'" alt="logo" />
         <h1 v-if="!collapsed">{{ systemStore.settings.SYSTEM_NAME || '工作流引擎' }}</h1>
@@ -82,14 +84,14 @@
       </a-layout-header>
 
       <a-layout-content :style="{ display: 'flex', flexDirection: 'column' }">
-        <div style="background: #fff; border-radius: 4px; flex: 1 1 0; min-height: 0;">
+        <!-- 【核心修复 2】为 router-view 的包装器添加 overflow-y: auto，使其成为滚动容器 -->
+        <div style="background: #fff; border-radius: 4px; flex: 1 1 0; min-height: 0; overflow-y: auto;">
           <router-view v-slot="{ Component }">
             <transition name="fade" mode="out-in">
               <component :is="Component" />
             </transition>
           </router-view>
         </div>
-        <!-- 【样式完善】调整 Footer 内边距 -->
         <a-layout-footer class="app-footer">
           {{ systemStore.settings.FOOTER_INFO || '© 2025 PPMC Workflow' }}
         </a-layout-footer>
@@ -104,12 +106,10 @@
         :body-style="{ padding: 0 }"
         width="250px"
     >
-      <!-- 【样式完善】为移动端抽屉内的 logo 添加特定 class -->
       <div class="logo-sidebar logo-drawer" @click="navigateTo('/')">
         <img :src="systemStore.iconBlobUrl || '/logo.svg'" alt="logo" />
         <h1>{{ systemStore.settings.SYSTEM_NAME || '工作流引擎' }}</h1>
       </div>
-      <!-- 【核心修改】将移动端导航菜单主题改为 'light' -->
       <a-menu
           v-model:selectedKeys="selectedKeys"
           theme="light"
@@ -305,6 +305,17 @@ const handleLogout = () => {
 </script>
 
 <style scoped>
+/* 【核心修复 3】为 Sider 添加内部滚动样式 */
+.scrollable-sider {
+  overflow-y: auto;
+}
+/* 隐藏滚动条但保留滚动功能 (适用于 Webkit 浏览器) */
+.scrollable-sider::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+}
+
+
 :global(.notification-popover-global) {
   width: 360px;
 }
@@ -314,7 +325,6 @@ const handleLogout = () => {
 .logo-sidebar img { height: 32px; margin-right: 8px; }
 .logo-sidebar h1 { color: white; font-size: 18px; margin: 0; font-weight: 600; white-space: nowrap; }
 
-/* 【样式完善】移动端抽屉内的 logo 标题颜色 */
 .logo-drawer h1 {
   color: var(--ant-primary-color, #1890ff);
 }
@@ -328,7 +338,6 @@ const handleLogout = () => {
   display: inline-block;
 }
 
-/* 【样式完善】响应式页脚 */
 .app-footer {
   text-align: center;
   padding: 12px 50px;
