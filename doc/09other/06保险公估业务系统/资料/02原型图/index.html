@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>数据看板 - 穗源保险公估一体化业务管理平台</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="app-container">
+    <!-- 侧边导航栏 -->
+    <aside class="sidebar">
+        <div class="sidebar-header">
+            穗源保险公估
+        </div>
+        <ul class="sidebar-nav">
+            <li class="sidebar-nav-item active"><a href="index.html">数据看板</a></li>
+            <li class="sidebar-nav-item"><a href="data_business_report.html">业务报表</a></li>
+            <li class="sidebar-nav-item"><a href="data_kpi_report.html">KPI绩效</a></li>
+            <li class="sidebar-nav-item"><a href="finance_settlement.html">财务中心</a></li>
+            <li class="sidebar-nav-item"><a href="admin_system_management.html">系统管理</a></li>
+        </ul>
+    </aside>
+
+    <!-- 主内容区 -->
+    <div class="main-wrapper">
+        <!-- 顶部栏 -->
+        <header class="header">
+            <div class="user-profile">
+                <div class="avatar">张</div>
+                <span>张伟 (总经理)</span>
+            </div>
+        </header>
+
+        <!-- 页面内容 -->
+        <main class="main-content">
+            <h1 class="page-title">总经理数据看板</h1>
+
+            <!-- 核心指标卡片 -->
+            <div class="kpi-card-container">
+                <div class="card kpi-card blue">
+                    <div class="value">58</div>
+                    <div class="label">今日接案量</div>
+                </div>
+                <div class="card kpi-card green">
+                    <div class="value">1,250,000<span class="unit">元</span></div>
+                    <div class="label">本月总收入</div>
+                </div>
+                <div class="card kpi-card orange">
+                    <div class="value">320</div>
+                    <div class="label">当前未决案件数</div>
+                </div>
+                <div class="card kpi-card red">
+                    <div class="value">3.2<span class="unit">天</span></div>
+                    <div class="label">平均结案周期</div>
+                </div>
+            </div>
+
+            <!-- 图表容器 -->
+            <div class="charts-container">
+                <div class="card">
+                    <div class="card-header">业务量趋势图 (最近30天)</div>
+                    <div class="chart-placeholder">
+                        [ 折线图: 每日新接案件数量 ]
+                    </div>
+                </div>
+                <div class="card">
+                    <div class="card-header">案件类型占比</div>
+                    <div class="chart-placeholder">
+                        [ 环形图: 标准车险, 复杂车险, 财险 ]
+                    </div>
+                </div>
+            </div>
+
+            <div class="charts-container">
+                <div class="card">
+                    <div class="card-header">保险公司合作贡献分析</div>
+                    <div class="chart-placeholder">
+                        [ 条形图: 平安, 人保, 太平洋... ]
+                    </div>
+                </div>
+                <div class="card">
+                    <div class="card-header">区域业绩分布</div>
+                    <div class="chart-placeholder">
+                        [ 饼图: 广州分公司, 深圳分公司 ]
+                    </div>
+                </div>
+            </div>
+
+        </main>
+    </div>
+</div>
+
+<!-- 注入演示助手 -->
+<script src="demo_helper.js"></script>
+</body>
+</html>

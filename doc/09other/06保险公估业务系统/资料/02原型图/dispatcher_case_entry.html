@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>案件录入 - 穗源保险公估一体化业务管理平台</title>
+    <link rel="stylesheet" href="style.css">
+    <style>
+        /* 页面专属样式 */
+        .form-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 20px 30px;
+        }
+        .form-item {
+            display: flex;
+            flex-direction: column;
+        }
+        .form-item.full-width {
+            grid-column: 1 / -1;
+        }
+        .form-item label {
+            margin-bottom: 8px;
+            color: var(--text-color-regular);
+            font-weight: 500;
+        }
+        .form-item input, .form-item select, .form-item textarea {
+            width: 100%;
+            padding: 10px 12px;
+            border: 1px solid var(--border-color-base);
+            border-radius: var(--border-radius-base);
+            font-size: 14px;
+            transition: border-color 0.2s;
+        }
+        .form-item input:focus, .form-item select:focus, .form-item textarea:focus {
+            outline: none;
+            border-color: var(--primary-color);
+        }
+        .form-item textarea {
+            min-height: 100px;
+            resize: vertical;
+        }
+        .form-actions {
+            grid-column: 1 / -1;
+            text-align: right;
+            margin-top: 20px;
+        }
+        .btn {
+            padding: 10px 20px;
+            border-radius: var(--border-radius-base);
+            border: 1px solid transparent;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .btn-primary {
+            background-color: var(--primary-color);
+            color: #fff;
+            border-color: var(--primary-color);
+        }
+        .btn-primary:hover {
+            opacity: 0.8;
+        }
+        .btn-secondary {
+            background-color: #fff;
+            color: var(--text-color-regular);
+            border-color: var(--border-color-base);
+        }
+        .btn-secondary:hover {
+            color: var(--primary-color);
+            border-color: var(--primary-color);
+        }
+        .form-checkbox-group label {
+            margin-right: 20px;
+            font-weight: normal;
+        }
+    </style>
+</head>
+<body>
+<div class="app-container">
+    <!-- 侧边导航栏 -->
+    <aside class="sidebar">
+        <div class="sidebar-header">
+            穗源保险公估
+        </div>
+        <ul class="sidebar-nav">
+            <li class="sidebar-nav-item"><a href="dispatcher_dispatch_center.html">派单中心</a></li>
+            <li class="sidebar-nav-item active"><a href="dispatcher_case_entry.html">案件录入</a></li>
+            <li class="sidebar-nav-item"><a href="dispatcher_task_query.html">任务查询</a></li>
+        </ul>
+    </aside>
+
+    <!-- 主内容区 -->
+    <div class="main-wrapper">
+        <!-- 顶部栏 -->
+        <header class="header">
+            <div class="user-profile">
+                <div class="avatar" style="background-color: #E6A23C;">王</div>
+                <span>王芳 (调度员)</span>
+            </div>
+        </header>
+
+        <!-- 页面内容 -->
+        <main class="main-content">
+            <h1 class="page-title">创建新案件</h1>
+
+            <div class="card">
+                <div class="card-header">案件委托单</div>
+                <form class="form-grid">
+                    <div class="form-item">
+                        <label for="product-type">产品类型</label>
+                        <select id="product-type">
+                            <option>车险</option>
+                            <option>财险</option>
+                            <option>健康险</option>
+                        </select>
+                    </div>
+                    <div class="form-item">
+                        <label>委托内容</label>
+                        <div class="form-checkbox-group">
+                            <input type="checkbox" id="c1" checked><label for="c1">查勘</label>
+                            <input type="checkbox" id="c2" checked><label for="c2">标的定损</label>
+                            <input type="checkbox" id="c3" checked><label for="c3">三者定损</label>
+                            <input type="checkbox" id="c4"><label for="c4">物损</label>
+                        </div>
+                    </div>
+                    <div class="form-item">
+                        <label for="insurer">承保方</label>
+                        <select id="insurer">
+                            <option>平安保险</option>
+                            <option>人保财险</option>
+                            <option>太平洋保险</option>
+                        </select>
+                    </div>
+                    <div class="form-item">
+                        <label for="case-no">报案号</label>
+                        <input type="text" id="case-no" value="PABX2024GZ00123">
+                    </div>
+                    <div class="form-item">
+                        <label for="incident-time">出险时间</label>
+                        <input type="datetime-local" id="incident-time" value="2024-05-20T09:15">
+                    </div>
+                    <div class="form-item">
+                        <label for="incident-location">出险地点</label>
+                        <input type="text" id="incident-location" value="广州市天河区黄埔大道西668号">
+                    </div>
+                    <div class="form-item">
+                        <label for="license-plate">标的车牌</label>
+                        <input type="text" id="license-plate" value="粤A·88888">
+                    </div>
+                    <div class="form-item">
+                        <label for="insured-person">被保险人</label>
+                        <input type="text" id="insured-person" value="王先生">
+                    </div>
+                    <div class="form-item">
+                        <label for="contact-person">联系人信息 (标的)</label>
+                        <input type="text" id="contact-person" value="王先生 - 13800138000">
+                    </div>
+                    <div class="form-item">
+                        <label for="third-party-contact">联系人信息 (三者)</label>
+                        <input type="text" id="third-party-contact" value="李女士 - 13900139000">
+                    </div>
+                    <div class="form-item full-width">
+                        <label for="accident-desc">事故经过</label>
+                        <textarea id="accident-desc">我方车辆粤A·88888在黄埔大道行驶时，因跟车过近，追尾前方车辆粤A·99999。我方车辆前保险杠、大灯受损；对方车辆后保险杠、尾门受损。无人员伤亡。</textarea>
+                    </div>
+                    <div class="form-item full-width">
+                        <label for="attachment">委托函附件</label>
+                        <input type="file" id="attachment">
+                    </div>
+
+                    <div class="form-actions">
+                        <button type="button" class="btn btn-secondary" style="margin-right: 10px;">保存草稿</button>
+                        <a href="dispatcher_dispatch_center.html" class="btn btn-primary">转调度中心</a>
+                    </div>
+                </form>
+            </div>
+        </main>
+    </div>
+</div>
+
+<script src="demo_helper.js"></script>
+</body>
+</html>

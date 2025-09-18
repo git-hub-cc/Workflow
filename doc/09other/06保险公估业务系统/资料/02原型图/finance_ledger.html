@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>财务台账 - 穗源保险公估一体化业务管理平台</title>
+    <link rel="stylesheet" href="style.css">
+    <style>
+        .filter-bar { display: flex; align-items: center; gap: 15px; padding: 15px 20px; }
+        .filter-item { display: flex; align-items: center; gap: 8px; }
+        .filter-item label { color: var(--text-color-regular); }
+        .filter-item input { padding: 8px; border: 1px solid var(--border-color-base); border-radius: 4px;}
+        .btn { padding: 8px 20px; border-radius: 4px; border: none; background-color: var(--primary-color); color: #fff; cursor: pointer; text-decoration: none;}
+        .card-header { display: flex; justify-content: space-between; align-items: center; }
+
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; font-size: 13px; }
+        th, td { border: 1px solid var(--border-color-lighter); padding: 12px 10px; text-align: right; }
+        th.text-left, td.text-left { text-align: left; }
+        th { background-color: var(--bg-color-base); font-weight: 500; }
+        tbody tr:hover { background-color: #fafafa; }
+        .profit-positive { color: var(--success-color); font-weight: bold; }
+        .profit-negative { color: var(--danger-color); font-weight: bold; }
+    </style>
+</head>
+<body>
+<div class="app-container">
+    <!-- 侧边导航栏 -->
+    <aside class="sidebar">
+        <div class="sidebar-header">穗源保险公估</div>
+        <ul class="sidebar-nav">
+            <li class="sidebar-nav-item"><a href="finance_settlement.html">财务中心</a></li>
+            <li class="sidebar-nav-item active"><a href="finance_ledger.html">财务台账</a></li>
+            <li class="sidebar-nav-item"><a href="finance_income_expense.html">收支管理</a></li>
+        </ul>
+    </aside>
+
+    <!-- 主内容区 -->
+    <div class="main-wrapper">
+        <!-- 顶部栏 -->
+        <header class="header">
+            <div class="user-profile">
+                <div class="avatar" style="background-color: #F56C6C;">李</div>
+                <span>李娜 (财务)</span>
+            </div>
+        </header>
+
+        <!-- 页面内容 -->
+        <main class="main-content">
+            <h1 class="page-title">财务台账</h1>
+            <div class="card filter-bar">
+                <div class="filter-item">
+                    <label>结案日期:</label>
+                    <input type="date" value="2024-05-01"> - <input type="date" value="2024-05-31">
+                </div>
+                <button class="btn">查询</button>
+            </div>
+            <div class="card">
+                <div class="card-header">
+                    <span>财务明细列表</span>
+                    <a href="#" class="btn">导出Excel</a>
+                </div>
+                <table>
+                    <thead>
+                    <tr>
+                        <th class="text-left">案件编号</th>
+                        <th class="text-left">承保方</th>
+                        <th class="text-left">查勘员</th>
+                        <th>结案日期</th>
+                        <th>公估费收入</th>
+                        <th>基础佣金</th>
+                        <th>扣罚</th>
+                        <th>最终佣金</th>
+                        <th>利润</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    <tr>
+                        <td class="text-left">SY-20240520-001</td>
+                        <td class="text-left">平安保险</td>
+                        <td class="text-left">陈浩</td>
+                        <td>2024-05-20</td>
+                        <td>425.00</td>
+                        <td>200.00</td>
+                        <td>0.00</td>
+                        <td>200.00</td>
+                        <td class="profit-positive">225.00</td>
+                    </tr>
+                    <tr>
+                        <td class="text-left">SY-20240521-005</td>
+                        <td class="text-left">人保财险</td>
+                        <td class="text-left">刘洋</td>
+                        <td>2024-05-22</td>
+                        <td>765.00</td>
+                        <td>350.00</td>
+                        <td>0.00</td>
+                        <td>350.00</td>
+                        <td class="profit-positive">415.00</td>
+                    </tr>
+                    <tr>
+                        <td class="text-left">SY-20240518-002</td>
+                        <td class="text-left">太平洋保险</td>
+                        <td class="text-left">刘洋</td>
+                        <td>2024-05-19</td>
+                        <td>350.00</td>
+                        <td>150.00</td>
+                        <td>20.00</td>
+                        <td>130.00</td>
+                        <td class="profit-positive">220.00</td>
+                    </tr>
+                    <tr>
+                        <td class="text-left">SY-20240515-011</td>
+                        <td class="text-left">平安保险</td>
+                        <td class="text-left">陈浩</td>
+                        <td>2024-05-16</td>
+                        <td>1200.00</td>
+                        <td>500.00</td>
+                        <td>50.00</td>
+                        <td>450.00</td>
+                        <td class="profit-positive">750.00</td>
+                    </tr>
+                    </tbody>
+                </table>
+            </div>
+        </main>
+    </div>
+</div>
+<script src="demo_helper.js"></script>
+</body>
+</html>

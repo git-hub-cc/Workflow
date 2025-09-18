@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>派单中心 - 穗源保险公估一体化业务管理平台</title>
+    <link rel="stylesheet" href="style.css">
+    <style>
+        /* 页面专属样式 */
+        .dispatch-layout {
+            display: flex;
+            gap: 20px;
+            height: calc(100vh - var(--header-height) - 100px); /* 视口高度减去头部和padding */
+        }
+        .case-pool, .assignment-panel {
+            background-color: #fff;
+            border: 1px solid var(--border-color-light);
+            border-radius: var(--border-radius-base);
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+        }
+        .case-pool {
+            flex: 1;
+        }
+        .assignment-panel {
+            flex: 1.2;
+        }
+        .panel-header {
+            padding: 15px 20px;
+            font-size: 16px;
+            font-weight: 600;
+            border-bottom: 1px solid var(--border-color-lighter);
+        }
+        .panel-content {
+            padding: 20px;
+            overflow-y: auto;
+        }
+
+        .case-card {
+            border: 1px solid var(--border-color-base);
+            border-radius: var(--border-radius-base);
+            padding: 15px;
+            margin-bottom: 15px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .case-card.active, .case-card:hover {
+            border-color: var(--primary-color);
+            box-shadow: 0 0 10px var(--primary-light-color);
+        }
+        .case-card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        .case-id {
+            font-weight: bold;
+            color: var(--text-color-primary);
+        }
+        .case-tag {
+            padding: 3px 8px;
+            font-size: 12px;
+            border-radius: var(--border-radius-base);
+            background-color: var(--primary-light-color);
+            color: var(--primary-color);
+        }
+        .case-card-body p {
+            margin: 5px 0;
+            color: var(--text-color-regular);
+            font-size: 13px;
+        }
+
+        .surveyor-list li {
+            display: flex;
+            align-items: center;
+            padding: 12px 0;
+            border-bottom: 1px solid var(--border-color-lighter);
+        }
+        .surveyor-list li:last-child {
+            border-bottom: none;
+        }
+        .surveyor-avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background-color: #f0f0f0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            margin-right: 15px;
+        }
+        .surveyor-info { flex-grow: 1; }
+        .surveyor-info .name { font-weight: 500; }
+        .surveyor-info .details { font-size: 13px; color: var(--text-color-secondary); }
+        .status-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 5px; }
+        .status-dot.idle { background-color: var(--success-color); }
+        .status-dot.busy { background-color: var(--danger-color); }
+
+        .btn {
+            padding: 8px 15px;
+            border-radius: var(--border-radius-base);
+            border: 1px solid transparent;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .btn-primary {
+            background-color: var(--primary-color);
+            color: #fff;
+            border-color: var(--primary-color);
+        }
+        .btn-primary:hover { opacity: 0.8; }
+    </style>
+</head>
+<body>
+<div class="app-container">
+    <!-- 侧边导航栏 -->
+    <aside class="sidebar">
+        <div class="sidebar-header">
+            穗源保险公估
+        </div>
+        <ul class="sidebar-nav">
+            <li class="sidebar-nav-item active"><a href="dispatcher_dispatch_center.html">派单中心</a></li>
+            <li class="sidebar-nav-item"><a href="dispatcher_case_entry.html">案件录入</a></li>
+            <li class="sidebar-nav-item"><a href="dispatcher_task_query.html">任务查询</a></li>
+        </ul>
+    </aside>
+
+    <!-- 主内容区 -->
+    <div class="main-wrapper">
+        <!-- 顶部栏 -->
+        <header class="header">
+            <div class="user-profile">
+                <div class="avatar" style="background-color: #E6A23C;">王</div>
+                <span>王芳 (调度员)</span>
+            </div>
+        </header>
+
+        <!-- 页面内容 -->
+        <main class="main-content">
+            <h1 class="page-title">派单中心</h1>
+            <div class="dispatch-layout">
+                <!-- 左侧：案件池 -->
+                <div class="case-pool">
+                    <div class="panel-header">待派单案件 (1)</div>
+                    <div class="panel-content">
+                        <div class="case-card active">
+                            <div class="case-card-header">
+                                <span class="case-id">SY-20240520-001</span>
+                                <span class="case-tag">车险</span>
+                            </div>
+                            <div class="case-card-body">
+                                <p><strong>地点：</strong>广州市天河区黄埔大道西668号</p>
+                                <p><strong>车牌：</strong>粤A·88888</p>
+                                <p><strong>委托方：</strong>平安保险</p>
+                            </div>
+                        </div>
+                        <!-- 可以添加更多案件卡片 -->
+                    </div>
+                </div>
+                <!-- 右侧：指派面板 -->
+                <div class="assignment-panel">
+                    <div class="panel-header">案件指派 - SY-20240520-001</div>
+                    <div class="panel-content">
+                        <h4>系统推荐查勘员</h4>
+                        <p style="font-size: 13px; color: var(--text-color-secondary); margin-top: -10px;">根据位置、状态和技能进行智能推荐</p>
+                        <ul class="surveyor-list" style="list-style: none; padding: 0;">
+                            <li>
+                                <div class="surveyor-avatar" style="background-color: #D6EFFF; color: #409EFF;">陈</div>
+                                <div class="surveyor-info">
+                                    <div class="name">陈浩</div>
+                                    <div class="details">
+                                        <span class="status-dot idle"></span>空闲 | 距离 2.5km
+                                    </div>
+                                </div>
+                                <button class="btn btn-primary">指派</button>
+                            </li>
+                            <li>
+                                <div class="surveyor-avatar" style="background-color: #E1F3D8; color: #67C23A;">刘</div>
+                                <div class="surveyor-info">
+                                    <div class="name">刘洋</div>
+                                    <div class="details">
+                                        <span class="status-dot idle"></span>空闲 | 距离 4.1km
+                                    </div>
+                                </div>
+                                <button class="btn btn-primary">指派</button>
+                            </li>
+                            <li>
+                                <div class="surveyor-avatar" style="background-color: #FDE2E2; color: #F56C6C;">李</div>
+                                <div class="surveyor-info">
+                                    <div class="name">李强</div>
+                                    <div class="details">
+                                        <span class="status-dot busy"></span>忙碌 | 距离 1.8km
+                                    </div>
+                                </div>
+                                <button class="btn btn-primary" disabled style="background-color: #C0C4CC; border-color: #C0C4CC;">指派</button>
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+</div>
+
+<script src="demo_helper.js"></script>
+</body>
+</html>

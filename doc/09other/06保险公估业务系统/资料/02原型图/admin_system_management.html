@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>系统管理 - 穗源保险公估一体化业务管理平台</title>
+    <link rel="stylesheet" href="style.css">
+    <style>
+        .card-header { display: flex; justify-content: space-between; align-items: center; }
+        .btn { padding: 8px 20px; border-radius: 4px; border: none; background-color: var(--primary-color); color: #fff; cursor: pointer; text-decoration: none; }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        th, td { border: 1px solid var(--border-color-lighter); padding: 12px; text-align: left; }
+        th { background-color: var(--bg-color-base); font-weight: 500; }
+        tbody tr:hover { background-color: var(--primary-light-color); }
+        .status-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 5px; }
+        .status-enabled { background-color: var(--success-color); }
+        .status-disabled { background-color: var(--info-color); }
+        .action-links a { color: var(--primary-color); text-decoration: none; margin-right: 10px; }
+    </style>
+</head>
+<body>
+<div class="app-container">
+    <!-- 侧边导航栏 -->
+    <aside class="sidebar">
+        <div class="sidebar-header">穗源保险公估</div>
+        <ul class="sidebar-nav">
+            <li class="sidebar-nav-item"><a href="index.html">数据看板</a></li>
+            <li class="sidebar-nav-item"><a href="data_business_report.html">业务报表</a></li>
+            <li class="sidebar-nav-item"><a href="data_kpi_report.html">KPI绩效</a></li>
+            <li class="sidebar-nav-item"><a href="finance_settlement.html">财务中心</a></li>
+            <li class="sidebar-nav-item active"><a href="admin_system_management.html">系统管理</a></li>
+        </ul>
+    </aside>
+
+    <!-- 主内容区 -->
+    <div class="main-wrapper">
+        <!-- 顶部栏 -->
+        <header class="header">
+            <div class="user-profile">
+                <div class="avatar">张</div>
+                <span>张伟 (总经理)</span>
+            </div>
+        </header>
+
+        <!-- 页面内容 -->
+        <main class="main-content">
+            <h1 class="page-title">系统管理</h1>
+
+            <div class="card">
+                <div class="card-header">
+                    <span>用户管理</span>
+                    <button class="btn">新增用户</button>
+                </div>
+                <table>
+                    <thead>
+                    <tr>
+                        <th>用户ID</th>
+                        <th>姓名</th>
+                        <th>所属部门</th>
+                        <th>角色</th>
+                        <th>状态</th>
+                        <th>操作</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    <tr>
+                        <td>gm_zhang</td>
+                        <td>张伟</td>
+                        <td>总经理办公室</td>
+                        <td>General Manager</td>
+                        <td><span class="status-dot status-enabled"></span>启用</td>
+                        <td class="action-links"><a href="#">编辑</a><a href="#">权限</a></td>
+                    </tr>
+                    <tr>
+                        <td>finance_li</td>
+                        <td>李娜</td>
+                        <td>财务部</td>
+                        <td>Finance Staff</td>
+                        <td><span class="status-dot status-enabled"></span>启用</td>
+                        <td class="action-links"><a href="#">编辑</a><a href="#">权限</a><a href="#">重置密码</a></td>
+                    </tr>
+                    <tr>
+                        <td>dispatcher_wang</td>
+                        <td>王芳</td>
+                        <td>广州分公司-调度中心</td>
+                        <td>Dispatcher</td>
+                        <td><span class="status-dot status-enabled"></span>启用</td>
+                        <td class="action-links"><a href="#">编辑</a><a href="#">权限</a><a href="#">重置密码</a></td>
+                    </tr>
+                    <tr>
+                        <td>reviewer_zhao</td>
+                        <td>赵磊</td>
+                        <td>广州分公司-车险一部</td>
+                        <td>Administrator / Reviewer</td>
+                        <td><span class="status-dot status-enabled"></span>启用</td>
+                        <td class="action-links"><a href="#">编辑</a><a href="#">权限</a><a href="#">重置密码</a></td>
+                    </tr>
+                    <tr>
+                        <td>surveyor_chen</td>
+                        <td>陈浩</td>
+                        <td>广州分公司-车险一部</td>
+                        <td>Field Surveyor</td>
+                        <td><span class="status-dot status-enabled"></span>启用</td>
+                        <td class="action-links"><a href="#">编辑</a><a href="#">权限</a><a href="#">重置密码</a></td>
+                    </tr>
+                    <tr>
+                        <td>surveyor_liu</td>
+                        <td>刘洋</td>
+                        <td>广州分公司-车险一部</td>
+                        <td>Field Surveyor</td>
+                        <td><span class="status-dot status-enabled"></span>启用</td>
+                        <td class="action-links"><a href="#">编辑</a><a href="#">权限</a><a href="#">重置密码</a></td>
+                    </tr>
+                    <tr>
+                        <td>surveyor_wu</td>
+                        <td>吴静</td>
+                        <td>广州分公司-财险部</td>
+                        <td>Field Surveyor</td>
+                        <td><span class="status-dot status-disabled"></span>禁用</td>
+                        <td class="action-links"><a href="#">编辑</a><a href="#">权限</a><a href="#">启用</a></td>
+                    </tr>
+                    </tbody>
+                </table>
+            </div>
+        </main>
+    </div>
+</div>
+<script src="demo_helper.js"></script>
+</body>
+</html>
