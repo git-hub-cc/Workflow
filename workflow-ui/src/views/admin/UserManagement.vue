@@ -9,9 +9,9 @@
       </template>
     </a-page-header>
 
-    <div style="padding: 24px;">
+    <div class="content-padding">
       <a-card :bordered="false" style="margin-bottom: 24px;">
-        <a-form :model="filterState" layout="inline">
+        <a-form :model="filterState" layout="inline" class="responsive-filter-form">
           <a-form-item label="关键字">
             <a-input v-model:value="filterState.keyword" placeholder="按用户ID或姓名搜索" allow-clear />
           </a-form-item>
@@ -217,11 +217,9 @@ const departmentTree = ref([]);
 const allRoles = ref([]);
 const allGroups = ref([]);
 
-// --- 【核心新增】响应式断点逻辑 ---
 const isMobile = ref(window.innerWidth < 768);
 const handleResize = () => { isMobile.value = window.innerWidth < 768; };
 onBeforeUnmount(() => { window.removeEventListener('resize', handleResize); });
-// --- 响应式逻辑结束 ---
 
 const fetchAuxiliaryData = async () => {
   try {
@@ -395,10 +393,5 @@ const handleResetPassword = (userId) => {
 .page-container {
   background-color: #fff;
   border-radius: 4px;
-}
-@media (max-width: 768px) {
-  :deep(.ant-form-inline .ant-form-item) {
-    margin-bottom: 16px;
-  }
 }
 </style>

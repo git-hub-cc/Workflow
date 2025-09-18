@@ -1,6 +1,5 @@
 <template>
   <a-layout style="min-height: 100vh">
-    <!-- 在非移动端显示 Sider -->
     <a-layout-sider v-if="!isMobile" v-model:collapsed="collapsed" collapsible>
       <div class="logo-sidebar" @click="navigateTo('/')">
         <img :src="systemStore.iconBlobUrl || '/logo.svg'" alt="logo" />
@@ -38,7 +37,6 @@
       <a-layout-header :style="{ background: '#fff', padding: '0 16px', borderBottom: '1px solid #f0f0f0' }">
         <div class="header-content">
           <div class="header-left">
-            <!-- 在移动端显示汉堡包菜单按钮 -->
             <a-button v-if="isMobile" type="text" @click="drawerVisible = true" style="font-size: 20px; margin-right: 8px;">
               <MenuOutlined />
             </a-button>
@@ -91,51 +89,53 @@
             </transition>
           </router-view>
         </div>
-        <a-layout-footer style="text-align: center; padding: 12px 24px; flex-shrink: 0;">
+        <!-- 【样式完善】调整 Footer 内边距 -->
+        <a-layout-footer class="app-footer">
           {{ systemStore.settings.FOOTER_INFO || '© 2025 PPMC Workflow' }}
         </a-layout-footer>
       </a-layout-content>
     </a-layout>
 
-    <!-- 移动端抽屉导航 -->
     <a-drawer
         v-if="isMobile"
         v-model:open="drawerVisible"
         placement="left"
         :closable="false"
+        :body-style="{ padding: 0 }"
         width="250px"
-    :body-style="{ padding: 0, backgroundColor: '#001529' }"
     >
-    <div class="logo-sidebar" @click="navigateTo('/')">
-      <img :src="systemStore.iconBlobUrl || '/logo.svg'" alt="logo" />
-      <h1>{{ systemStore.settings.SYSTEM_NAME || '工作流引擎' }}</h1>
-    </div>
-    <a-menu
-        v-model:selectedKeys="selectedKeys"
-        theme="dark"
-        mode="inline"
-        @click="handleMenuClick"
-    >
-      <a-sub-menu key="user-center">
-        <template #icon><UserOutlined /></template>
-        <template #title>个人中心</template>
-        <a-menu-item key="/tasks">
-          <template #icon><CheckSquareOutlined /></template>
-          <span>我的待办</span>
-          <a-badge :count="pendingTasksCount" :offset="[10, 0]" />
-        </a-menu-item>
-        <a-menu-item key="/my-submissions">
-          <template #icon><SendOutlined /></template>
-          <span>我的申请</span>
-        </a-menu-item>
-        <a-menu-item key="/completed-tasks">
-          <template #icon><FileDoneOutlined /></template>
-          <span>我的已办</span>
-        </a-menu-item>
-      </a-sub-menu>
+      <!-- 【样式完善】为移动端抽屉内的 logo 添加特定 class -->
+      <div class="logo-sidebar logo-drawer" @click="navigateTo('/')">
+        <img :src="systemStore.iconBlobUrl || '/logo.svg'" alt="logo" />
+        <h1>{{ systemStore.settings.SYSTEM_NAME || '工作流引擎' }}</h1>
+      </div>
+      <!-- 【核心修改】将移动端导航菜单主题改为 'light' -->
+      <a-menu
+          v-model:selectedKeys="selectedKeys"
+          theme="light"
+          mode="inline"
+          @click="handleMenuClick"
+      >
+        <a-sub-menu key="user-center">
+          <template #icon><UserOutlined /></template>
+          <template #title>个人中心</template>
+          <a-menu-item key="/tasks">
+            <template #icon><CheckSquareOutlined /></template>
+            <span>我的待办</span>
+            <a-badge :count="pendingTasksCount" :offset="[10, 0]" />
+          </a-menu-item>
+          <a-menu-item key="/my-submissions">
+            <template #icon><SendOutlined /></template>
+            <span>我的申请</span>
+          </a-menu-item>
+          <a-menu-item key="/completed-tasks">
+            <template #icon><FileDoneOutlined /></template>
+            <span>我的已办</span>
+          </a-menu-item>
+        </a-sub-menu>
 
-      <MenuRenderer :menus="displayMenus" />
-    </a-menu>
+        <MenuRenderer :menus="displayMenus" />
+      </a-menu>
     </a-drawer>
   </a-layout>
 </template>
@@ -313,6 +313,12 @@ const handleLogout = () => {
 .logo-sidebar { height: 32px; margin: 16px; display: flex; align-items: center; justify-content: center; cursor: pointer; overflow: hidden; }
 .logo-sidebar img { height: 32px; margin-right: 8px; }
 .logo-sidebar h1 { color: white; font-size: 18px; margin: 0; font-weight: 600; white-space: nowrap; }
+
+/* 【样式完善】移动端抽屉内的 logo 标题颜色 */
+.logo-drawer h1 {
+  color: var(--ant-primary-color, #1890ff);
+}
+
 .fade-enter-active, .fade-leave-active { transition: opacity 0.2s ease; }
 .fade-enter-from, .fade-leave-to { opacity: 0; }
 .ant-menu-item .anticon, .ant-sub-menu-title .anticon { margin-right: 8px; }
@@ -320,5 +326,17 @@ const handleLogout = () => {
 
 .ant-dropdown-link span {
   display: inline-block;
+}
+
+/* 【样式完善】响应式页脚 */
+.app-footer {
+  text-align: center;
+  padding: 12px 50px;
+  flex-shrink: 0;
+}
+@media (max-width: 768px) {
+  .app-footer {
+    padding: 12px 16px;
+  }
 }
 </style>

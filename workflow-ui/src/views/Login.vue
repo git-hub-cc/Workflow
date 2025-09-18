@@ -2,7 +2,6 @@
   <div class="login-container" :style="backgroundStyle">
     <div class="login-box">
       <div class="logo-section">
-        <!-- [FIX] Bind src to the secure blob URL from the store -->
         <img :src="systemStore.iconBlobUrl || '/logo.svg'" alt="logo" />
         <h1>{{ systemStore.settings.SYSTEM_NAME || '表单工作流引擎' }}</h1>
       </div>
@@ -68,9 +67,6 @@ const formState = reactive({
   password: 'admin',
 });
 
-// [FIX] The 'systemIconUrl' computed property is no longer needed here.
-// The template now directly uses `systemStore.iconBlobUrl`.
-
 const backgroundStyle = computed(() => {
   const bgId = systemStore.settings.LOGIN_BACKGROUND_ID;
   if (bgId) {
@@ -97,9 +93,11 @@ const handleLogin = async () => {
   align-items: center;
   height: 100vh;
   background-color: #f0f2f5;
+  padding: 16px; /* 【样式完善】增加内边距防止超窄屏幕溢出 */
 }
 .login-box {
   width: 368px;
+  max-width: 100%; /* 【样式完善】确保在小屏上不会超出宽度 */
   padding: 36px;
   background: rgba(255, 255, 255, 0.9);
   border-radius: 8px;
@@ -114,7 +112,6 @@ const handleLogin = async () => {
 }
 .logo-section h1 {
   font-size: 24px;
-  /* 【核心修改】使用 CSS 变量来应用主题色 */
   color: var(--ant-primary-color);
   margin-top: 16px;
 }
@@ -138,5 +135,11 @@ const handleLogin = async () => {
 :deep(.ant-alert) {
   padding: 8px 12px;
   font-size: 12px;
+}
+/* 【样式完善】调整小屏幕上的内边距 */
+@media (max-width: 480px) {
+  .login-box {
+    padding: 24px;
+  }
 }
 </style>

@@ -3,7 +3,8 @@
     <a-page-header title="仪表盘" sub-title="系统关键指标概览" />
     <div class="content-padding">
       <a-spin :spinning="loading">
-        <a-row :gutter="[24, 24]">
+        <!-- 【样式完善】使用响应式 gutter -->
+        <a-row :gutter="{ xs: 8, sm: 16, md: 24 }">
           <!-- 指标卡片 -->
           <a-col :xs="24" :sm="12" :md="6">
             <a-card>
@@ -27,7 +28,7 @@
           </a-col>
 
           <!-- ECharts 图表 -->
-          <a-col :span="24">
+          <a-col :span="24" style="margin-top: 24px;">
             <a-card title="任务耗时 TOP 5 (瓶颈分析)">
               <v-chart class="chart" :option="chartOption" autoresize />
             </a-card>
@@ -137,14 +138,5 @@ const chartOption = computed(() => {
 }
 .chart {
   height: 400px;
-}
-/* 【核心新增】响应式 padding */
-.content-padding {
-  padding: 24px;
-}
-@media (max-width: 768px) {
-  .content-padding {
-    padding: 16px;
-  }
 }
 </style>

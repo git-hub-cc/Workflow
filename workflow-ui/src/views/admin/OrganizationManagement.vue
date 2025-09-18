@@ -15,7 +15,7 @@
       </template>
     </a-page-header>
 
-    <div style="padding: 24px;">
+    <div class="content-padding">
       <a-spin :spinning="loading">
         <a-alert
             message="操作说明"
@@ -40,7 +40,6 @@
                   <component :is="dataRef.type === 'department' ? ApartmentOutlined : UserOutlined" style="margin-right: 8px;" />
                   {{ title }}
                 </span>
-                <!-- 【核心修改】将操作按钮始终可见，而不是依赖 hover -->
                 <a-space v-if="dataRef.type === 'department'" class="node-actions" @click.stop>
                   <a-tooltip title="新增子部门">
                     <a-button type="text" size="small" @click="showModal('create-sub', dataRef)">
@@ -307,7 +306,6 @@ const handleDelete = async (dataRef) => {
   font-weight: normal;
 }
 
-/* 【核心修改】调整为始终显示，并优化触摸设备上的体验 */
 .node-actions {
   display: inline-flex;
 }

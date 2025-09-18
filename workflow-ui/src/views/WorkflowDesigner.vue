@@ -1,3 +1,4 @@
+
 <template>
   <div class="page-container">
     <a-page-header title="流程设计器" @back="() => $router.push({ name: 'admin-forms' })">
@@ -97,7 +98,7 @@ import { getFormById, deployWorkflow, getWorkflowTemplate, updateWorkflowTemplat
 import {
   UndoOutlined, RedoOutlined, ZoomInOutlined, ZoomOutOutlined,
   FullscreenOutlined, DownloadOutlined, FileImageOutlined, UploadOutlined,
-  SettingOutlined, // 【核心新增】
+  SettingOutlined,
 } from '@ant-design/icons-vue';
 import { flattenFields } from '@/utils/formUtils.js';
 
@@ -128,12 +129,10 @@ const availableGroups = ref([]);
 const formFields = ref([]);
 const selectedElement = ref(null);
 
-// --- 【核心新增】响应式断点 ---
 const isMobile = ref(window.innerWidth < 768);
 const propertiesDrawerVisible = ref(false);
 const handleResize = () => { isMobile.value = window.innerWidth < 768; };
 onBeforeUnmount(() => window.removeEventListener('resize', handleResize));
-// ---
 
 watch(loading, async (val) => {
   if (!val) {
@@ -349,8 +348,10 @@ const downloadSvg = async () => {
   padding: 0;
   display: flex;
   flex-direction: column;
-  height: calc(100vh - 64px - 48px);
+  height: 100%; /* Fallback for older browsers */
+  height: calc(100vh - 64px); /* Assuming header height is 64px */
   background-color: #fff;
+  overflow: hidden; /* 【样式完善】防止页面滚动 */
 }
 .toolbar {
   padding: 8px 24px;
@@ -395,5 +396,9 @@ const downloadSvg = async () => {
   bottom: 80px;
   right: 24px;
   z-index: 100;
+}
+/* 【样式完善】为FAB按钮添加阴影以增强可见性 */
+.mobile-fab-group .ant-btn {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 </style>

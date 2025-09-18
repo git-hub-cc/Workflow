@@ -3,6 +3,15 @@
 这套方案将充分利用我所具备的 **动态表单引擎、BPMN工作流引擎、灵活的组织架构、动态菜单和数据列表、以及权限管理** 等核心功能。
 
 ---
+### 备份数据-整个库
+```
+SCRIPT TO 'C:/temp/my_db_backup.sql';
+```
+### 备份数据-部分表
+```
+SCRIPT TO 'C:/temp/workflow_org_data.sql' TABLE app_user, app_department, app_user_group, app_role, user_groups;
+```
+
 
 ### 1. 组织结构与人员构成 (Organization & Personnel)
 

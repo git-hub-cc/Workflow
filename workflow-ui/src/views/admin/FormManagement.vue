@@ -9,9 +9,10 @@
       </template>
     </a-page-header>
 
-    <div style="padding: 24px;">
+    <!-- 【样式完善】使用 content-padding 和 responsive-filter-form class -->
+    <div class="content-padding">
       <a-card :bordered="false" style="margin-bottom: 24px;">
-        <a-form :model="filterState" layout="inline">
+        <a-form :model="filterState" layout="inline" class="responsive-filter-form">
           <a-form-item label="表单名称">
             <a-input v-model:value="filterState.name" placeholder="输入名称模糊查询" allow-clear />
           </a-form-item>
@@ -256,12 +257,5 @@ const navigateToDependency = (item) => {
 .page-container {
   background-color: #fff;
   border-radius: 4px;
-}
-
-/* 【核心新增】移动端内联表单换行 */
-@media (max-width: 768px) {
-  :deep(.ant-form-inline .ant-form-item) {
-    margin-bottom: 16px;
-  }
 }
 </style>

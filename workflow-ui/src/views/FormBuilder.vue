@@ -1,3 +1,4 @@
+
 <template>
   <div class="page-container">
     <a-page-header :title="pageTitle" @back="() => $router.push({ name: 'admin-forms' })">
@@ -5,11 +6,9 @@
         <a-space>
           <a-button @click="showPreviewModal">
             <template #icon><EyeOutlined /></template>
-            <!-- 【核心修改】移动端只显示图标 -->
             <span v-if="!isMobile">预览</span>
           </a-button>
 
-          <!-- 【核心新增】移动端将导入/导出收到一个菜单里 -->
           <a-dropdown v-if="!isMobile">
             <template #overlay>
               <a-menu>
@@ -38,7 +37,7 @@
     </a-page-header>
 
     <a-spin :spinning="loading" tip="正在加载表单定义...">
-      <a-row :gutter="16" style="padding: 16px;">
+      <a-row :gutter="16" class="content-padding">
         <a-col :span="24">
           <a-form-item label="表单名称" :label-col="{ span: isMobile ? 24 : 2 }" :wrapper-col="{ span: isMobile ? 24 : 10 }">
             <a-input v-model:value="formDefinition.name" placeholder="例如：请假申请单" />
@@ -47,7 +46,7 @@
       </a-row>
 
       <div class="builder-container">
-        <!-- 左侧: 组件面板 (桌面端) -->
+        <!-- Left Panel (Desktop) -->
         <div v-if="!isMobile" class="palette">
           <a-card title="布局组件" size="small">
             <div v-for="item in paletteItems.layout" :key="item.label" class="palette-item" draggable="true" @dragstart="handleDragStart(item)">{{ item.label }}</div>
@@ -60,7 +59,7 @@
           </a-card>
         </div>
 
-        <!-- 中间: 画布 -->
+        <!-- Canvas -->
         <div class="canvas" @dragover.prevent @drop.prevent.stop="handleCanvasDrop($event)">
           <a-form layout="vertical">
             <div v-if="formDefinition.schema.fields.length === 0" class="canvas-placeholder">
@@ -82,7 +81,7 @@
           </a-form>
         </div>
 
-        <!-- 右侧: 属性配置面板 (桌面端) -->
+        <!-- Right Panel (Desktop) -->
         <properties-panel
             v-if="!isMobile"
             :selected-field="selectedField"
@@ -92,21 +91,18 @@
       </div>
     </a-spin>
 
-    <!-- 预览模态框 -->
     <FormPreviewModal
         v-if="previewModalVisible"
         v-model:open="previewModalVisible"
         :form-definition="formDefinition"
     />
 
-    <!-- 【核心新增】移动端悬浮操作按钮 -->
     <div v-if="isMobile" class="mobile-fab-group">
       <a-button type="primary" shape="circle" size="large" @click="paletteDrawerVisible = true">
         <PlusOutlined />
       </a-button>
     </div>
 
-    <!-- 【核心新增】移动端组件面板抽屉 -->
     <a-drawer
         v-if="isMobile"
         v-model:open="paletteDrawerVisible"
@@ -136,7 +132,6 @@
       </a-list>
     </a-drawer>
 
-    <!-- 【核心新增】移动端属性面板抽屉 -->
     <a-drawer
         v-if="isMobile"
         v-model:open="propertiesDrawerVisible"
@@ -152,7 +147,6 @@
       />
     </a-drawer>
 
-    <!-- 隐藏的 input 用于文件导入 -->
     <input type="file" ref="wordFileInputRef" @change="handleWordImport" style="display: none" accept=".docx" />
     <input type="file" ref="jsonFileInputRef" @change="handleJsonImport" style="display: none" accept=".json" />
   </div>
@@ -178,7 +172,6 @@ const router = useRouter();
 const loading = ref(false);
 const saving = ref(false);
 
-// --- 【核心新增】响应式断点 ---
 const isMobile = ref(window.innerWidth < 768);
 const handleResize = () => { isMobile.value = window.innerWidth < 768; };
 onMounted(() => window.addEventListener('resize', handleResize));
@@ -211,7 +204,6 @@ const jsonFileInputRef = ref(null);
 const wordFileInputRef = ref(null);
 const importingWord = ref(false);
 
-// --- 【核心新增】移动端抽屉状态 ---
 const paletteDrawerVisible = ref(false);
 const propertiesDrawerVisible = ref(false);
 
@@ -294,7 +286,6 @@ const handleDrop = (event, targetList, index) => {
   }
 };
 
-// 【核心新增】移动端点击添加组件
 const addComponent = (item) => {
   const newField = createNewField(item);
   let targetList = formDefinition.schema.fields;
@@ -381,7 +372,6 @@ const createNewField = (item) => {
   return baseField;
 };
 
-// --- 【核心新增】移动端上下移动 ---
 const moveField = (direction, index, list) => {
   const targetIndex = direction === 'up' ? index - 1 : index + 1;
   if (targetIndex < 0 || targetIndex >= list.length) return;
@@ -574,10 +564,12 @@ const handleWordImport = async (event) => {
   display: flex;
   flex-direction: column;
   height: 100%;
+  overflow: hidden; /* 【样式完善】防止页面滚动 */
 }
 .builder-container {
   display: flex;
   gap: 16px;
+  /* 【样式完善】调整内边距 */
   padding: 0 16px 16px;
   flex-grow: 1;
   min-height: 0;
@@ -585,6 +577,7 @@ const handleWordImport = async (event) => {
 .palette {
   width: 220px;
   flex-shrink: 0;
+  overflow-y: auto; /* 【样式完善】当组件过多时可滚动 */
 }
 .canvas {
   flex-grow: 1;
@@ -615,5 +608,9 @@ const handleWordImport = async (event) => {
   display: flex;
   flex-direction: column;
   gap: 16px;
+}
+/* 【样式完善】为FAB按钮添加阴影以增强可见性 */
+.mobile-fab-group .ant-btn {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 </style>

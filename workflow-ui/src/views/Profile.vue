@@ -1,7 +1,7 @@
 <template>
   <div class="page-container">
     <a-page-header title="个人设置" />
-    <div style="padding: 24px;">
+    <div class="content-padding">
       <a-tabs v-model:activeKey="activeTab" centered>
         <!-- 个人资料 Tab -->
         <a-tab-pane key="profile" tab="个人资料">
@@ -163,11 +163,7 @@ const handleChangePassword = async () => {
   margin-bottom: 32px !important;
 }
 
-/* 【核心新增】移动端样式调整 */
 @media (max-width: 768px) {
-  .page-container {
-    padding: 12px;
-  }
   .tab-content {
     margin: 16px 0;
   }

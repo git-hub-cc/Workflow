@@ -27,12 +27,12 @@
       <!-- 管理员专属快捷入口 -->
       <div v-if="userStore.isAdmin" style="margin-top: 24px;">
         <a-divider>管理员快捷入口</a-divider>
-        <a-row :gutter="[16, 16]">
-          <!-- 【核心修改】为栅格列添加响应式断点 -->
+        <!-- 【样式完善】使用响应式 gutter -->
+        <a-row :gutter="{ xs: 16, sm: 16, md: 24 }">
           <a-col :xs="24" :sm="12" :md="8">
             <a-card hoverable @click="$router.push({ name: 'admin-forms' })">
               <a-card-meta title="表单管理" description="管理、创建和设计业务表单。">
-                <template #avatar><TableOutlined style="font-size: 24px; color: #722ed1" /></template>
+                <template #avatar><FormOutlined style="font-size: 24px; color: #722ed1" /></template>
               </a-card-meta>
             </a-card>
           </a-col>
@@ -40,7 +40,7 @@
           <a-col :xs="24" :sm="12" :md="8">
             <a-card hoverable @click="$router.push({ name: 'admin-menus' })">
               <a-card-meta title="菜单管理" description="配置用户在左侧看到的导航菜单。">
-                <template #avatar><MenuOutlined style="font-size: 24px; color: #52c41a" /></template>
+                <template #avatar><AppstoreOutlined style="font-size: 24px; color: #52c41a" /></template>
               </a-card-meta>
             </a-card>
           </a-col>
@@ -65,8 +65,8 @@ import { useUserStore } from '@/stores/user';
 import {
   RocketOutlined,
   CheckSquareOutlined,
-  TableOutlined,
-  MenuOutlined,
+  FormOutlined,
+  AppstoreOutlined,
   DashboardOutlined
 } from '@ant-design/icons-vue';
 
@@ -100,13 +100,5 @@ const goToFirstMenu = () => {
 .page-container {
   background-color: #fff;
   border-radius: 4px;
-}
-.content-padding {
-  padding: 24px;
-}
-@media (max-width: 768px) {
-  .content-padding {
-    padding: 16px;
-  }
 }
 </style>

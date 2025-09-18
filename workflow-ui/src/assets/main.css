@@ -1,18 +1,47 @@
-/* 全局样式 */
-body {
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-    margin: 0;
-    background-color: #f0f2f5;
-}
+/* Import Ant Design Vue reset styles */
+@import 'ant-design-vue/dist/reset.css';
 
+/* Your existing global styles */
 #app {
+    height: 100vh;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial,
+    'Noto Sans', sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol',
+    'Noto Color Emoji';
 }
 
-/* 覆盖 antd 的一些样式或添加自定义样式 */
-.page-container {
+/*
+ ==========================================================================
+ 【样式完善】新增全局辅助类，用于响应式布局
+ ==========================================================================
+*/
+
+/* 1. 响应式内容内边距 */
+.content-padding {
     padding: 24px;
-    background: #fff;
-    /* 【核心修改】移除 min-height 计算，改为 100% 高度并允许内部滚动 */
-    height: 100%;
-    overflow-y: auto;
+}
+
+/* 2. 响应式筛选表单 */
+.responsive-filter-form .ant-form-item {
+    margin-bottom: 24px;
+}
+
+@media (max-width: 768px) {
+    .content-padding {
+        padding: 16px;
+    }
+
+    .responsive-filter-form {
+        display: flex;
+        flex-direction: column;
+    }
+
+    .responsive-filter-form .ant-form-item {
+        margin-right: 0 !important;
+        margin-bottom: 16px;
+    }
+
+    /* 3. 响应式卡片内边距 */
+    .ant-card-body {
+        padding: 16px !important;
+    }
 }

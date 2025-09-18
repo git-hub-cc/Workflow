@@ -1,3 +1,4 @@
+
 <template>
   <div class="page-container">
     <a-page-header :title="task.stepName || '任务处理'" :sub-title="task.formName" @back="() => $router.push({ name: 'task-list' })" />
@@ -11,8 +12,8 @@
         <a-button type="primary" @click="$router.push('/tasks')">返回待办列表</a-button>
       </a-empty>
 
-      <!-- 【核心修改】使用 a-row 和 a-col 实现响应式布局 -->
-      <a-row v-else-if="!loading" :gutter="[24, 24]" class="detail-layout">
+      <!-- 【样式完善】使用 content-padding 和响应式 gutter -->
+      <a-row v-else-if="!loading" :gutter="{ xs: 8, sm: 16, md: 24 }" class="detail-layout content-padding">
         <a-col :xs="24" :lg="16" class="main-content">
           <a-card title="表单详情">
             <a-descriptions bordered :column="1">
@@ -297,15 +298,6 @@ const getReadonlyDisplayValue = (field, value) => {
 </script>
 
 <style scoped>
-/* 【核心修改】移除旧的 flex 布局，改为 padding */
-.detail-layout {
-  padding: 24px;
-}
-@media (max-width: 768px) {
-  .detail-layout {
-    padding: 16px;
-  }
-}
 .main-content, .side-content { min-width: 0; }
 .approval-comment { background-color: #fafafa; border: 1px solid #f0f0f0; padding: 8px 12px; border-radius: 4px; margin-top: 8px; font-size: 14px; color: #595959; word-wrap: break-word; }
 .approval-comment strong { color: #262626; margin-right: 8px; }

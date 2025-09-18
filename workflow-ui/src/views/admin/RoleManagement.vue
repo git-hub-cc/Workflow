@@ -9,9 +9,9 @@
       </template>
     </a-page-header>
 
-    <div style="padding: 24px;">
+    <div class="content-padding">
       <a-card :bordered="false" style="margin-bottom: 24px;">
-        <a-form :model="filterState" layout="inline">
+        <a-form :model="filterState" layout="inline" class="responsive-filter-form">
           <a-form-item label="角色名称">
             <a-input v-model:value="filterState.name" placeholder="输入名称模糊查询" allow-clear />
           </a-form-item>
@@ -185,10 +185,5 @@ const handleDelete = async (roleId) => {
 .page-container {
   background-color: #fff;
   border-radius: 4px;
-}
-@media (max-width: 768px) {
-  :deep(.ant-form-inline .ant-form-item) {
-    margin-bottom: 16px;
-  }
 }
 </style>
