@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>任务处理 - 穗源保险公估一体化业务管理平台</title>
+    <link rel="stylesheet" href="style.css">
+    <style>
+        .info-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px 20px; font-size: 14px; }
+        .info-grid p { margin: 5px 0; }
+        .status-updater { display: flex; gap: 10px; flex-wrap: wrap; border-top: 1px solid var(--border-color-lighter); padding-top: 15px; margin-top: 15px;}
+        .btn-status { padding: 8px 15px; border-radius: 4px; border: 1px solid var(--border-color-base); background-color: #fff; cursor: pointer; }
+        .btn-status.active { background-color: var(--success-color); color: #fff; border-color: var(--success-color); }
+        .btn { padding: 10px 25px; border-radius: 4px; border: none; background-color: var(--primary-color); color: #fff; cursor: pointer; text-decoration: none;}
+        .btn-secondary { background-color: #f5f7fa; color: var(--text-color-regular); border: 1px solid var(--border-color-base); }
+        .final-actions { text-align: center; margin-top: 20px; }
+
+        /* Uploader styles */
+        .upload-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 15px; }
+        .upload-item { border: 1px dashed var(--border-color-base); border-radius: 4px; text-align: center; padding: 20px 10px; cursor: pointer; }
+        .upload-item:hover { border-color: var(--primary-color); color: var(--primary-color); }
+        .upload-item .icon { font-size: 36px; }
+        .upload-item .text { font-size: 13px; margin-top: 8px; }
+
+        /* Loss assessment table styles */
+        #loss-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+        #loss-table th, #loss-table td { border: 1px solid var(--border-color-lighter); padding: 8px; text-align: left; }
+        #loss-table th { background-color: var(--bg-color-base); }
+        #loss-table td input, #loss-table td select { width: 100%; padding: 5px; border: 1px solid var(--border-color-base); border-radius: 3px; box-sizing: border-box;}
+        #loss-table .part-selector { cursor: pointer; color: var(--text-color-placeholder); }
+        #loss-table .part-selector:hover { background-color: #f5f7fa; }
+        #loss-table .part-selector.filled { color: var(--text-color-primary); font-weight: 500;}
+        #loss-table .delete-row { color: var(--danger-color); text-decoration: none; }
+
+        /* Parts Selector Modal Styles */
+        .modal { display: none; position: fixed; z-index: 1001; left: 0; top: 0; width: 100%; height: 100%; overflow: auto; background-color: rgba(0,0,0,0.4); }
+        .modal-content { background-color: #fefefe; margin: 10% auto; padding: 20px; border: 1px solid #888; width: 80%; max-width: 500px; border-radius: var(--border-radius-base); }
+        .modal-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color-light); padding-bottom: 10px; margin-bottom: 15px;}
+        .modal-title { font-size: 16px; font-weight: 600; }
+        .close-btn { color: #aaa; font-size: 28px; font-weight: bold; cursor: pointer; }
+        #parts-search-input { width: 100%; padding: 8px; margin-bottom: 15px; border: 1px solid var(--border-color-base); border-radius: 4px; }
+        #parts-list { list-style-type: none; padding: 0; margin: 0; max-height: 250px; overflow-y: auto; border: 1px solid var(--border-color-light); }
+        #parts-list li { padding: 10px; cursor: pointer; border-bottom: 1px solid var(--border-color-lighter); }
+        #parts-list li:hover, #parts-list li.selected { background-color: var(--primary-light-color); }
+        #parts-list li:last-child { border-bottom: none; }
+        .modal-footer { text-align: right; margin-top: 20px; }
+    </style>
+</head>
+<body>
+<div class="app-container">
+    <aside class="sidebar">
+        <div class="sidebar-header">穗源保险公估</div>
+        <ul class="sidebar-nav">
+            <li class="sidebar-nav-item active"><a href="surveyor_task_list.html">我的任务</a></li>
+            <li class="sidebar-nav-item"><a href="surveyor_case_history.html">历史案件</a></li>
+            <li class="sidebar-nav-item"><a href="surveyor_commission.html">我的佣金</a></li>
+        </ul>
+    </aside>
+
+    <div class="main-wrapper">
+        <header class="header">
+            <div class="user-profile">
+                <div class="avatar" style="background-color: #409EFF;">陈</div>
+                <span>陈浩 (查勘员)</span>
+            </div>
+        </header>
+
+        <main class="main-content">
+            <h1 class="page-title">处理任务: SY-20240520-001</h1>
+
+            <div class="card">
+                <div class="card-header">案件信息</div>
+                <div class="info-grid">
+                    <p><strong>车牌号:</strong> 粤A·88888</p>
+                    <p><strong>承保方:</strong> 平安保险</p>
+                    <p><strong>案件类型:</strong> 查勘+定损</p>
+                    <p><strong>报案人:</strong> 王先生</p>
+                    <p><strong>联系电话:</strong> 13800138000</p>
+                    <p><strong>出险时间:</strong> 2024-05-20 09:15</p>
+                    <p><strong>出险地点:</strong> 广州市天河区黄埔大道西668号 赛马场内</p>
+                </div>
+                <div class="status-updater">
+                    <button class="btn-status">接受任务</button>
+                    <button class="btn-status">出发</button>
+                    <button class="btn-status active">已到场</button>
+                    <button class="btn-status">查勘中</button>
+                    <button class="btn-status">定损中</button>
+                    <button class="btn-status">完成</button>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header">资料上传</div>
+                <div class="upload-grid">
+                    <div class="upload-item"><div class="icon">+</div><div class="text">现场照片 (环境/碰撞部位)</div></div>
+                    <div class="upload-item"><div class="icon">+</div><div class="text">损毁细节照片</div></div>
+                    <div class="upload-item"><div class="icon">+</div><div class="text">驾驶证/行驶证</div></div>
+                    <div class="upload-item"><div class="icon">+</div><div class="text">身份证/银行卡</div></div>
+                    <div class="upload-item"><div class="icon">+</div><div class="text">事故认定书</div></div>
+                    <div class="upload-item"><div class="icon">+</div><div class="text">其他资料</div></div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header">定损清单</div>
+                <table id="loss-table">
+                    <thead><tr><th>损失项目</th><th>维修方式</th><th>数量</th><th>备注</th><th>操作</th></tr></thead>
+                    <tbody>
+                    <tr>
+                        <td class="part-selector filled">前保险杠总成</td>
+                        <td><select><option>更换</option><option>维修</option></select></td>
+                        <td><input type="number" value="1"></td>
+                        <td><input type="text" placeholder="例如: 副厂件"></td>
+                        <td><a href="#" class="delete-row">删除</a></td>
+                    </tr>
+                    <tr>
+                        <td class="part-selector"><span>双击选择零件...</span></td>
+                        <td><select><option>更换</option><option>维修</option></select></td>
+                        <td><input type="number" value="1"></td>
+                        <td><input type="text"></td>
+                        <td><a href="#" class="delete-row">删除</a></td>
+                    </tr>
+                    </tbody>
+                </table>
+                <button id="add-row-btn" style="margin-top:10px; font-size:12px; padding: 5px 10px;" class="btn-secondary">新增一项</button>
+            </div>
+
+            <div class="card">
+                <div class="card-header">查勘报告</div>
+                <textarea style="width: 100%; min-height: 100px; padding: 10px; border-radius: 4px; border: 1px solid var(--border-color-base);" placeholder="在此处填写查勘小结、出险经过、责任划分建议等..."></textarea>
+            </div>
+
+            <div class="final-actions">
+                <button class="btn btn-secondary" style="margin-right: 15px;">暂存报告</button>
+                <a href="surveyor_task_list.html" class="btn">提交审核</a>
+            </div>
+        </main>
+    </div>
+</div>
+
+<!-- 零件选择模态框 -->
+<div id="parts-modal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <span class="modal-title">选择损失项目</span>
+            <span class="close-btn">&times;</span>
+        </div>
+        <input type="text" id="parts-search-input" placeholder="搜索零件名称...">
+        <ul id="parts-list">
+            <!-- Parts will be populated by JavaScript -->
+        </ul>
+        <div class="modal-footer">
+            <button id="confirm-part-btn" class="btn">确认选择</button>
+        </div>
+    </div>
+</div>
+
+<script src="demo_helper.js"></script>
+<!-- ==================== 新增交互脚本 ==================== -->
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // --- Mock Parts Database ---
+        const partsData = [
+            "前保险杠总成", "后保险杠总成", "左前大灯总成", "右前大灯总成",
+            "左前翼子板", "右前翼子板", "引擎盖", "前挡风玻璃", "后挡风玻璃",
+            "左前门", "右前门", "左后门", "右后门", "车顶", "后备箱盖",
+            "水箱框架", "水箱", "冷凝器", "电子扇", "左前轮毂", "右前轮胎",
+            "工时-喷漆(金属漆)", "工时-喷漆(珍珠漆)", "工时-钣金"
+        ];
+
+        // --- DOM Elements ---
+        const lossTableBody = document.querySelector('#loss-table tbody');
+        const addRowBtn = document.getElementById('add-row-btn');
+        const modal = document.getElementById('parts-modal');
+        const closeBtn = modal.querySelector('.close-btn');
+        const searchInput = document.getElementById('parts-search-input');
+        const partsList = document.getElementById('parts-list');
+        const confirmBtn = document.getElementById('confirm-part-btn');
+
+        let activeCell = null; // To store which cell triggered the modal
+
+        // --- Functions ---
+        function populatePartsList(filter = '') {
+            partsList.innerHTML = '';
+            const filteredParts = partsData.filter(part => part.toLowerCase().includes(filter.toLowerCase()));
+            filteredParts.forEach(part => {
+                const li = document.createElement('li');
+                li.textContent = part;
+                li.dataset.partName = part;
+                partsList.appendChild(li);
+            });
+        }
+
+        function openModal(cell) {
+            activeCell = cell;
+            populatePartsList();
+            modal.style.display = 'block';
+            searchInput.focus();
+        }
+
+        function closeModal() {
+            modal.style.display = 'none';
+            searchInput.value = '';
+            activeCell = null;
+        }
+
+        function addRow() {
+            const newRow = document.createElement('tr');
+            newRow.innerHTML = `
+            <td class="part-selector"><span>双击选择零件...</span></td>
+            <td><select><option>更换</option><option>维修</option></select></td>
+            <td><input type="number" value="1"></td>
+            <td><input type="text"></td>
+            <td><a href="#" class="delete-row">删除</a></td>
+        `;
+            lossTableBody.appendChild(newRow);
+        }
+
+        // --- Event Listeners ---
+        lossTableBody.addEventListener('dblclick', function(e) {
+            if (e.target && (e.target.matches('td.part-selector') || e.target.parentElement.matches('td.part-selector'))) {
+                const cell = e.target.closest('td.part-selector');
+                openModal(cell);
+            }
+        });
+
+        lossTableBody.addEventListener('click', function(e) {
+            if (e.target && e.target.matches('a.delete-row')) {
+                e.preventDefault();
+                e.target.closest('tr').remove();
+            }
+        });
+
+        addRowBtn.addEventListener('click', addRow);
+        closeBtn.addEventListener('click', closeModal);
+        window.addEventListener('click', function(e) {
+            if (e.target == modal) {
+                closeModal();
+            }
+        });
+
+        searchInput.addEventListener('input', function() {
+            populatePartsList(this.value);
+        });
+
+        partsList.addEventListener('click', function(e) {
+            if (e.target && e.target.matches('li')) {
+                // Remove 'selected' from any other item
+                const currentlySelected = partsList.querySelector('.selected');
+                if (currentlySelected) {
+                    currentlySelected.classList.remove('selected');
+                }
+                // Add 'selected' to the clicked item
+                e.target.classList.add('selected');
+            }
+        });
+
+        confirmBtn.addEventListener('click', function() {
+            const selectedPart = partsList.querySelector('li.selected');
+            if (selectedPart && activeCell) {
+                activeCell.textContent = selectedPart.dataset.partName;
+                activeCell.classList.add('filled');
+                activeCell.classList.remove('part-selector-placeholder');
+                closeModal();
+            } else {
+                // Can use the global modal for feedback
+                showModal('提示', '请先从列表中选择一个零件。', 'warning');
+            }
+        });
+
+        // --- Initial Load ---
+        populatePartsList();
+    });
+</script>
+</body>
+</html>

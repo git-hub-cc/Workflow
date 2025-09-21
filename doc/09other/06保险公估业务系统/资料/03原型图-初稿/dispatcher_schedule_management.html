@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>排班管理 - 穗源保险公估一体化业务管理平台</title>
+    <link rel="stylesheet" href="style.css">
+    <style>
+        /* --- 顶部控制区域 --- */
+        .schedule-controls {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+        .week-nav { display: flex; align-items: center; gap: 10px; }
+        .week-nav span { font-size: 16px; font-weight: 500; color: var(--text-color-primary); }
+        .week-nav button {
+            padding: 8px 15px; border-radius: 4px; border: 1px solid var(--border-color-base);
+            background-color: #fff; cursor: pointer; transition: all 0.2s;
+        }
+        .week-nav button:hover { color: var(--primary-color); border-color: var(--primary-color); }
+
+        .controls-right { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+        .filter-group { display: flex; align-items: center; gap: 15px; flex-wrap: wrap; margin-right: 10px; }
+        .filter-item { display: flex; align-items: center; gap: 8px; }
+        .filter-item label { color: var(--text-color-regular); font-size: 13px; }
+        .filter-item select, .filter-item input {
+            padding: 8px 12px; border: 1px solid var(--border-color-base);
+            border-radius: 4px; font-size: 13px;
+        }
+        .btn {
+            padding: 8px 20px; border-radius: 4px; border: 1px solid var(--border-color-base);
+            background-color: #fff; cursor: pointer; transition: all 0.2s;
+        }
+        .btn:hover { color: var(--primary-color); border-color: var(--primary-color); }
+        .btn-primary { background-color: var(--primary-color); color: #fff; border-color: var(--primary-color); }
+        .btn-primary:hover { opacity: 0.8; color: #fff; }
+
+        /* --- 排班表格 --- */
+        .schedule-table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        .schedule-table th, .schedule-table td {
+            border: 1px solid var(--border-color-lighter);
+            text-align: center;
+            vertical-align: middle;
+            padding: 10px;
+        }
+        .schedule-table th { background-color: var(--bg-color-base); font-weight: 500; }
+        .surveyor-info-header { text-align: left; padding-left: 20px; width: 160px; }
+        .surveyor-info-cell { text-align: left; padding: 10px 20px; }
+        .surveyor-info-cell .name { font-weight: 500; color: var(--text-color-primary); }
+        .surveyor-info-cell .phone { font-size: 12px; color: var(--text-color-secondary); margin-top: 3px; }
+
+        /* --- 班次标签与编辑模式样式 (核心修改) --- */
+        @keyframes jiggle {
+            0%, 100% { transform: rotate(0); }
+            25% { transform: rotate(-1.5deg); }
+            75% { transform: rotate(1.5deg); }
+        }
+
+        .shift-tag {
+            display: inline-block; width: 100%; padding: 8px 10px; border-radius: 4px;
+            font-size: 13px; font-weight: 500; border: 1px solid transparent;
+            transition: transform 0.1s, box-shadow 0.2s;
+            cursor: default; /* 默认不可点击 */
+        }
+        .is-editing .shift-tag {
+            cursor: pointer; /* 编辑模式下可点击 */
+            animation: jiggle 0.4s infinite;
+        }
+        .is-editing .shift-tag:hover {
+            transform: scale(1.05);
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+
+        .shift-morning { background-color: #ecf5ff; color: #409eff; border-color: #d9ecff;}
+        .shift-evening { background-color: #fdf6ec; color: #e6a23c; border-color: #faecd8;}
+        .shift-full { background-color: #f0f9eb; color: #67c23a; border-color: #e1f3d8;}
+        .shift-off { background-color: #f4f4f5; color: #909399; border-color: #e9e9eb;}
+
+        /* --- 分页 --- */
+        .pagination { display: flex; justify-content: flex-end; align-items: center; margin-top: 25px; padding: 10px 0; }
+        .pagination ul { list-style: none; padding: 0; margin: 0; display: flex; gap: 8px; }
+        .pagination li a { display: block; text-decoration: none; padding: 8px 14px; border: 1px solid var(--border-color-base); border-radius: 4px; color: var(--text-color-regular); transition: all 0.2s; }
+        .pagination li a:hover { color: var(--primary-color); border-color: var(--primary-color); }
+        .pagination li.active a { background-color: var(--primary-color); color: #fff; border-color: var(--primary-color); }
+        .pagination li.disabled a { color: var(--text-color-placeholder); cursor: not-allowed; background-color: #f4f4f5; }
+    </style>
+</head>
+<body>
+<div class="app-container">
+    <!-- 侧边导航栏 -->
+    <aside class="sidebar">
+        <div class="sidebar-header">穗源保险公估</div>
+        <ul class="sidebar-nav">
+            <li class="sidebar-nav-item"><a href="dispatcher_dispatch_center.html">派单中心</a></li>
+            <li class="sidebar-nav-item"><a href="dispatcher_case_entry.html">案件录入</a></li>
+            <li class="sidebar-nav-item"><a href="dispatcher_task_query.html">任务查询</a></li>
+            <li class="sidebar-nav-item active"><a href="dispatcher_schedule_management.html">排班管理</a></li>
+        </ul>
+    </aside>
+
+    <!-- 主内容区 -->
+    <div class="main-wrapper">
+        <!-- 顶部栏 -->
+        <header class="header">
+            <div class="user-profile">
+                <div class="avatar" style="background-color: #E6A23C;">王</div>
+                <span>王芳 (调度员)</span>
+            </div>
+        </header>
+
+        <!-- 页面内容 -->
+        <main class="main-content">
+            <h1 class="page-title">排班管理</h1>
+
+            <div class="card">
+                <div class="schedule-controls">
+                    <div class="week-nav">
+                        <button>&laquo; 上一周</button>
+                        <span>2024年5月20日 - 2024年5月26日</span>
+                        <button>下一周 &raquo;</button>
+                    </div>
+                    <div class="controls-right">
+                        <div class="filter-group">
+                            <div class="filter-item">
+                                <label>区域:</label>
+                                <select>
+                                    <option>全部区域</option>
+                                    <option selected>广州分公司</option>
+                                    <option>深圳分公司</option>
+                                    <option>佛山分公司</option>
+                                </select>
+                            </div>
+                            <div class="filter-item">
+                                <label>姓名:</label>
+                                <input type="text" placeholder="输入姓名搜索">
+                            </div>
+                            <div class="filter-item">
+                                <label>手机号:</label>
+                                <input type="text" placeholder="输入手机号搜索">
+                            </div>
+                            <button class="btn">查询</button>
+                        </div>
+                        <button id="edit-schedule-btn" class="btn">修改排班</button>
+                        <button id="save-schedule-btn" class="btn btn-primary">保存排班</button>
+                    </div>
+                </div>
+            </div>
+
+            <div id="schedule-card" class="card">
+                <table class="schedule-table">
+                    <thead>
+                    <tr>
+                        <th class="surveyor-info-header">查勘员信息</th>
+                        <th>周一 (05-20)</th><th>周二 (05-21)</th><th>周三 (05-22)</th>
+                        <th>周四 (05-23)</th><th>周五 (05-24)</th><th>周六 (05-25)</th>
+                        <th>周日 (05-26)</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    <tr>
+                        <td class="surveyor-info-cell">
+                            <div class="name">陈浩</div><div class="phone">138****1234</div>
+                        </td>
+                        <td><div class="shift-tag shift-morning">早班 08-16</div></td>
+                        <td><div class="shift-tag shift-morning">早班 08-16</div></td>
+                        <td><div class="shift-tag shift-evening">晚班 16-24</div></td>
+                        <td><div class="shift-tag shift-evening">晚班 16-24</div></td>
+                        <td><div class="shift-tag shift-full">全天 09-21</div></td>
+                        <td><div class="shift-tag shift-off">休息</div></td>
+                        <td><div class="shift-tag shift-off">休息</div></td>
+                    </tr>
+                    <tr>
+                        <td class="surveyor-info-cell">
+                            <div class="name">刘洋</div><div class="phone">139****5678</div>
+                        </td>
+                        <td><div class="shift-tag shift-evening">晚班 16-24</div></td>
+                        <td><div class="shift-tag shift-evening">晚班 16-24</div></td>
+                        <td><div class="shift-tag shift-off">休息</div></td>
+                        <td><div class="shift-tag shift-off">休息</div></td>
+                        <td><div class="shift-tag shift-morning">早班 08-16</div></td>
+                        <td><div class="shift-tag shift-full">全天 09-21</div></td>
+                        <td><div class="shift-tag shift-full">全天 09-21</div></td>
+                    </tr>
+                    <tr>
+                        <td class="surveyor-info-cell">
+                            <div class="name">吴静</div><div class="phone">137****8899</div>
+                        </td>
+                        <td><div class="shift-tag shift-off">休息</div></td>
+                        <td><div class="shift-tag shift-full">全天 09-21</div></td>
+                        <td><div class="shift-tag shift-morning">早班 08-16</div></td>
+                        <td><div class="shift-tag shift-morning">早班 08-16</div></td>
+                        <td><div class="shift-tag shift-off">休息</div></td>
+                        <td><div class="shift-tag shift-evening">晚班 16-24</div></td>
+                        <td><div class="shift-tag shift-evening">晚班 16-24</div></td>
+                    </tr>
+                    <tr>
+                        <td class="surveyor-info-cell">
+                            <div class="name">张三</div><div class="phone">136****1122</div>
+                        </td>
+                        <td><div class="shift-tag shift-full">全天 09-21</div></td>
+                        <td><div class="shift-tag shift-off">休息</div></td>
+                        <td><div class="shift-tag shift-off">休息</div></td>
+                        <td><div class="shift-tag shift-morning">早班 08-16</div></td>
+                        <td><div class="shift-tag shift-morning">早班 08-16</div></td>
+                        <td><div class="shift-tag shift-evening">晚班 16-24</div></td>
+                        <td><div class="shift-tag shift-evening">晚班 16-24</div></td>
+                    </tr>
+                    <tr>
+                        <td class="surveyor-info-cell">
+                            <div class="name">李四</div><div class="phone">135****3344</div>
+                        </td>
+                        <td><div class="shift-tag shift-morning">早班 08-16</div></td>
+                        <td><div class="shift-tag shift-evening">晚班 16-24</div></td>
+                        <td><div class="shift-tag shift-morning">早班 08-16</div></td>
+                        <td><div class="shift-tag shift-evening">晚班 16-24</div></td>
+                        <td><div class="shift-tag shift-off">休息</div></td>
+                        <td><div class="shift-tag shift-off">休息</div></td>
+                        <td><div class="shift-tag shift-full">全天 09-21</div></td>
+                    </tr>
+                    </tbody>
+                </table>
+                <div style="font-size: 13px; color: var(--text-color-secondary); margin-top: 15px; float: left;">* 点击“修改排班”按钮后，可点击班次标签进行调整。</div>
+                <nav class="pagination">
+                    <ul>
+                        <li class="disabled"><a href="#">&laquo;</a></li>
+                        <li class="active"><a href="#">1</a></li>
+                        <li><a href="#">2</a></li>
+                        <li><a href="#">3</a></li>
+                        <li><a href="#">&raquo;</a></li>
+                    </ul>
+                </nav>
+            </div>
+        </main>
+    </div>
+</div>
+
+<script src="demo_helper.js"></script>
+
+<!-- ==================== 新增交互脚本 ==================== -->
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // --- 状态与元素获取 ---
+        let isEditing = false;
+        const editBtn = document.getElementById('edit-schedule-btn');
+        const saveBtn = document.getElementById('save-schedule-btn');
+        const scheduleCard = document.getElementById('schedule-card');
+        const scheduleTable = document.querySelector('.schedule-table');
+
+        // --- 班次定义 ---
+        const shifts = [
+            { name: '早班 08-16', class: 'shift-morning' },
+            { name: '晚班 16-24', class: 'shift-evening' },
+            { name: '全天 09-21', class: 'shift-full' },
+            { name: '休息', class: 'shift-off' }
+        ];
+
+        // --- 函数：进入编辑模式 ---
+        function enterEditMode() {
+            isEditing = true;
+            scheduleCard.classList.add('is-editing');
+            editBtn.textContent = '取消修改';
+            editBtn.style.borderColor = 'var(--danger-color)';
+            editBtn.style.color = 'var(--danger-color)';
+        }
+
+        // --- 函数：退出编辑模式 ---
+        function exitEditMode() {
+            isEditing = false;
+            scheduleCard.classList.remove('is-editing');
+            editBtn.textContent = '修改排班';
+            editBtn.style.borderColor = ''; // 恢复默认边框色
+            editBtn.style.color = '';       // 恢复默认文字颜色
+        }
+
+        // --- 事件监听 ---
+        // 1. 点击 "修改/取消" 按钮
+        editBtn.addEventListener('click', function() {
+            if (isEditing) {
+                exitEditMode();
+                // 可以在这里增加 "是否放弃未保存的修改？" 的确认提示
+            } else {
+                enterEditMode();
+            }
+        });
+
+        // 2. 点击 "保存排班" 按钮
+        saveBtn.addEventListener('click', function() {
+            // 在实际应用中，这里会收集数据并发送到后端
+            showModal('保存成功', '排班已成功保存！', 'success'); // 使用模态框替代alert
+            exitEditMode();
+        });
+
+        // 3. 点击排班表格内的单元格 (事件委托)
+        if (scheduleTable) {
+            scheduleTable.addEventListener('click', function(event) {
+                // 只有在编辑模式下才响应
+                if (!isEditing) {
+                    return;
+                }
+
+                const target = event.target;
+                if (target.classList.contains('shift-tag')) {
+                    let currentClass = shifts.find(s => target.classList.contains(s.class))?.class;
+
+                    if (currentClass) {
+                        const currentIndex = shifts.findIndex(shift => shift.class === currentClass);
+                        const nextIndex = (currentIndex + 1) % shifts.length;
+                        const nextShift = shifts[nextIndex];
+
+                        target.classList.remove(currentClass);
+                        target.classList.add(nextShift.class);
+                        target.textContent = nextShift.name;
+                    }
+                }
+            });
+        }
+    });
+</script>
+<!-- ======================================================= -->
+
+</body>
+</html>

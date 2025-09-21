@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>我的佣金 - 穗源保险公估一体化业务管理平台</title>
+    <link rel="stylesheet" href="style.css">
+    <style>
+        .card-header { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;}
+        .btn { padding: 8px 20px; border-radius: 4px; border: none; background-color: var(--primary-color); color: #fff; cursor: pointer; text-decoration: none; }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; font-size: 13px; }
+        th, td { border: 1px solid var(--border-color-lighter); padding: 12px 10px; text-align: left; vertical-align: middle; }
+        th { background-color: var(--bg-color-base); font-weight: 500; }
+        .text-right { text-align: right !important; }
+        .text-bold { font-weight: bold; }
+        .status-tag { padding: 3px 8px; border-radius: 4px; font-size: 12px; white-space: nowrap;}
+        .status-green { background-color: #f0f9eb; color: #67c23a; }
+        .status-orange { background-color: #fdf6ec; color: #e6a23c; }
+
+        /* --- 新增样式: 搜索栏 --- */
+        .filter-bar {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            padding: 15px 20px;
+            border-bottom: 1px solid var(--border-color-light);
+            margin: -20px -20px 20px -20px;
+        }
+        .filter-item { display: flex; align-items: center; gap: 8px; }
+        .filter-item label { color: var(--text-color-regular); font-size: 13px; }
+        .filter-item input, .filter-item select {
+            padding: 8px;
+            border: 1px solid var(--border-color-base);
+            border-radius: 4px;
+            font-size: 13px;
+        }
+        .btn-secondary { background-color: #fff; color: var(--text-color-regular); border: 1px solid var(--border-color-base); }
+
+        /* --- 新增样式: 分页 --- */
+        .pagination {
+            display: flex;
+            justify-content: flex-end;
+            align-items: center;
+            margin-top: 25px;
+        }
+        .pagination ul { list-style: none; padding: 0; margin: 0; display: flex; gap: 8px; }
+        .pagination li a {
+            display: block; text-decoration: none; padding: 8px 14px;
+            border: 1px solid var(--border-color-base); border-radius: 4px;
+            color: var(--text-color-regular); transition: all 0.2s;
+        }
+        .pagination li a:hover { color: var(--primary-color); border-color: var(--primary-color); }
+        .pagination li.active a { background-color: var(--primary-color); color: #fff; border-color: var(--primary-color); }
+        .pagination li.disabled a { color: var(--text-color-placeholder); cursor: not-allowed; background-color: #f4f4f5; }
+    </style>
+</head>
+<body>
+<div class="app-container">
+    <aside class="sidebar">
+        <div class="sidebar-header">穗源保险公估</div>
+        <ul class="sidebar-nav">
+            <li class="sidebar-nav-item"><a href="surveyor_task_list.html">我的任务</a></li>
+            <li class="sidebar-nav-item"><a href="surveyor_case_history.html">历史案件</a></li>
+            <li class="sidebar-nav-item active"><a href="surveyor_commission.html">我的佣金</a></li>
+            <li class="sidebar-nav-item"><a href="surveyor_withdrawal_history.html">提现记录</a></li>
+        </ul>
+    </aside>
+
+    <div class="main-wrapper">
+        <header class="header">
+            <div class="user-profile">
+                <div class="avatar" style="background-color: #409EFF;">陈</div>
+                <span>陈浩 (查勘员)</span>
+            </div>
+        </header>
+
+        <main class="main-content">
+            <h1 class="page-title">我的佣金</h1>
+
+            <div class="kpi-card-container">
+                <div class="card kpi-card green">
+                    <div class="value">6,850<span class="unit">元</span></div>
+                    <div class="label">本月预估收入</div>
+                </div>
+                <div class="card kpi-card blue">
+                    <div class="value">3,500<span class="unit">元</span></div>
+                    <div class="label">可提现余额</div>
+                </div>
+                <div class="card kpi-card orange">
+                    <div class="value">3,350<span class="unit">元</span></div>
+                    <div class="label">待结算金额</div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="filter-bar">
+                    <div class="filter-item">
+                        <label>完成日期:</label>
+                        <input type="date">
+                        <span>-</span>
+                        <input type="date">
+                    </div>
+                    <div class="filter-item">
+                        <label>案件号:</label>
+                        <input type="text" placeholder="输入案件编号...">
+                    </div>
+                    <div class="filter-item">
+                        <label>状态:</label>
+                        <select>
+                            <option>全部</option>
+                            <option>可提现</option>
+                            <option>待结算</option>
+                        </select>
+                    </div>
+                    <button class="btn btn-secondary">查询</button>
+                </div>
+
+                <div class="card-header">
+                    <span>我的任务佣金</span>
+                    <div>
+                        <span style="font-size: 14px; color: var(--text-color-regular); margin-right: 15px;">
+                            已勾选: <strong id="selected-total" style="color: var(--danger-color);">0.00 元</strong>
+                        </span>
+                        <button id="withdraw-btn" class="btn">申请提现</button>
+                    </div>
+                </div>
+                <table>
+                    <thead>
+                    <tr>
+                        <th style="width: 40px; text-align: center;"><input type="checkbox" id="select-all"></th>
+                        <th>案件编号</th>
+                        <th>任务类型</th>
+                        <th>完成时间</th>
+                        <th>佣金状态</th>
+                        <th class="text-right">佣金金额 (元)</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    <tr>
+                        <td style="text-align: center;"><input type="checkbox" class="task-checkbox" data-amount="200.00"></td>
+                        <td>SY-20240520-001</td>
+                        <td>查勘+定损</td>
+                        <td>2024-05-20</td>
+                        <td><span class="status-tag status-green">可提现</span></td>
+                        <td class="text-right text-bold">200.00</td>
+                    </tr>
+                    <tr>
+                        <td style="text-align: center;"><input type="checkbox" class="task-checkbox" data-amount="450.00"></td>
+                        <td>SY-20240515-011</td>
+                        <td>查勘+定损 (含KPI扣罚)</td>
+                        <td>2024-05-16</td>
+                        <td><span class="status-tag status-green">可提现</span></td>
+                        <td class="text-right text-bold">450.00</td>
+                    </tr>
+                    <tr>
+                        <td style="text-align: center;"><input type="checkbox" class="task-checkbox" data-amount="2850.00"></td>
+                        <td>SY-20240512-007</td>
+                        <td>财险大案（定损）</td>
+                        <td>2024-05-12</td>
+                        <td><span class="status-tag status-green">可提现</span></td>
+                        <td class="text-right text-bold">2,850.00</td>
+                    </tr>
+                    <tr>
+                        <td style="text-align: center;"><input type="checkbox" disabled></td>
+                        <td>SY-20240522-008</td>
+                        <td>现场查勘</td>
+                        <td>2024-05-22</td>
+                        <td><span class="status-tag status-orange">待结算</span></td>
+                        <td class="text-right">120.00</td>
+                    </tr>
+                    <tr>
+                        <td style="text-align: center;"><input type="checkbox" disabled></td>
+                        <td>SY-20240523-010</td>
+                        <td>人伤查勘</td>
+                        <td>2024-05-23</td>
+                        <td><span class="status-tag status-orange">待结算</span></td>
+                        <td class="text-right">3,230.00</td>
+                    </tr>
+                    </tbody>
+                </table>
+                <nav class="pagination">
+                    <ul>
+                        <li class="disabled"><a href="#">&laquo;</a></li>
+                        <li class="active"><a href="#">1</a></li>
+                        <li><a href="#">2</a></li>
+                        <li><a href="#">&raquo;</a></li>
+                    </ul>
+                </nav>
+            </div>
+        </main>
+    </div>
+</div>
+<script src="demo_helper.js"></script>
+<!-- ==================== 新增交互脚本 ==================== -->
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const selectAllCheckbox = document.getElementById('select-all');
+        const taskCheckboxes = document.querySelectorAll('.task-checkbox:not([disabled])');
+        const selectedTotalEl = document.getElementById('selected-total');
+        const withdrawBtn = document.getElementById('withdraw-btn');
+
+        // 更新已勾选总金额
+        function updateTotal() {
+            let total = 0;
+            taskCheckboxes.forEach(checkbox => {
+                if (checkbox.checked) {
+                    total += parseFloat(checkbox.dataset.amount);
+                }
+            });
+            selectedTotalEl.textContent = total.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' 元';
+        }
+
+        // "全选" 复选框的事件监听
+        selectAllCheckbox.addEventListener('change', function() {
+            taskCheckboxes.forEach(checkbox => {
+                checkbox.checked = this.checked;
+            });
+            updateTotal();
+        });
+
+        // 单个任务复选框的事件监听
+        taskCheckboxes.forEach(checkbox => {
+            checkbox.addEventListener('change', function() {
+                if (!this.checked) {
+                    // 如果取消勾选任何一个，则取消"全选"状态
+                    selectAllCheckbox.checked = false;
+                } else {
+                    // 如果所有都已勾选，则勾选"全选"
+                    const allChecked = Array.from(taskCheckboxes).every(cb => cb.checked);
+                    selectAllCheckbox.checked = allChecked;
+                }
+                updateTotal();
+            });
+        });
+
+        // "申请提现" 按钮的事件监听
+        withdrawBtn.addEventListener('click', function() {
+            const totalAmountText = selectedTotalEl.textContent;
+            const totalAmount = parseFloat(totalAmountText.replace(/,/g, ''));
+
+            if (totalAmount <= 0) {
+                showModal('操作提示', '请至少选择一个可提现的任务。', 'warning');
+                return;
+            }
+            // 使用全局模态框进行确认
+            showModal('提现申请确认', `您正在申请提现 <strong>${totalAmountText}</strong>，确认提交吗？`, 'info');
+
+            // 真实场景下，点击模态框的“确定”后会发送API请求。
+            // 此处仅做演示，申请提交后不清空勾选状态，以便用户查看。
+        });
+    });
+</script>
+</body>
+</html>
