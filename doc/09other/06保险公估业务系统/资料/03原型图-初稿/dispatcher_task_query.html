@@ -5,6 +5,15 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>任务查询 - 穗源保险公估一体化业务管理平台</title>
     <link rel="stylesheet" href="style.css">
+    <!-- 新增: 超时预警样式 -->
+    <style>
+        .task-overdue td {
+            background-color: #fef0f0 !important;
+        }
+        .task-overdue .status-tag {
+            font-weight: bold;
+        }
+    </style>
 </head>
 <body>
 <div class="app-container">
@@ -48,6 +57,12 @@
                         </select>
                     </div>
                     <div class="filter-item">
+                        <label>委托时间:</label>
+                        <input type="date">
+                        <span>至</span>
+                        <input type="date">
+                    </div>
+                    <div class="filter-item">
                         <label>查勘员:</label>
                         <input type="text" placeholder="输入查勘员姓名...">
                     </div>
@@ -75,15 +90,16 @@
                         <tbody>
                         <tr>
                             <td>SY-20240520-001</td><td>PABX...GZ00123</td><td>粤A·88888</td>
-                            <td>赵磊 (审核主管)</td>
+                            <td>赵磊 (品控)</td>
                             <td><span class="status-tag status-warning">待审核</span></td>
                             <td>2024-05-20 11:30:45</td>
                             <td class="action-links"><a href="reviewer_case_audit.html">查看</a></td>
                         </tr>
-                        <tr>
+                        <!-- 修改: 增加 task-overdue 类并修改状态文本 -->
+                        <tr class="task-overdue">
                             <td>SY-20240521-003</td><td>PICC...GZ00458</td><td>粤B·54321</td>
                             <td>陈浩 (查勘员)</td>
-                            <td><span class="status-tag status-danger">待接受</span></td>
+                            <td><span class="status-tag status-danger">待接受 (超时)</span></td>
                             <td>2024-05-21 09:35:12</td>
                             <td class="action-links"><a href="#">改派</a></td>
                         </tr>

@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>审核质量分析 - 穗源保险公估一体化业务管理平台</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="app-container">
+    <!-- 侧边导航栏 (已修改为品控角色) -->
+    <aside class="sidebar">
+        <div class="sidebar-header">穗源保险公估</div>
+        <ul class="sidebar-nav">
+            <li class="sidebar-nav-item"><a href="reviewer_todo_list.html">待办列表</a></li>
+            <li class="sidebar-nav-item"><a href="reviewer_case_audit.html">案件审核</a></li>
+            <li class="sidebar-nav-item"><a href="reviewer_case_history.html">历史案件</a></li>
+            <li class="sidebar-nav-item active"><a href="reviewer_business_report.html">商务报表</a></li>
+        </ul>
+    </aside>
+
+    <!-- 主内容区 -->
+    <div class="main-wrapper">
+        <!-- 顶部栏 (已修改为品控角色) -->
+        <header class="header">
+            <div class="header-left">
+                <button id="hamburger-btn" class="hamburger-btn">☰</button>
+            </div>
+            <div class="user-profile">
+                <div class="avatar" style="background-color: #67C23A;">赵</div>
+                <span>赵磊 (品控)</span>
+            </div>
+        </header>
+
+        <!-- 页面内容 (已重构为审核质量分析) -->
+        <main class="main-content">
+            <h1 class="page-title">审核质量分析报表</h1>
+
+            <!-- 新增: 品控核心指标 -->
+            <div class="kpi-card-container">
+                <div class="card kpi-card blue">
+                    <div class="value">128</div>
+                    <div class="label">本月审核总数</div>
+                </div>
+                <div class="card kpi-card orange">
+                    <div class="value">35<span class="unit">分钟</span></div>
+                    <div class="label">平均审核耗时</div>
+                </div>
+                <div class="card kpi-card green">
+                    <div class="value">93.8%</div>
+                    <div class="label">一次性通过率</div>
+                </div>
+                <div class="card kpi-card red">
+                    <div class="value">6.2%</div>
+                    <div class="label">退回修改率</div>
+                </div>
+            </div>
+
+            <!-- 筛选区域 (已修改) -->
+            <div class="card" style="margin-top:20px;">
+                <div class="filter-bar">
+                    <div class="filter-item">
+                        <label>委托时间:</label>
+                        <input type="date">
+                        <span>-</span>
+                        <input type="date">
+                    </div>
+                    <div class="filter-item">
+                        <label>结案时间:</label>
+                        <input type="date">
+                        <span>-</span>
+                        <input type="date">
+                    </div>
+                    <div class="filter-item">
+                        <label>审核时间:</label>
+                        <input type="date" value="2024-05-01">
+                        <span>-</span>
+                        <input type="date" value="2024-05-31">
+                    </div>
+                    <div class="filter-item">
+                        <label>结算时间:</label>
+                        <input type="date">
+                        <span>-</span>
+                        <input type="date">
+                    </div>
+                    <div class="filter-item">
+                        <label>承保方:</label>
+                        <select>
+                            <option>全部</option>
+                            <option>平安保险</option>
+                            <option>人保财险</option>
+                            <option>太平洋保险</option>
+                        </select>
+                    </div>
+                    <div class="filter-item">
+                        <label>查勘员:</label>
+                        <select><option>全部</option><option>陈浩</option><option>刘洋</option></select>
+                    </div>
+                    <div class="filter-item">
+                        <label>审核结果:</label>
+                        <select><option>全部</option><option>审核通过</option><option>退回修改</option></select>
+                    </div>
+                    <div class="filter-actions">
+                        <button class="btn btn-secondary">重置</button>
+                        <button class="btn btn-primary">查询</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 数据列表 (已修改) -->
+            <div class="card">
+                <div class="card-header">
+                    <span>审核明细</span>
+                    <button class="btn btn-primary">导出报表</button>
+                </div>
+                <div class="table-responsive-wrapper">
+                    <table>
+                        <thead>
+                        <tr>
+                            <th>案件编号</th><th>车牌号</th><th>查勘员</th>
+                            <th>审核完成时间</th><th>审核耗时</th><th>审核结果</th><th>操作</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        <tr>
+                            <td>SY-20240520-001</td><td>粤A·88888</td><td>陈浩</td>
+                            <td>2024-05-20 12:05:10</td><td>35分钟</td>
+                            <td><span class="status-tag status-success">审核通过</span></td>
+                            <td class="action-links"><a href="reviewer_case_audit.html">查看</a></td>
+                        </tr>
+                        <tr>
+                            <td>SY-20240518-002</td><td>粤A·66778</td><td>刘洋</td>
+                            <td>2024-05-18 16:30:15</td><td>28分钟</td>
+                            <td><span class="status-tag status-success">审核通过</span></td>
+                            <td class="action-links"><a href="#">查看</a></td>
+                        </tr>
+                        <tr>
+                            <td>SY-20240515-011</td><td>粤A·ABCD1</td><td>陈浩</td>
+                            <td>2024-05-15 10:05:20</td><td>48分钟</td>
+                            <td><span class="status-tag status-danger">退回修改</span></td>
+                            <td class="action-links"><a href="#">查看</a></td>
+                        </tr>
+                        <tr>
+                            <td>SY-20240512-007</td><td>粤B·XYZ89</td><td>陈浩</td>
+                            <td>2024-05-12 11:45:55</td><td>25分钟</td>
+                            <td><span class="status-tag status-success">审核通过</span></td>
+                            <td class="action-links"><a href="#">查看</a></td>
+                        </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div class="card-footer">
+                    <nav class="pagination">
+                        <ul>
+                            <li class="disabled"><a href="#">&laquo;</a></li>
+                            <li class="active"><a href="#">1</a></li>
+                            <li><a href="#">&raquo;</a></li>
+                        </ul>
+                    </nav>
+                </div>
+            </div>
+        </main>
+    </div>
+</div>
+<script src="demo_helper.js"></script>
+</body>
+</html>

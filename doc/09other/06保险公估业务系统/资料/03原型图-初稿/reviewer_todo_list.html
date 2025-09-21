@@ -5,6 +5,23 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>待办列表 - 穗源保险公估一体化业务管理平台</title>
     <link rel="stylesheet" href="style.css">
+    <!-- 新增: 超时预警样式 -->
+    <style>
+        .todo-item.overdue .todo-icon {
+            background-color: #fef0f0;
+            color: #f56c6c;
+            border: 1px solid #fde2e2;
+        }
+        .overdue-tag {
+            margin-left: 10px;
+            font-size: 11px;
+            font-weight: bold;
+            color: #f56c6c;
+            background-color: #fef0f0;
+            padding: 2px 6px;
+            border-radius: 4px;
+        }
+    </style>
 </head>
 <body>
 <div class="app-container">
@@ -15,6 +32,7 @@
             <li class="sidebar-nav-item active"><a href="reviewer_todo_list.html">待办列表</a></li>
             <li class="sidebar-nav-item"><a href="reviewer_case_audit.html">案件审核</a></li>
             <li class="sidebar-nav-item"><a href="reviewer_case_history.html">历史案件</a></li>
+            <li class="sidebar-nav-item"><a href="reviewer_business_report.html">商务报表</a></li>
         </ul>
     </aside>
 
@@ -27,7 +45,7 @@
             </div>
             <div class="user-profile">
                 <div class="avatar" style="background-color: #67C23A;">赵</div>
-                <span>赵磊 (审核主管)</span>
+                <span>赵磊 (品控)</span>
             </div>
         </header>
 
@@ -37,10 +55,14 @@
             <div class="card">
                 <div class="card-header"><span>待审核案件 (2)</span></div>
                 <ul class="todo-list">
-                    <li class="todo-item">
+                    <!-- 修改: 增加 overdue 类和 overdue-tag -->
+                    <li class="todo-item overdue">
                         <div class="todo-icon">审</div>
                         <div class="todo-content">
-                            <div class="title">案件 SY-20240520-001 (粤A·88888) 报告已提交</div>
+                            <div class="title">
+                                案件 SY-20240520-001 (粤A·88888) 报告已提交
+                                <span class="overdue-tag">停留过久</span>
+                            </div>
                             <div class="meta">提交人: 陈浩 | 提交时间: 2024-05-20 11:30:45</div>
                         </div>
                         <div class="todo-actions">

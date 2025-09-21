@@ -5,6 +5,15 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>我的任务 - 穗源保险公估一体化业务管理平台</title>
     <link rel="stylesheet" href="style.css">
+    <!-- 新增: 超时预警样式 -->
+    <style>
+        .task-overdue td {
+            background-color: #fef0f0 !important;
+        }
+        .task-overdue .status-tag {
+            font-weight: bold;
+        }
+    </style>
 </head>
 <body>
 <div class="app-container">
@@ -73,13 +82,14 @@
                         </tr>
                         </thead>
                         <tbody>
-                        <tr>
+                        <!-- 修改: 增加 task-overdue 类并修改状态文本 -->
+                        <tr class="task-overdue">
                             <td>SY-20240520-001</td>
                             <td>粤A·88888</td>
                             <td><strong>查勘+定损</strong></td>
                             <td>平安保险</td>
                             <td>2024-05-20 09:45:00</td>
-                            <td><span class="status-tag status-danger">待接受</span></td>
+                            <td><span class="status-tag status-danger">待接受 (超时)</span></td>
                             <td class="action-links">
                                 <a href="surveyor_case_detail.html" class="success">接受并处理</a>
                                 <a href="#" class="danger">拒绝</a>

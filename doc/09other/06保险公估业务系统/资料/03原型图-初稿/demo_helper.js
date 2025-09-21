@@ -87,7 +87,7 @@ document.addEventListener('DOMContentLoaded', function() {
         { name: '总经理 (张伟)', page: 'index.html' },
         { name: '调度员 (王芳)', page: 'dispatcher_case_entry.html' },
         { name: '查勘员 (陈浩)', page: 'surveyor_task_list.html' },
-        { name: '审核主管 (赵磊)', page: 'reviewer_case_audit.html' },
+        { name: '品控 (赵磊)', page: 'reviewer_case_audit.html' },
         { name: '财务 (李娜)', page: 'finance_settlement.html' },
     ];
 
@@ -108,7 +108,7 @@ document.addEventListener('DOMContentLoaded', function() {
             isActive = currentPage.startsWith('dispatcher_');
         } else if (role.name.includes('查勘员')) {
             isActive = currentPage.startsWith('surveyor_');
-        } else if (role.name.includes('审核主管')) {
+        } else if (role.name.includes('品控')) {
             isActive = currentPage.startsWith('reviewer_');
         } else if (role.name.includes('财务')) {
             isActive = currentPage.startsWith('finance_');
