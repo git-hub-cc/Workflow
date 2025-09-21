@@ -5,56 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>待办列表 - 穗源保险公估一体化业务管理平台</title>
     <link rel="stylesheet" href="style.css">
-    <style>
-        .todo-list {
-            list-style: none;
-            padding: 0;
-            margin: 0;
-        }
-        .todo-item {
-            display: flex;
-            align-items: center;
-            padding: 15px 20px;
-            border-bottom: 1px solid var(--border-color-lighter);
-            transition: background-color 0.2s;
-        }
-        .todo-item:hover {
-            background-color: var(--primary-light-color);
-        }
-        .todo-item:last-child {
-            border-bottom: none;
-        }
-        .todo-icon {
-            flex-shrink: 0;
-            margin-right: 20px;
-            width: 40px; height: 40px;
-            border-radius: 50%;
-            background-color: var(--primary-light-color);
-            color: var(--primary-color);
-            display: flex; align-items: center; justify-content: center;
-            font-size: 18px;
-        }
-        .todo-content {
-            flex-grow: 1;
-        }
-        .todo-content .title {
-            font-weight: 500;
-            color: var(--text-color-primary);
-        }
-        .todo-content .meta {
-            font-size: 13px;
-            color: var(--text-color-secondary);
-            margin-top: 4px;
-        }
-        .todo-actions a {
-            padding: 6px 15px;
-            border-radius: 4px;
-            background-color: var(--primary-color);
-            color: #fff;
-            text-decoration: none;
-            font-size: 13px;
-        }
-    </style>
 </head>
 <body>
 <div class="app-container">
@@ -72,6 +22,9 @@
     <div class="main-wrapper">
         <!-- 顶部栏 -->
         <header class="header">
+            <div class="header-left">
+                <button id="hamburger-btn" class="hamburger-btn">☰</button>
+            </div>
             <div class="user-profile">
                 <div class="avatar" style="background-color: #67C23A;">赵</div>
                 <span>赵磊 (审核主管)</span>
@@ -82,16 +35,16 @@
         <main class="main-content">
             <h1 class="page-title">我的待办</h1>
             <div class="card">
-                <div class="card-header">待审核案件 (2)</div>
+                <div class="card-header"><span>待审核案件 (2)</span></div>
                 <ul class="todo-list">
                     <li class="todo-item">
                         <div class="todo-icon">审</div>
                         <div class="todo-content">
-                            <div class="title">案件 SY-20240520-001 (车险) 报告已提交</div>
+                            <div class="title">案件 SY-20240520-001 (粤A·88888) 报告已提交</div>
                             <div class="meta">提交人: 陈浩 | 提交时间: 2024-05-20 11:30:45</div>
                         </div>
                         <div class="todo-actions">
-                            <a href="reviewer_case_audit.html">立即处理</a>
+                            <a href="reviewer_case_audit.html" class="btn btn-primary btn-sm">立即处理</a>
                         </div>
                     </li>
                     <li class="todo-item">
@@ -101,7 +54,7 @@
                             <div class="meta">提交人: 刘洋 | 提交时间: 2024-05-22 14:10:05</div>
                         </div>
                         <div class="todo-actions">
-                            <a href="#">立即处理</a>
+                            <a href="#" class="btn btn-primary btn-sm">立即处理</a>
                         </div>
                     </li>
                 </ul>

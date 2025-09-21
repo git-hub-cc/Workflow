@@ -7,41 +7,21 @@
     <link rel="stylesheet" href="style.css">
     <style>
         /* --- 页面专属样式 --- */
-        .filter-bar {
-            display: flex;
-            align-items: center;
-            gap: 20px;
-            padding: 15px 20px;
-        }
-        .filter-item { display: flex; align-items: center; gap: 8px; }
-        .filter-item label { color: var(--text-color-regular); flex-shrink: 0; }
-        .filter-item input, .filter-item select { padding: 8px; border: 1px solid var(--border-color-base); border-radius: 4px;}
-        .btn-primary { padding: 8px 20px; border-radius: 4px; border: none; background-color: var(--primary-color); color: #fff; cursor: pointer; }
+        .kpi-filter-bar { display: flex; align-items: center; gap: 20px; flex-wrap: wrap; padding: 15px 20px; }
+        .kpi-filter-bar .filter-item { display: flex; align-items: center; gap: 8px; }
+        .kpi-filter-bar .filter-item label { flex-shrink: 0; }
+        .kpi-filter-bar .filter-item input, .kpi-filter-bar .filter-item select { padding: 9px 12px; }
 
-        .region-list {
-            display: flex;
-            flex-direction: column;
-            gap: 20px;
-        }
-
-        .region-card .card-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-        .region-status {
-            font-size: 14px;
-            padding: 5px 12px;
-            border-radius: 15px;
-            font-weight: 500;
-        }
+        .region-list { display: flex; flex-direction: column; gap: 20px; }
+        .region-card .card-header { display: flex; justify-content: space-between; align-items: center; }
+        .region-status { font-size: 14px; padding: 5px 12px; border-radius: 15px; font-weight: 500; }
         .status-saturated { background-color: #fef0f0; color: #f56c6c; } /* 饱和 */
         .status-idle { background-color: #f0f9eb; color: #67c23a; }      /* 闲置 */
         .status-balanced { background-color: #ecf5ff; color: #409eff; } /* 均衡 */
 
         .summary-kpis {
             display: grid;
-            grid-template-columns: repeat(5, 1fr); /* 调整为5列 */
+            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
             gap: 15px;
             text-align: center;
             margin-bottom: 25px;
@@ -51,19 +31,16 @@
         .kpi-item .value { font-size: 22px; font-weight: bold; color: var(--text-color-primary); }
         .kpi-item .label { font-size: 13px; color: var(--text-color-secondary); margin-top: 4px; }
 
-        table { width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 13px; }
-        th, td { border: 1px solid var(--border-color-lighter); padding: 10px 8px; text-align: center; }
-        th { background-color: var(--bg-color-base); font-weight: 500; }
-        tbody tr:hover { background-color: #fafafa; }
+        .kpi-table { width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 13px; }
+        .kpi-table th, .kpi-table td { border: 1px solid var(--border-color-lighter); padding: 10px 8px; text-align: center; }
+        .kpi-table th { background-color: var(--bg-color-base); font-weight: 500; }
 
         .indicator { display: inline-flex; align-items: center; gap: 4px; }
         .indicator.good { color: var(--success-color); }
         .indicator.bad { color: var(--danger-color); }
-        .indicator svg { width: 12px; height: 12px; }
         .text-right { text-align: right !important; padding-right: 15px !important; }
         .text-bold { font-weight: bold; }
 
-        /* --- 数据洞察与建议 --- */
         .analysis-box {
             margin-top: 25px; padding: 15px; background-color: #f5f7fa;
             border-radius: var(--border-radius-base); border: 1px solid var(--border-color-light);
@@ -74,24 +51,6 @@
         }
         .analysis-title svg { margin-right: 8px; color: var(--primary-color); }
         .analysis-content { font-size: 13px; line-height: 1.6; color: var(--text-color-regular); }
-
-        /* --- 分页 --- */
-        .pagination {
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            margin-top: 30px;
-            padding: 10px 0;
-        }
-        .pagination ul { list-style: none; padding: 0; margin: 0; display: flex; gap: 8px; }
-        .pagination li a {
-            display: block; text-decoration: none; padding: 8px 14px;
-            border: 1px solid var(--border-color-base); border-radius: 4px;
-            color: var(--text-color-regular); transition: all 0.2s;
-        }
-        .pagination li a:hover { color: var(--primary-color); border-color: var(--primary-color); }
-        .pagination li.active a { background-color: var(--primary-color); color: #fff; border-color: var(--primary-color); }
-        .pagination li.disabled a { color: var(--text-color-placeholder); cursor: not-allowed; background-color: #f4f4f5; }
     </style>
 </head>
 <body>
@@ -112,6 +71,9 @@
     <div class="main-wrapper">
         <!-- 顶部栏 -->
         <header class="header">
+            <div class="header-left">
+                <button id="hamburger-btn" class="hamburger-btn">☰</button>
+            </div>
             <div class="user-profile">
                 <div class="avatar">张</div>
                 <span>张伟 (总经理)</span>
@@ -122,7 +84,7 @@
         <main class="main-content">
             <h1 class="page-title">区域效能与饱和度分析</h1>
 
-            <div class="card filter-bar">
+            <div class="card kpi-filter-bar">
                 <div class="filter-item">
                     <label>时间范围:</label>
                     <input type="date" value="2024-05-20">
@@ -135,10 +97,10 @@
                         <option>全部</option>
                         <option selected>广东省</option>
                         <option>湖南省</option>
-                        <option>福建省</option>
                     </select>
                 </div>
-                <button class="btn-primary">查询</button>
+                <button class="btn btn-primary">查询</button>
+                <button class="btn btn-secondary">重置</button>
             </div>
 
             <div class="region-list">
@@ -152,25 +114,27 @@
                         <div class="kpi-item"><div class="value">2</div><div class="label">超时单总数</div></div>
                         <div class="kpi-item"><div class="value">35,000</div><div class="label">总产值(元)</div></div>
                     </div>
-                    <table>
-                        <thead><tr><th>查勘员</th><th>派单数</th><th>结案率</th><th>接单响应(分)</th><th>超时单数</th><th>报告通过率</th><th>人均产值(元)</th></tr></thead>
-                        <tbody>
-                        <tr>
-                            <td>陈浩</td><td class="text-bold">15</td><td>80%</td>
-                            <td><span class="indicator bad">3.2</span></td>
-                            <td><span class="indicator bad">2</span></td>
-                            <td><span class="indicator bad">92%</span></td>
-                            <td class="text-right text-bold">21,000</td>
-                        </tr>
-                        <tr>
-                            <td>刘洋</td><td>10</td><td>90%</td>
-                            <td><span class="indicator good">1.5</span></td>
-                            <td><span class="indicator good">0</span></td>
-                            <td><span class="indicator good">100%</span></td>
-                            <td class="text-right">14,000</td>
-                        </tr>
-                        </tbody>
-                    </table>
+                    <div class="table-responsive-wrapper">
+                        <table class="kpi-table">
+                            <thead><tr><th>查勘员</th><th>派单数</th><th>结案率</th><th>接单响应(分)</th><th>超时单数</th><th>报告通过率</th><th>人均产值(元)</th></tr></thead>
+                            <tbody>
+                            <tr>
+                                <td>陈浩</td><td class="text-bold">15</td><td>80%</td>
+                                <td><span class="indicator bad">3.2</span></td>
+                                <td><span class="indicator bad">2</span></td>
+                                <td><span class="indicator bad">92%</span></td>
+                                <td class="text-right text-bold">21,000</td>
+                            </tr>
+                            <tr>
+                                <td>刘洋</td><td>10</td><td>90%</td>
+                                <td><span class="indicator good">1.5</span></td>
+                                <td><span class="indicator good">0</span></td>
+                                <td><span class="indicator good">100%</span></td>
+                                <td class="text-right">14,000</td>
+                            </tr>
+                            </tbody>
+                        </table>
+                    </div>
                     <div class="analysis-box">
                         <div class="analysis-title"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M2 6a6 6 0 1 1 10.174 4.31c-.203.196-.359.4-.453.619l-.762 1.769A.5.5 0 0 1 10.5 13h-5a.5.5 0 0 1-.46-.302l-.761-1.77a1.964 1.964 0 0 0-.453-.618A6 6 0 0 1 2 6zm6 8.5a.5.5 0 0 1 .5-.5h.5a.5.5 0 0 1 0 1h-.5a.5.5 0 0 1-.5-.5zM8 1a.5.5 0 0 1 .5.5v2a.5.5 0 0 1-1 0v-2A.5.5 0 0 1 8 1z"/></svg>数据洞察与建议</div>
                         <div class="analysis-content">广州区域人均负荷(12.5单)远超健康水平，已处于饱和状态。查勘员 <strong>陈浩</strong> 工作量(15单)过大，直接导致其接单响应变慢，并产生了 <strong>2个超时单</strong>，报告质量也受影响。
@@ -189,25 +153,27 @@
                         <div class="kpi-item"><div class="value">0</div><div class="label">超时单总数</div></div>
                         <div class="kpi-item"><div class="value">12,600</div><div class="label">总产值(元)</div></div>
                     </div>
-                    <table>
-                        <thead><tr><th>查勘员</th><th>派单数</th><th>结案率</th><th>接单响应(分)</th><th>超时单数</th><th>报告通过率</th><th>人均产值(元)</th></tr></thead>
-                        <tbody>
-                        <tr>
-                            <td>周强</td><td>5</td><td>100%</td>
-                            <td><span class="indicator good">1.1</span></td>
-                            <td><span class="indicator good">0</span></td>
-                            <td><span class="indicator good">100%</span></td>
-                            <td class="text-right">7,000</td>
-                        </tr>
-                        <tr>
-                            <td>孙悦</td><td>4</td><td>100%</td>
-                            <td><span class="indicator good">0.8</span></td>
-                            <td><span class="indicator good">0</span></td>
-                            <td><span class="indicator good">100%</span></td>
-                            <td class="text-right">5,600</td>
-                        </tr>
-                        </tbody>
-                    </table>
+                    <div class="table-responsive-wrapper">
+                        <table class="kpi-table">
+                            <thead><tr><th>查勘员</th><th>派单数</th><th>结案率</th><th>接单响应(分)</th><th>超时单数</th><th>报告通过率</th><th>人均产值(元)</th></tr></thead>
+                            <tbody>
+                            <tr>
+                                <td>周强</td><td>5</td><td>100%</td>
+                                <td><span class="indicator good">1.1</span></td>
+                                <td><span class="indicator good">0</span></td>
+                                <td><span class="indicator good">100%</span></td>
+                                <td class="text-right">7,000</td>
+                            </tr>
+                            <tr>
+                                <td>孙悦</td><td>4</td><td>100%</td>
+                                <td><span class="indicator good">0.8</span></td>
+                                <td><span class="indicator good">0</span></td>
+                                <td><span class="indicator good">100%</span></td>
+                                <td class="text-right">5,600</td>
+                            </tr>
+                            </tbody>
+                        </table>
+                    </div>
                     <div class="analysis-box">
                         <div class="analysis-title"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M2 6a6 6 0 1 1 10.174 4.31c-.203.196-.359.4-.453.619l-.762 1.769A.5.5 0 0 1 10.5 13h-5a.5.5 0 0 1-.46-.302l-.761-1.77a1.964 1.964 0 0 0-.453-.618A6 6 0 0 1 2 6zm6 8.5a.5.5 0 0 1 .5-.5h.5a.5.5 0 0 1 0 1h-.5a.5.5 0 0 1-.5-.5zM8 1a.5.5 0 0 1 .5.5v2a.5.5 0 0 1-1 0v-2A.5.5 0 0 1 8 1z"/></svg>数据洞察与建议</div>
                         <div class="analysis-content">深圳区域人均负荷(4.5单)较低，各项效率指标表现完美，说明该区域人力资源存在闲置，产值潜力未被充分挖掘。
@@ -226,30 +192,26 @@
                         <div class="kpi-item"><div class="value">0</div><div class="label">超时单总数</div></div>
                         <div class="kpi-item"><div class="value">22,400</div><div class="label">总产值(元)</div></div>
                     </div>
-                    <table>
-                        <thead><tr><th>查勘员</th><th>派单数</th><th>结案率</th><th>接单响应(分)</th><th>超时单数</th><th>报告通过率</th><th>人均产值(元)</th></tr></thead>
-                        <tbody>
-                        <tr>
-                            <td>林峰</td><td>9</td><td>90%</td>
-                            <td><span class="indicator good">1.5</span></td>
-                            <td><span class="indicator good">0</span></td>
-                            <td><span class="indicator good">100%</span></td>
-                            <td class="text-right">12,600</td>
-                        </tr>
-                        <tr>
-                            <td>黄敏</td><td>7</td><td>100%</td>
-                            <td><span class="indicator good">1.2</span></td>
-                            <td><span class="indicator good">0</span></td>
-                            <td><span class="indicator good">100%</span></td>
-                            <td class="text-right">9,800</td>
-                        </tr>
-                        </tbody>
-                    </table>
-                    <div class="analysis-box">
-                        <div class="analysis-title"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M2 6a6 6 0 1 1 10.174 4.31c-.203.196-.359.4-.453.619l-.762 1.769A.5.5 0 0 1 10.5 13h-5a.5.5 0 0 1-.46-.302l-.761-1.77a1.964 1.964 0 0 0-.453-.618A6 6 0 0 1 2 6zm6 8.5a.5.5 0 0 1 .5-.5h.5a.5.5 0 0 1 0 1h-.5a.5.5 0 0 1-.5-.5zM8 1a.5.5 0 0 1 .5.5v2a.5.5 0 0 1-1 0v-2A.5.5 0 0 1 8 1z"/></svg>数据洞察与建议</div>
-                        <div class="analysis-content">佛山区域人均负荷(8.0单)处于健康、高效的区间，团队成员工作量分配均匀，各项KPI指标表现良好，是区域管理的优秀范本。
-                            <br><strong>建议：</strong> 1. <strong>保持稳定</strong>：维持当前的派单策略和团队规模。 2. <strong>经验分享</strong>：总结佛山区域的管理经验，向其他区域推广，尤其是关于如何平衡工作量与效率。
-                        </div>
+                    <div class="table-responsive-wrapper">
+                        <table class="kpi-table">
+                            <thead><tr><th>查勘员</th><th>派单数</th><th>结案率</th><th>接单响应(分)</th><th>超时单数</th><th>报告通过率</th><th>人均产值(元)</th></tr></thead>
+                            <tbody>
+                            <tr>
+                                <td>林峰</td><td>9</td><td>90%</td>
+                                <td><span class="indicator good">1.5</span></td>
+                                <td><span class="indicator good">0</span></td>
+                                <td><span class="indicator good">100%</span></td>
+                                <td class="text-right">12,600</td>
+                            </tr>
+                            <tr>
+                                <td>黄敏</td><td>7</td><td>100%</td>
+                                <td><span class="indicator good">1.2</span></td>
+                                <td><span class="indicator good">0</span></td>
+                                <td><span class="indicator good">100%</span></td>
+                                <td class="text-right">9,800</td>
+                            </tr>
+                            </tbody>
+                        </table>
                     </div>
                 </div>
             </div>

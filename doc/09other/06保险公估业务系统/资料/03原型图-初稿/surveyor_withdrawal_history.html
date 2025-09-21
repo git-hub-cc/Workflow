@@ -5,30 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>提现记录 - 穗源保险公估一体化业务管理平台</title>
     <link rel="stylesheet" href="style.css">
-    <style>
-        .filter-bar { display: flex; align-items: center; gap: 15px; padding: 15px 20px; flex-wrap: wrap; }
-        .filter-item { display: flex; align-items: center; gap: 8px; }
-        .filter-item label { color: var(--text-color-regular); }
-        .filter-item input, .filter-item select { padding: 8px; border: 1px solid var(--border-color-base); border-radius: 4px;}
-        .btn { padding: 8px 20px; border-radius: 4px; border: none; background-color: var(--primary-color); color: #fff; cursor: pointer; }
-
-        table { width: 100%; border-collapse: collapse; margin-top: 20px; font-size: 13px; }
-        th, td { border: 1px solid var(--border-color-lighter); padding: 12px 10px; text-align: left; }
-        th { background-color: var(--bg-color-base); font-weight: 500; }
-        tbody tr:hover { background-color: #fafafa; }
-        .text-bold { font-weight: bold; }
-        .status-tag { padding: 3px 8px; border-radius: 4px; font-size: 12px; white-space: nowrap;}
-        .status-green { background-color: #f0f9eb; color: #67c23a; }
-        .status-orange { background-color: #fdf6ec; color: #e6a23c; }
-        .status-red { background-color: #fef0f0; color: #f56c6c; }
-
-        .pagination { display: flex; justify-content: flex-end; align-items: center; margin-top: 25px; }
-        .pagination ul { list-style: none; padding: 0; margin: 0; display: flex; gap: 8px; }
-        .pagination li a { display: block; text-decoration: none; padding: 8px 14px; border: 1px solid var(--border-color-base); border-radius: 4px; color: var(--text-color-regular); transition: all 0.2s; }
-        .pagination li a:hover { color: var(--primary-color); border-color: var(--primary-color); }
-        .pagination li.active a { background-color: var(--primary-color); color: #fff; border-color: var(--primary-color); }
-        .pagination li.disabled a { color: var(--text-color-placeholder); cursor: not-allowed; background-color: #f4f4f5; }
-    </style>
 </head>
 <body>
 <div class="app-container">
@@ -44,6 +20,9 @@
 
     <div class="main-wrapper">
         <header class="header">
+            <div class="header-left">
+                <button id="hamburger-btn" class="hamburger-btn">☰</button>
+            </div>
             <div class="user-profile">
                 <div class="avatar" style="background-color: #409EFF;">陈</div>
                 <span>陈浩 (查勘员)</span>
@@ -52,73 +31,82 @@
 
         <main class="main-content">
             <h1 class="page-title">提现记录</h1>
-            <div class="card filter-bar">
-                <div class="filter-item">
-                    <label>申请日期:</label>
-                    <input type="date"> - <input type="date">
+            <div class="card">
+                <div class="filter-bar">
+                    <div class="filter-item">
+                        <label>申请日期:</label>
+                        <input type="date"> - <input type="date">
+                    </div>
+                    <div class="filter-item">
+                        <label>状态:</label>
+                        <select>
+                            <option>全部</option>
+                            <option>审批中</option>
+                            <option>已支付</option>
+                            <option>已驳回</option>
+                        </select>
+                    </div>
+                    <div class="filter-actions">
+                        <button class="btn btn-primary">查询</button>
+                        <button class="btn btn-secondary">重置</button>
+                    </div>
                 </div>
-                <div class="filter-item">
-                    <label>状态:</label>
-                    <select>
-                        <option>全部</option>
-                        <option>审批中</option>
-                        <option>已支付</option>
-                        <option>已驳回</option>
-                    </select>
-                </div>
-                <button class="btn">查询</button>
             </div>
             <div class="card">
-                <div class="card-header">历史记录</div>
-                <table>
-                    <thead>
-                    <tr>
-                        <th>申请时间</th>
-                        <th>提现金额 (元)</th>
-                        <th>状态</th>
-                        <th>审批/支付时间</th>
-                        <th>备注</th>
-                    </tr>
-                    </thead>
-                    <tbody>
-                    <tr>
-                        <td>2024-05-31 10:20:15</td>
-                        <td class="text-bold">3,500.00</td>
-                        <td><span class="status-tag status-orange">审批中</span></td>
-                        <td>-</td>
-                        <td>-</td>
-                    </tr>
-                    <tr>
-                        <td>2024-05-01 10:00:45</td>
-                        <td class="text-bold">5,200.00</td>
-                        <td><span class="status-tag status-green">已支付</span></td>
-                        <td>2024-05-01 14:30:00</td>
-                        <td>-</td>
-                    </tr>
-                    <tr>
-                        <td>2024-04-28 15:10:30</td>
-                        <td class="text-bold">1,500.00</td>
-                        <td><span class="status-tag status-red">已驳回</span></td>
-                        <td>2024-04-28 17:00:10</td>
-                        <td>银行卡信息有误</td>
-                    </tr>
-                    <tr>
-                        <td>2024-04-15 09:30:00</td>
-                        <td class="text-bold">4,800.00</td>
-                        <td><span class="status-tag status-green">已支付</span></td>
-                        <td>2024-04-15 11:25:18</td>
-                        <td>-</td>
-                    </tr>
-                    </tbody>
-                </table>
-                <nav class="pagination">
-                    <ul>
-                        <li class="disabled"><a href="#">&laquo;</a></li>
-                        <li class="active"><a href="#">1</a></li>
-                        <li><a href="#">2</a></li>
-                        <li><a href="#">&raquo;</a></li>
-                    </ul>
-                </nav>
+                <div class="card-header"><span>历史记录</span></div>
+                <div class="table-responsive-wrapper">
+                    <table>
+                        <thead>
+                        <tr>
+                            <th>申请时间</th>
+                            <th>提现金额 (元)</th>
+                            <th>状态</th>
+                            <th>审批/支付时间</th>
+                            <th>备注</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        <tr>
+                            <td>2024-05-31 10:20:15</td>
+                            <td class="text-bold">3,500.00</td>
+                            <td><span class="status-tag status-warning">审批中</span></td>
+                            <td>-</td>
+                            <td>-</td>
+                        </tr>
+                        <tr>
+                            <td>2024-05-01 10:00:45</td>
+                            <td class="text-bold">5,200.00</td>
+                            <td><span class="status-tag status-success">已支付</span></td>
+                            <td>2024-05-01 14:30:00</td>
+                            <td>-</td>
+                        </tr>
+                        <tr>
+                            <td>2024-04-28 15:10:30</td>
+                            <td class="text-bold">1,500.00</td>
+                            <td><span class="status-tag status-danger">已驳回</span></td>
+                            <td>2024-04-28 17:00:10</td>
+                            <td>银行卡信息有误</td>
+                        </tr>
+                        <tr>
+                            <td>2024-04-15 09:30:00</td>
+                            <td class="text-bold">4,800.00</td>
+                            <td><span class="status-tag status-success">已支付</span></td>
+                            <td>2024-04-15 11:25:18</td>
+                            <td>-</td>
+                        </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div class="card-footer">
+                    <nav class="pagination">
+                        <ul>
+                            <li class="disabled"><a href="#">&laquo;</a></li>
+                            <li class="active"><a href="#">1</a></li>
+                            <li><a href="#">2</a></li>
+                            <li><a href="#">&raquo;</a></li>
+                        </ul>
+                    </nav>
+                </div>
             </div>
         </main>
     </div>

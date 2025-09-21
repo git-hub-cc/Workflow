@@ -5,33 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>我的任务 - 穗源保险公估一体化业务管理平台</title>
     <link rel="stylesheet" href="style.css">
-    <style>
-        .filter-bar { display: flex; align-items: center; gap: 15px; padding: 15px 20px; }
-        .filter-item { display: flex; align-items: center; gap: 8px; }
-        .filter-item label { color: var(--text-color-regular); }
-        .filter-item input, .filter-item select { padding: 8px; border: 1px solid var(--border-color-base); border-radius: 4px;}
-        .btn { padding: 8px 20px; border-radius: 4px; border: none; background-color: var(--primary-color); color: #fff; cursor: pointer; text-decoration: none;}
-
-        table { width: 100%; border-collapse: collapse; margin-top: 20px; font-size: 13px; }
-        th, td { border: 1px solid var(--border-color-lighter); padding: 12px 10px; text-align: left; vertical-align: middle; }
-        th { background-color: var(--bg-color-base); font-weight: 500; }
-        tbody tr:hover { background-color: var(--primary-light-color); }
-        .status-tag { padding: 3px 8px; border-radius: 4px; font-size: 12px; white-space: nowrap;}
-        .status-blue { background-color: #ecf5ff; color: #409eff; } /* 进行中 */
-        .status-green { background-color: #f0f9eb; color: #67c23a; } /* 已完成 */
-        .status-purple { background-color: #fef0f0; color: #f56c6c; } /* 待接受 */
-        .action-links a { color: var(--primary-color); text-decoration: none; margin-right: 10px; }
-        .action-links a.danger { color: var(--danger-color); }
-        .action-links a.success { color: var(--success-color); }
-
-        /* --- Pagination --- */
-        .pagination { display: flex; justify-content: flex-end; align-items: center; margin-top: 25px; }
-        .pagination ul { list-style: none; padding: 0; margin: 0; display: flex; gap: 8px; }
-        .pagination li a { display: block; text-decoration: none; padding: 8px 14px; border: 1px solid var(--border-color-base); border-radius: 4px; color: var(--text-color-regular); transition: all 0.2s; }
-        .pagination li a:hover { color: var(--primary-color); border-color: var(--primary-color); }
-        .pagination li.active a { background-color: var(--primary-color); color: #fff; border-color: var(--primary-color); }
-        .pagination li.disabled a { color: var(--text-color-placeholder); cursor: not-allowed; background-color: #f4f4f5; }
-    </style>
 </head>
 <body>
 <div class="app-container">
@@ -50,6 +23,9 @@
     <div class="main-wrapper">
         <!-- 顶部栏 -->
         <header class="header">
+            <div class="header-left">
+                <button id="hamburger-btn" class="hamburger-btn">☰</button>
+            </div>
             <div class="user-profile">
                 <div class="avatar" style="background-color: #409EFF;">陈</div>
                 <span>陈浩 (查勘员)</span>
@@ -59,97 +35,104 @@
         <!-- 页面内容 -->
         <main class="main-content">
             <h1 class="page-title">我的任务</h1>
-            <div class="card filter-bar">
-                <div class="filter-item">
-                    <label>任务状态:</label>
-                    <select>
-                        <option>全部</option>
-                        <option>待接受</option>
-                        <option>进行中</option>
-                        <option>已完成</option>
-                    </select>
+            <div class="card">
+                <div class="filter-bar">
+                    <div class="filter-item">
+                        <label>任务状态:</label>
+                        <select>
+                            <option>全部</option>
+                            <option>待接受</option>
+                            <option>进行中</option>
+                            <option>已完成</option>
+                        </select>
+                    </div>
+                    <div class="filter-item">
+                        <label>案件号/车牌:</label>
+                        <input type="text" placeholder="输入关键字...">
+                    </div>
+                    <div class="filter-actions">
+                        <button class="btn btn-primary">查询</button>
+                        <button class="btn btn-secondary">重置</button>
+                    </div>
                 </div>
-                <div class="filter-item">
-                    <label>案件号/车牌:</label>
-                    <input type="text" placeholder="输入关键字...">
-                </div>
-                <button class="btn">查询</button>
             </div>
 
             <div class="card">
-                <div class="card-header">任务列表</div>
-                <table>
-                    <thead>
-                    <tr>
-                        <th>案件编号</th>
-                        <th>车牌号</th>
-                        <th>案件类型</th>
-                        <th>委托方</th>
-                        <th>派单时间</th>
-                        <th>状态</th>
-                        <th>操作</th>
-                    </tr>
-                    </thead>
-                    <tbody>
-                    <!-- ==================== 案件类型已根据要求更新 ==================== -->
-                    <tr>
-                        <td>SY-20240521-005</td>
-                        <td>粤A·GHJ789</td>
-                        <td><strong>人伤查勘</strong></td>
-                        <td>平安保险</td>
-                        <td>2024-05-21 10:15:00</td>
-                        <td><span class="status-tag status-purple">待接受</span></td>
-                        <td class="action-links">
-                            <a href="surveyor_case_detail.html" class="success">接受并处理</a>
-                            <a href="#" class="danger">拒绝</a>
-                        </td>
-                    </tr>
-                    <tr>
-                        <td>SY-20240521-003</td>
-                        <td>粤B·54321</td>
-                        <td><strong>车物查勘</strong></td>
-                        <td>人保财险</td>
-                        <td>2024-05-21 09:35:12</td>
-                        <td><span class="status-tag status-purple">待接受</span></td>
-                        <td class="action-links">
-                            <a href="surveyor_case_detail.html" class="success">接受并处理</a>
-                            <a href="#" class="danger">拒绝</a>
-                        </td>
-                    </tr>
-                    <tr>
-                        <td>SY-20240520-001</td>
-                        <td>粤A·88888</td>
-                        <td><strong>查勘+定损</strong></td>
-                        <td>平安保险</td>
-                        <td>2024-05-20 09:45:00</td>
-                        <td><span class="status-tag status-blue">进行中 (已到场)</span></td>
-                        <td class="action-links">
-                            <a href="surveyor_case_detail.html">处理任务</a>
-                        </td>
-                    </tr>
-                    <tr>
-                        <td>SY-20240518-002</td>
-                        <td>粤A·66778</td>
-                        <td><strong>车物定损</strong></td>
-                        <td>太平洋保险</td>
-                        <td>2024-05-18 10:10:00</td>
-                        <td><span class="status-tag status-green">已完成</span></td>
-                        <td class="action-links">
-                            <a href="surveyor_case_detail.html">查看详情</a>
-                        </td>
-                    </tr>
-                    <!-- ============================================================= -->
-                    </tbody>
-                </table>
-                <nav class="pagination">
-                    <ul>
-                        <li class="disabled"><a href="#">&laquo;</a></li>
-                        <li class="active"><a href="#">1</a></li>
-                        <li><a href="#">2</a></li>
-                        <li><a href="#">3</a></li>
-                        <li><a href="#">&raquo;</a></li>
-                    </ul>
-                </nav>
+                <div class="card-header"><span>任务列表</span></div>
+                <div class="table-responsive-wrapper">
+                    <table>
+                        <thead>
+                        <tr>
+                            <th>案件编号</th>
+                            <th>车牌号</th>
+                            <th>案件类型</th>
+                            <th>委托方</th>
+                            <th>派单时间</th>
+                            <th>状态</th>
+                            <th>操作</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        <tr>
+                            <td>SY-20240520-001</td>
+                            <td>粤A·88888</td>
+                            <td><strong>查勘+定损</strong></td>
+                            <td>平安保险</td>
+                            <td>2024-05-20 09:45:00</td>
+                            <td><span class="status-tag status-danger">待接受</span></td>
+                            <td class="action-links">
+                                <a href="surveyor_case_detail.html" class="success">接受并处理</a>
+                                <a href="#" class="danger">拒绝</a>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>SY-20240521-005</td>
+                            <td>粤A·GHJ789</td>
+                            <td><strong>人伤查勘</strong></td>
+                            <td>平安保险</td>
+                            <td>2024-05-21 10:15:00</td>
+                            <td><span class="status-tag status-danger">待接受</span></td>
+                            <td class="action-links">
+                                <a href="#" class="success">接受并处理</a>
+                                <a href="#" class="danger">拒绝</a>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>SY-20240521-003</td>
+                            <td>粤B·54321</td>
+                            <td><strong>车物查勘</strong></td>
+                            <td>人保财险</td>
+                            <td>2024-05-21 09:35:12</td>
+                            <td><span class="status-tag status-primary">进行中 (已出发)</span></td>
+                            <td class="action-links">
+                                <a href="#">处理任务</a>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>SY-20240518-002</td>
+                            <td>粤A·66778</td>
+                            <td><strong>车物定损</strong></td>
+                            <td>太平洋保险</td>
+                            <td>2024-05-18 10:10:00</td>
+                            <td><span class="status-tag status-success">已完成</span></td>
+                            <td class="action-links">
+                                <a href="#">查看详情</a>
+                            </td>
+                        </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div class="card-footer">
+                    <nav class="pagination">
+                        <ul>
+                            <li class="disabled"><a href="#">&laquo;</a></li>
+                            <li class="active"><a href="#">1</a></li>
+                            <li><a href="#">2</a></li>
+                            <li><a href="#">3</a></li>
+                            <li><a href="#">&raquo;</a></li>
+                        </ul>
+                    </nav>
+                </div>
             </div>
         </main>
     </div>

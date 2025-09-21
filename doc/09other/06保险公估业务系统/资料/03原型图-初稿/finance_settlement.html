@@ -5,95 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>财务中心 - 穗源保险公估一体化业务管理平台</title>
     <link rel="stylesheet" href="style.css">
-    <style>
-        .tab-container {
-            display: flex;
-            border-bottom: 2px solid var(--border-color-light);
-            margin-bottom: 20px;
-        }
-        .tab-link {
-            padding: 10px 20px;
-            cursor: pointer;
-            font-size: 16px;
-            color: var(--text-color-regular);
-            border-bottom: 2px solid transparent;
-            margin-bottom: -2px;
-        }
-        .tab-link.active {
-            color: var(--primary-color);
-            border-bottom-color: var(--primary-color);
-            font-weight: 500;
-        }
-        .tab-content { display: none; }
-        .tab-content.active { display: block; }
-
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-top: 15px;
-        }
-        th, td {
-            border: 1px solid var(--border-color-lighter);
-            padding: 12px 15px;
-            text-align: left;
-            vertical-align: middle;
-        }
-        th {
-            background-color: var(--bg-color-base);
-            font-weight: 500;
-        }
-        td input[type="number"] {
-            width: 100px; padding: 5px; border-radius: 4px;
-            border: 1px solid var(--border-color-base);
-        }
-        .status-tag { padding: 4px 10px; border-radius: 4px; font-size: 12px; }
-        .status-pending { background-color: var(--primary-light-color); color: var(--primary-color); }
-        .status-paid { background-color: #f0f9eb; color: var(--success-color); }
-        .btn-sm { padding: 5px 12px; font-size: 13px; margin: 0 5px; }
-        .btn { padding: 8px 20px; border-radius: 4px; border: 1px solid transparent; cursor: pointer;}
-        .btn-success { background-color: var(--success-color); color: #fff; border:none; border-radius: 4px; cursor: pointer;}
-        .btn-danger { background-color: var(--danger-color); color: #fff; border:none; border-radius: 4px; cursor: pointer;}
-        .btn-secondary { background-color: #fff; color: var(--text-color-regular); border-color: var(--border-color-base); }
-
-
-        /* --- New styles for finance entry form --- */
-        .finance-form { padding-top: 10px; }
-        .form-section-header {
-            font-size: 15px;
-            font-weight: 600;
-            margin-top: 20px;
-            margin-bottom: 15px;
-            padding-bottom: 8px;
-            border-bottom: 1px solid var(--border-color-lighter);
-        }
-        .finance-form .form-section-header:first-of-type { margin-top: 0; }
-        .form-grid {
-            display: grid;
-            grid-template-columns: repeat(4, 1fr);
-            gap: 15px 25px;
-        }
-        .form-item { display: flex; flex-direction: column; gap: 5px; }
-        .form-item label { font-size: 13px; color: var(--text-color-regular); }
-        .form-item input,
-        .form-item select,
-        .form-item textarea {
-            width: 100%;
-            padding: 8px;
-            border-radius: 4px;
-            border: 1px solid var(--border-color-base);
-            font-size: 14px;
-            box-sizing: border-box;
-        }
-        .form-item input[disabled] { background-color: #F5F7FA; color: var(--text-color-secondary); }
-        .form-item.col-span-2 { grid-column: span 2; }
-        .form-item.col-span-full { grid-column: 1 / -1; }
-        .form-actions {
-            text-align: right;
-            margin-top: 25px;
-            padding-top: 15px;
-            border-top: 1px solid var(--border-color-light);
-        }
-    </style>
 </head>
 <body>
 <div class="app-container">
@@ -110,6 +21,9 @@
     <div class="main-wrapper">
         <!-- 顶部栏 -->
         <header class="header">
+            <div class="header-left">
+                <button id="hamburger-btn" class="hamburger-btn">☰</button>
+            </div>
             <div class="user-profile">
                 <div class="avatar" style="background-color: #F56C6C;">李</div>
                 <span>李娜 (财务)</span>
@@ -124,27 +38,26 @@
                 <div id="tab1-btn" class="tab-link">提现审批 (1)</div>
             </div>
 
-
             <!-- 案件结算内容 -->
             <div id="tab2-content" class="tab-content active">
                 <div class="card">
-                    <div class="card-header">财务结算录入 - 案件 SY-20240520-001</div>
+                    <div class="card-header"><span>财务结算录入 - 案件 SY-20240520-001</span></div>
                     <form class="finance-form">
                         <!-- Section: Fee Info -->
                         <div class="form-section-header">公估费信息</div>
                         <div class="form-grid">
                             <div class="form-item">
-                                <label>系统公估费</label>
-                                <input type="text" value="425.00 元" disabled>
+                                <label>系统公估费 (元)</label>
+                                <input type="text" value="425.00" disabled>
                             </div>
                             <div class="form-item">
-                                <label>审核后实际公估费</label>
+                                <label>审核后实际公估费 (元)</label>
                                 <input type="number" value="425.00">
                             </div>
                         </div>
 
                         <!-- Section: Vehicle/Property Settlement -->
-                        <div class="form-section-header">车物结算</div>
+                        <div class="form-section-header">查勘员结算</div>
                         <div class="form-grid">
                             <div class="form-item">
                                 <label>结算提成姓名 1</label>
@@ -152,72 +65,36 @@
                             </div>
                             <div class="form-item">
                                 <label>结算任务类型 1</label>
-                                <select><option>单查勘</option><option>单定损</option><option selected>查勘+定损</option><option>无人车</option><option>外省公估费</option></select>
+                                <select><option>单查勘</option><option selected>查勘+定损</option></select>
                             </div>
                             <div class="form-item">
-                                <label>结算提成姓名 2</label>
-                                <select><option>无</option><option>陈浩</option><option>刘洋</option></select>
+                                <label>基础佣金 1 (元)</label>
+                                <input type="number" value="200.00">
                             </div>
                             <div class="form-item">
-                                <label>结算任务类型 2</label>
-                                <select><option>无</option><option>单查勘</option><option>单定损</option><option>查勘+定损</option><option>无人车</option></select>
+                                <label>扣罚/奖励 1 (元)</label>
+                                <input type="number" value="-20.00" title="负数为扣罚，正数为奖励">
                             </div>
                         </div>
 
-                        <!-- Section: Personal Injury & Other Commissions -->
-                        <div class="form-section-header">人伤及其他结算</div>
+                        <!-- Section: Other Commissions -->
+                        <div class="form-section-header">其他人员结算</div>
                         <div class="form-grid">
-                            <div class="form-item">
-                                <label>案件奖罚</label>
-                                <input type="number" value="0.00">
-                            </div>
-                            <div class="form-item col-span-2">
-                                <label>案件奖罚原因</label>
-                                <input type="text">
-                            </div>
-                            <div class="form-item">
-                                <label>扣罚项</label>
-                                <select><option>无</option><option>小案录案</option><option>大案录案</option><option>现场查勘</option></select>
-                            </div>
-                            <div class="form-item">
-                                <label>人伤提成</label>
-                                <input type="number" value="0.00">
-                            </div>
-                            <div class="form-item">
-                                <label>人伤提成姓名</label>
-                                <select><option>无</option></select>
-                            </div>
-                            <div class="form-item">
-                                <label>审案提成</label>
-                                <input type="number" value="15.00">
-                            </div>
                             <div class="form-item">
                                 <label>审案人</label>
                                 <select><option>赵磊</option></select>
                             </div>
                             <div class="form-item">
-                                <label>小案录案提成</label>
-                                <input type="number" value="5.00">
+                                <label>审案提成 (元)</label>
+                                <input type="number" value="15.00">
                             </div>
                             <div class="form-item">
-                                <label>小案录案人</label>
+                                <label>录案人</label>
                                 <select><option>王芳</option></select>
                             </div>
                             <div class="form-item">
-                                <label>大案录案提成</label>
-                                <input type="number" value="0.00">
-                            </div>
-                            <div class="form-item">
-                                <label>大案录案人</label>
-                                <select><option>无</option></select>
-                            </div>
-                            <div class="form-item">
-                                <label>督导提成</label>
-                                <input type="number" value="0.00">
-                            </div>
-                            <div class="form-item">
-                                <label>督导</label>
-                                <select><option>无</option></select>
+                                <label>录案提成 (元)</label>
+                                <input type="number" value="5.00">
                             </div>
                         </div>
 
@@ -226,22 +103,22 @@
                         <div class="form-grid">
                             <div class="form-item col-span-full">
                                 <label>备注</label>
-                                <textarea rows="3"></textarea>
+                                <textarea class="form-textarea" rows="2"></textarea>
+                            </div>
+                            <div class="form-item">
+                                <label>结算操作员</label>
+                                <input type="text" value="李娜" disabled>
                             </div>
                             <div class="form-item">
                                 <label>结算操作时间</label>
                                 <input type="text" value="2024-05-20 12:05:10" disabled>
-                            </div>
-                            <div class="form-item">
-                                <label>报表生成时间</label>
-                                <input type="text" value="2024-05-20 09:15:00" disabled>
                             </div>
                         </div>
 
                         <!-- Actions -->
                         <div class="form-actions">
                             <button type="button" class="btn btn-secondary">暂存</button>
-                            <button type="button" class="btn btn-success" style="margin-left: 10px;">完成结算</button>
+                            <button type="button" class="btn btn-success" id="complete-settlement-btn">完成结算</button>
                         </div>
                     </form>
                 </div>
@@ -250,24 +127,26 @@
             <!-- 提现审批内容 -->
             <div id="tab1-content" class="tab-content">
                 <div class="card">
-                    <div class="card-header">提现审批列表</div>
-                    <table>
-                        <thead>
-                        <tr><th>申请人</th><th>申请时间</th><th>提现金额 (元)</th><th>状态</th><th>操作</th></tr>
-                        </thead>
-                        <tbody>
-                        <tr>
-                            <td>陈浩 (广州-车险一部)</td>
-                            <td>2024-05-31 10:20:15</td>
-                            <td><strong>3,500.00</strong></td>
-                            <td><span class="status-tag status-pending">待审批</span></td>
-                            <td>
-                                <button class="btn-sm btn-success">批准并支付</button>
-                                <button class="btn-sm btn-danger">驳回</button>
-                            </td>
-                        </tr>
-                        </tbody>
-                    </table>
+                    <div class="card-header"><span>提现审批列表</span></div>
+                    <div class="table-responsive-wrapper">
+                        <table>
+                            <thead>
+                            <tr><th>申请人</th><th>申请时间</th><th>提现金额 (元)</th><th>状态</th><th>操作</th></tr>
+                            </thead>
+                            <tbody>
+                            <tr>
+                                <td>陈浩 (广州-车险一部)</td>
+                                <td>2024-05-31 10:20:15</td>
+                                <td><strong>3,500.00</strong></td>
+                                <td><span class="status-tag status-warning">待审批</span></td>
+                                <td>
+                                    <button class="btn btn-success btn-sm">批准</button>
+                                    <button class="btn btn-danger btn-sm">驳回</button>
+                                </td>
+                            </tr>
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
 
@@ -276,24 +155,26 @@
 </div>
 <script src="demo_helper.js"></script>
 <script>
-    // 简单的Tab切换逻辑
-    const tab1Btn = document.getElementById('tab1-btn');
-    const tab2Btn = document.getElementById('tab2-btn');
-    const tab1Content = document.getElementById('tab1-content');
-    const tab2Content = document.getElementById('tab2-content');
+    document.addEventListener('DOMContentLoaded', function() {
+        const tab1Btn = document.getElementById('tab1-btn');
+        const tab2Btn = document.getElementById('tab2-btn');
+        const tab1Content = document.getElementById('tab1-content');
+        const tab2Content = document.getElementById('tab2-content');
+        const completeBtn = document.getElementById('complete-settlement-btn');
 
-    tab1Btn.addEventListener('click', () => {
-        tab1Btn.classList.add('active');
-        tab2Btn.classList.remove('active');
-        tab1Content.classList.add('active');
-        tab2Content.classList.remove('active');
-    });
+        function switchTab(activeBtn, inactiveBtn, activeContent, inactiveContent) {
+            activeBtn.classList.add('active');
+            inactiveBtn.classList.remove('active');
+            activeContent.classList.add('active');
+            inactiveContent.classList.remove('active');
+        }
 
-    tab2Btn.addEventListener('click', () => {
-        tab2Btn.classList.add('active');
-        tab1Btn.classList.remove('active');
-        tab2Content.classList.add('active');
-        tab1Content.classList.remove('active');
+        tab1Btn.addEventListener('click', () => switchTab(tab1Btn, tab2Btn, tab1Content, tab2Content));
+        tab2Btn.addEventListener('click', () => switchTab(tab2Btn, tab1Btn, tab2Content, tab1Content));
+
+        completeBtn.addEventListener('click', function() {
+            showModal('结算成功', '案件 SY-20240520-001 已完成财务结算。<br>相关款项已记入台账，查勘员佣金已入账。', 'success');
+        });
     });
 </script>
 </body>

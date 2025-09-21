@@ -5,24 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>任务查询 - 穗源保险公估一体化业务管理平台</title>
     <link rel="stylesheet" href="style.css">
-    <style>
-        .filter-bar { display: flex; align-items: center; gap: 15px; padding: 15px 20px; }
-        .filter-item { display: flex; align-items: center; gap: 8px; }
-        .filter-item label { color: var(--text-color-regular); }
-        .filter-item input, .filter-item select { padding: 8px; border: 1px solid var(--border-color-base); border-radius: 4px;}
-        .btn { padding: 8px 20px; border-radius: 4px; border: none; background-color: var(--primary-color); color: #fff; cursor: pointer; }
-
-        table { width: 100%; border-collapse: collapse; margin-top: 20px; font-size: 13px; }
-        th, td { border: 1px solid var(--border-color-lighter); padding: 12px 10px; text-align: left; vertical-align: middle; }
-        th { background-color: var(--bg-color-base); font-weight: 500; }
-        tbody tr:hover { background-color: #fafafa; }
-        .status-tag { padding: 3px 8px; border-radius: 4px; font-size: 12px; white-space: nowrap;}
-        .status-blue { background-color: #ecf5ff; color: #409eff; } /* 进行中 */
-        .status-yellow { background-color: #fdf6ec; color: #e6a23c; } /* 待审核 */
-        .status-purple { background-color: #fef0f0; color: #f56c6c; } /* 待接受 */
-        .status-cyan { background-color: #e0f2f1; color: #009688; } /* 待派单 */
-        .action-links a { color: var(--primary-color); text-decoration: none; margin-right: 10px; }
-    </style>
 </head>
 <body>
 <div class="app-container">
@@ -41,6 +23,9 @@
     <div class="main-wrapper">
         <!-- 顶部栏 -->
         <header class="header">
+            <div class="header-left">
+                <button id="hamburger-btn" class="hamburger-btn">☰</button>
+            </div>
             <div class="user-profile">
                 <div class="avatar" style="background-color: #E6A23C;">王</div>
                 <span>王芳 (调度员)</span>
@@ -50,68 +35,85 @@
         <!-- 页面内容 -->
         <main class="main-content">
             <h1 class="page-title">任务查询</h1>
-            <div class="card filter-bar">
-                <div class="filter-item">
-                    <label>案件状态:</label>
-                    <select>
-                        <option>全部</option>
-                        <option selected>进行中</option>
-                        <option>待派单</option>
-                        <option>待接受</option>
-                        <option>待审核</option>
-                    </select>
+            <div class="card">
+                <div class="filter-bar">
+                    <div class="filter-item">
+                        <label>案件状态:</label>
+                        <select>
+                            <option>全部</option>
+                            <option selected>进行中</option>
+                            <option>待派单</option>
+                            <option>待接受</option>
+                            <option>待审核</option>
+                        </select>
+                    </div>
+                    <div class="filter-item">
+                        <label>查勘员:</label>
+                        <input type="text" placeholder="输入查勘员姓名...">
+                    </div>
+                    <div class="filter-item">
+                        <label>报案号/车牌:</label>
+                        <input type="text" placeholder="输入关键字...">
+                    </div>
+                    <div class="filter-actions">
+                        <button class="btn btn-primary">查询</button>
+                        <button class="btn btn-secondary">重置</button>
+                    </div>
                 </div>
-                <div class="filter-item">
-                    <label>查勘员:</label>
-                    <input type="text" placeholder="输入查勘员姓名...">
-                </div>
-                <div class="filter-item">
-                    <label>报案号/车牌:</label>
-                    <input type="text" placeholder="输入关键字...">
-                </div>
-                <button class="btn">查询</button>
             </div>
 
             <div class="card">
-                <div class="card-header">案件实时状态</div>
-                <table>
-                    <thead>
-                    <tr>
-                        <th>案件编号</th><th>报案号</th><th>车牌号</th>
-                        <th>当前处理人</th><th>当前状态</th><th>更新时间</th><th>操作</th>
-                    </tr>
-                    </thead>
-                    <tbody>
-                    <tr>
-                        <td>SY-20240520-001</td><td>PABX...GZ00123</td><td>粤A·88888</td>
-                        <td>赵磊 (品管)</td>
-                        <td><span class="status-tag status-yellow">待审核</span></td>
-                        <td>2024-05-20 11:30:45</td>
-                        <td class="action-links"><a href="reviewer_case_audit.html">查看</a></td>
-                    </tr>
-                    <tr>
-                        <td>SY-20240521-003</td><td>PICC...GZ00458</td><td>粤B·54321</td>
-                        <td>陈浩 (查勘员)</td>
-                        <td><span class="status-tag status-purple">待接受</span></td>
-                        <td>2024-05-21 09:35:12</td>
-                        <td class="action-links"><a href="#">改派</a></td>
-                    </tr>
-                    <tr>
-                        <td>SY-20240522-008</td><td>TPY...SH00111</td><td>沪A·C5E67</td>
-                        <td>刘洋 (查勘员)</td>
-                        <td><span class="status-tag status-blue">进行中 (已到场)</span></td>
-                        <td>2024-05-22 10:15:30</td>
-                        <td class="action-links"><a href="#">查看</a></td>
-                    </tr>
-                    <tr>
-                        <td>SY-20240522-009</td><td>PABX...BJ00999</td><td>京A·88B88</td>
-                        <td>-</td>
-                        <td><span class="status-tag status-cyan">待派单</span></td>
-                        <td>2024-05-22 11:05:00</td>
-                        <td class="action-links"><a href="dispatcher_dispatch_center.html">去派单</a></td>
-                    </tr>
-                    </tbody>
-                </table>
+                <div class="card-header"><span>案件实时状态</span></div>
+                <div class="table-responsive-wrapper">
+                    <table>
+                        <thead>
+                        <tr>
+                            <th>案件编号</th><th>报案号</th><th>车牌号</th>
+                            <th>当前处理人</th><th>当前状态</th><th>更新时间</th><th>操作</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        <tr>
+                            <td>SY-20240520-001</td><td>PABX...GZ00123</td><td>粤A·88888</td>
+                            <td>赵磊 (审核主管)</td>
+                            <td><span class="status-tag status-warning">待审核</span></td>
+                            <td>2024-05-20 11:30:45</td>
+                            <td class="action-links"><a href="reviewer_case_audit.html">查看</a></td>
+                        </tr>
+                        <tr>
+                            <td>SY-20240521-003</td><td>PICC...GZ00458</td><td>粤B·54321</td>
+                            <td>陈浩 (查勘员)</td>
+                            <td><span class="status-tag status-danger">待接受</span></td>
+                            <td>2024-05-21 09:35:12</td>
+                            <td class="action-links"><a href="#">改派</a></td>
+                        </tr>
+                        <tr>
+                            <td>SY-20240522-008</td><td>TPY...SH00111</td><td>沪A·C5E67</td>
+                            <td>刘洋 (查勘员)</td>
+                            <td><span class="status-tag status-primary">进行中 (已到场)</span></td>
+                            <td>2024-05-22 10:15:30</td>
+                            <td class="action-links"><a href="#">查看</a></td>
+                        </tr>
+                        <tr>
+                            <td>SY-20240522-009</td><td>PABX...BJ00999</td><td>京A·88B88</td>
+                            <td>-</td>
+                            <td><span class="status-tag status-info">待派单</span></td>
+                            <td>2024-05-22 11:05:00</td>
+                            <td class="action-links"><a href="dispatcher_dispatch_center.html">去派单</a></td>
+                        </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div class="card-footer">
+                    <nav class="pagination">
+                        <ul>
+                            <li class="disabled"><a href="#">&laquo;</a></li>
+                            <li class="active"><a href="#">1</a></li>
+                            <li><a href="#">2</a></li>
+                            <li><a href="#">&raquo;</a></li>
+                        </ul>
+                    </nav>
+                </div>
             </div>
         </main>
     </div>

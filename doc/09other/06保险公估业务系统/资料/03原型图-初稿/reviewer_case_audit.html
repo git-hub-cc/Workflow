@@ -5,198 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>案件审核 - SY-20240520-001</title>
     <link rel="stylesheet" href="style.css">
-    <style>
-        .audit-layout {
-            display: flex;
-            gap: 20px;
-            align-items: flex-start; /* 顶部对齐 */
-        }
-        .main-audit-content {
-            flex: 2; /* 占据2/3空间 */
-        }
-        .side-audit-panel {
-            flex: 1; /* 占据1/3空间 */
-            position: sticky;
-            top: 20px; /* 滚动时固定 */
-        }
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-top: 15px;
-        }
-        th, td {
-            border: 1px solid var(--border-color-lighter);
-            padding: 10px 12px;
-            text-align: left;
-        }
-        th {
-            background-color: var(--bg-color-base);
-            font-weight: 500;
-        }
-        td.amount { text-align: right; font-weight: bold; }
-        .total-row { font-weight: bold; background-color: #fafafa;}
-
-        .photo-gallery {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
-            gap: 10px;
-        }
-        .photo-item {
-            width: 100%;
-            padding-top: 75%; /* 4:3 aspect ratio */
-            position: relative;
-            background-color: #f0f2f5;
-            border-radius: 4px;
-            overflow: hidden;
-            cursor: pointer;
-        }
-        .photo-item span {
-            position: absolute;
-            bottom: 5px;
-            left: 8px;
-            right: 8px;
-            font-size: 12px;
-            color: var(--text-color-secondary);
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-        }
-
-        .btn {
-            padding: 10px 20px;
-            border-radius: var(--border-radius-base);
-            border: 1px solid transparent; font-size: 14px; cursor: pointer;
-            text-decoration: none; display: inline-block;
-        }
-        .btn-success { background-color: var(--success-color); color: #fff; }
-        .btn-danger { background-color: var(--danger-color); color: #fff; }
-        .side-audit-panel textarea { width: 100%; min-height: 80px; padding: 8px; border: 1px solid var(--border-color-base); border-radius: 4px; }
-        .side-audit-panel .form-item { margin-bottom: 15px; }
-        .side-audit-panel label { display: block; margin-bottom: 5px; font-weight: 500;}
-
-        .audit-task-block {
-            padding-bottom: 15px;
-            margin-bottom: 15px;
-            border-bottom: 1px solid var(--border-color-lighter);
-        }
-        .audit-task-block:last-of-type {
-            border-bottom: none;
-            margin-bottom: 0;
-        }
-        .audit-task-block h4 {
-            font-size: 14px;
-            margin: 0 0 10px 0;
-            display: flex;
-            justify-content: space-between;
-        }
-        .audit-task-block .kpi-check { font-size: 13px; }
-        .audit-task-block .kpi-check strong { color: var(--success-color); }
-        .audit-task-block .commission-item {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            font-size: 13px;
-            color: var(--text-color-regular);
-            margin-bottom: 8px;
-        }
-        .final-summary {
-            border-top: 2px solid var(--border-color-light);
-            padding-top: 15px;
-            margin-top: 15px;
-        }
-        .final-summary label { font-size: 14px; }
-        /* 调整最终佣金输入框样式 */
-        #final-commission {
-            padding: 8px; width: 100%;
-            border: 1px solid var(--border-color-base);
-            border-radius: 4px; font-size: 16px; font-weight: bold;
-            text-align: right; color: var(--text-color-primary); /* 改为主要文字颜色 */
-            background-color: #F5F7FA; /* 只读背景色 */
-            cursor: not-allowed; /* 不可点击指针 */
-        }
-
-        /* 新增样式用于佣金和扣罚输入框 */
-        .input-with-unit {
-            display: flex;
-            align-items: center;
-            gap: 4px;
-        }
-        .commission-input {
-            width: 70px;
-            padding: 4px 6px;
-            border: 1px solid var(--border-color-base);
-            border-radius: 4px;
-            text-align: right;
-            font-size: 13px;
-            -moz-appearance: textfield; /* For Firefox */
-        }
-        .commission-input::-webkit-outer-spin-button,
-        .commission-input::-webkit-inner-spin-button {
-            -webkit-appearance: none; /* For Chrome, Safari, Edge, Opera */
-            margin: 0;
-        }
-        .reason-input {
-            width: 120px;
-            padding: 4px 6px;
-            border: 1px solid var(--border-color-base);
-            border-radius: 4px;
-            font-size: 13px;
-        }
-
-        /* --- Styles for Quality Control Form --- */
-        .form-grid {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 15px 20px;
-        }
-        .form-grid .form-item {
-            display: flex;
-            flex-direction: column;
-            gap: 5px;
-        }
-        .form-grid .form-item label {
-            color: var(--text-color-regular);
-            font-weight: 500;
-            font-size: 13px;
-            margin: 0;
-        }
-        .form-grid .form-item input,
-        .form-grid .form-item select,
-        .form-grid .form-item textarea {
-            width: 100%;
-            padding: 8px 12px;
-            border: 1px solid var(--border-color-base);
-            border-radius: var(--border-radius-base);
-            font-size: 13px;
-            box-sizing: border-box;
-        }
-        .form-grid .form-item input[disabled] {
-            background-color: #F5F7FA;
-            cursor: not-allowed;
-        }
-        .form-grid .form-item.full-width {
-            grid-column: 1 / -1;
-        }
-        .form-grid .form-actions {
-            grid-column: 1 / -1;
-            text-align: right;
-            padding-top: 15px;
-            margin-top: 5px;
-            border-top: 1px solid var(--border-color-lighter);
-        }
-        .btn-secondary {
-            background-color: #fff;
-            color: var(--text-color-regular);
-            border: 1px solid var(--border-color-base);
-        }
-        .btn-secondary:hover {
-            color: var(--primary-color);
-            border-color: var(--primary-color);
-        }
-
-        /* --- 新增样式：任务审核按钮 --- */
-        .btn-sm { padding: 5px 12px; font-size: 13px; }
-    </style>
 </head>
 <body>
 <div class="app-container">
@@ -214,6 +22,9 @@
     <div class="main-wrapper">
         <!-- 顶部栏 -->
         <header class="header">
+            <div class="header-left">
+                <button id="hamburger-btn" class="hamburger-btn">☰</button>
+            </div>
             <div class="user-profile">
                 <div class="avatar" style="background-color: #67C23A;">赵</div>
                 <span>赵磊 (审核主管)</span>
@@ -227,50 +38,51 @@
                 <!-- 左侧主内容 -->
                 <div class="main-audit-content">
                     <div class="card">
-                        <div class="card-header">案件基本信息</div>
-                        <p><strong>承保方:</strong> 平安保险 | <strong>报案号:</strong> PABX2024GZ00123</p>
-                        <p><strong>车牌:</strong> 粤A·88888 | <strong>被保险人:</strong> 王先生</p>
-                        <p><strong>出险时间:</strong> 2024-05-20 09:15:00</p>
+                        <div class="card-header"><span>案件基本信息</span></div>
+                        <div class="info-grid">
+                            <p><strong>承保方:</strong> 平安保险</p>
+                            <p><strong>报案号:</strong> PABX...GZ00123</p>
+                            <p><strong>车牌:</strong> 粤A·88888</p>
+                            <p><strong>被保险人:</strong> 王先生</p>
+                            <p><strong>出险时间:</strong> 2024-05-20 09:15</p>
+                        </div>
                     </div>
                     <div class="card">
-                        <div class="card-header">委托任务 (1): 现场查勘</div>
+                        <div class="card-header"><span>委托任务 (1): 现场查勘</span></div>
                         <p><strong>执行查勘员:</strong> 陈浩</p>
-                        <p><strong>损失情况描述:</strong> 标的车前保险杠、左前大灯、中网破损。三者车后保险杠、尾门变形。符合事故逻辑。</p>
-                        <p><strong>查勘员总结:</strong> 损失已核实，建议按清单定损。现场单证已收集齐全。</p>
+                        <p><strong>查勘员总结:</strong> 标的车前保险杠、左前大灯、中网破损。三者车后保险杠、尾门变形。符合事故逻辑。损失已核实，建议按清单定损。现场单证已收集齐全。</p>
                     </div>
                     <div class="card">
-                        <div class="card-header">委托任务 (2): 标的定损</div>
-                        <table>
-                            <thead>
-                            <tr><th>项目名称 (标的车: 奥迪A6)</th><th>数量</th></tr>
-                            </thead>
-                            <tbody>
-                            <tr><td>前保险杠更换</td><td>1 件</td></tr>
-                            <tr><td>左前大灯总成更换</td><td>1 件</td></tr>
-                            <tr><td>工时费</td><td>1 项</td></tr>
-                            <tr class="total-row">
-                                <td colspan="2">标的定损合计</td>
-                            </tr>
-                            </tbody>
-                        </table>
+                        <div class="card-header"><span>委托任务 (2): 标的定损</span></div>
+                        <div class="table-responsive-wrapper">
+                            <table>
+                                <thead>
+                                <tr><th>项目名称 (标的车: 奥迪A6)</th><th>数量</th></tr>
+                                </thead>
+                                <tbody>
+                                <tr><td>前保险杠更换</td><td>1 件</td></tr>
+                                <tr><td>左前大灯总成更换</td><td>1 件</td></tr>
+                                <tr><td>工时费</td><td>1 项</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
                     <div class="card">
-                        <div class="card-header">委托任务 (3): 三者定损</div>
-                        <table>
-                            <thead>
-                            <tr><th>项目名称 (三者车: 丰田卡罗拉)</th><th>数量</th></tr>
-                            </thead>
-                            <tbody>
-                            <tr><td>后保险杠修复喷漆</td><td>1 项</td></tr>
-                            <tr><td>尾门钣金喷漆</td><td>1 项</td></tr>
-                            <tr class="total-row">
-                                <td colspan="2">三者定损合计</td>
-                            </tr>
-                            </tbody>
-                        </table>
+                        <div class="card-header"><span>委托任务 (3): 三者定损</span></div>
+                        <div class="table-responsive-wrapper">
+                            <table>
+                                <thead>
+                                <tr><th>项目名称 (三者车: 丰田卡罗拉)</th><th>数量</th></tr>
+                                </thead>
+                                <tbody>
+                                <tr><td>后保险杠修复喷漆</td><td>1 项</td></tr>
+                                <tr><td>尾门钣金喷漆</td><td>1 项</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
                     <div class="card">
-                        <div class="card-header">现场照片与收集单证</div>
+                        <div class="card-header"><span>现场照片与收集单证</span></div>
                         <div class="photo-gallery">
                             <div class="photo-item"><span>IMG_1015_碰撞部位.jpg</span></div>
                             <div class="photo-item"><span>IMG_1016_标的车全貌.jpg</span></div>
@@ -282,7 +94,7 @@
                     </div>
                     <!-- 品管信息录入卡片 -->
                     <div class="card">
-                        <div class="card-header">品管信息录入</div>
+                        <div class="card-header"><span>品管信息录入</span></div>
                         <form class="form-grid">
                             <div class="form-item">
                                 <label>保单归属地</label>
@@ -294,11 +106,7 @@
                             </div>
                             <div class="form-item">
                                 <label>实际操作任务类型</label>
-                                <select><option selected>查勘+定损</option><option>单查勘</option><option>单定损</option><option>人伤查勘</option></select>
-                            </div>
-                            <div class="form-item">
-                                <label>人车合照类型</label>
-                                <select><option selected>查勘+定损</option><option>单查勘</option><option>单定损</option><option>无人车</option></select>
+                                <select><option selected>查勘+定损</option><option>单查勘</option></select>
                             </div>
                             <div class="form-item">
                                 <label>是否人伤</label>
@@ -309,43 +117,26 @@
                                 <select><option selected>否</option><option>是</option></select>
                             </div>
                             <div class="form-item">
-                                <label>标的万元以上核损通过时间</label>
-                                <input type="datetime-local">
-                            </div>
-                            <div class="form-item">
-                                <label>三者万元以上核损通过时间</label>
-                                <input type="datetime-local">
-                            </div>
-                            <div class="form-item">
                                 <label>案件状态</label>
-                                <select>
-                                    <option>已结案</option><option>待定损</option><option>定损中</option>
-                                    <option>定损退回</option><option>待查勘</option><option>待复勘</option>
-                                    <option>单证收集</option><option>待理算</option><option>取消委托</option>
-                                    <option>未结案</option><option>未勘销案</option>
-                                </select>
+                                <select><option>已结案</option></select>
                             </div>
-                            <div class="form-item full-width">
+                            <div class="form-item col-span-full">
                                 <label>案件处理情况</label>
-                                <textarea rows="2" placeholder="手录案件处理情况..."></textarea>
-                            </div>
-                            <div class="form-item">
-                                <label>结案/移出平台时间</label>
-                                <input type="datetime-local">
+                                <textarea class="form-textarea" placeholder="手录案件处理情况..."></textarea>
                             </div>
                             <div class="form-item">
                                 <label>审核人</label>
-                                <input type="text" value="赵磊 (按工号进入默认)" disabled>
+                                <input type="text" value="赵磊" disabled>
                             </div>
                             <div class="form-item">
                                 <label>审核时间</label>
-                                <input type="text" value="2024-05-20 11:45:00 (自动默认)" disabled>
+                                <input type="text" value="2024-05-20 11:45:00" disabled>
                             </div>
-                            <div class="form-item full-width">
+                            <div class="form-item col-span-full">
                                 <label>备注</label>
-                                <textarea rows="2" placeholder="填写备注..."></textarea>
+                                <textarea class="form-textarea" placeholder="填写备注..."></textarea>
                             </div>
-                            <div class="form-actions full-width">
+                            <div class="form-actions col-span-full">
                                 <button type="button" class="btn btn-secondary">保存品管信息</button>
                             </div>
                         </form>
@@ -354,15 +145,15 @@
                 <!-- 右侧审核面板 -->
                 <aside class="side-audit-panel">
                     <div id="settlement-card" class="card">
-                        <div class="card-header">审核与结算</div>
-                        <!-- 任务1审核 -->
+                        <div class="card-header"><span>审核与结算</span></div>
+                        <!-- 任务审核 -->
                         <div class="audit-task-block">
-                            <h4><span>任务: 现场查勘</span><span>陈浩</span></h4>
-                            <hr style="border: none; border-top: 1px dashed var(--border-color-lighter); margin: 10px 0;">
+                            <h4><span>任务: 查勘+定损</span><span>陈浩</span></h4>
+                            <hr class="dashed-divider">
                             <div class="commission-item">
                                 <span>基础佣金</span>
                                 <div class="input-with-unit">
-                                    <input type="number" class="commission-input commission-base-input" value="100.00">
+                                    <input type="number" class="commission-input commission-base-input" value="200.00">
                                     <span>元</span>
                                 </div>
                             </div>
@@ -377,59 +168,7 @@
                                 <span>扣罚原因</span>
                                 <input type="text" class="reason-input" value="报告提交超时">
                             </div>
-                            <div style="display: flex; gap: 10px; margin-top: 15px; border-top: 1px dashed var(--border-color-lighter); padding-top: 10px; justify-content: flex-end;">
-                                <a href="#" class="btn btn-danger btn-sm">退回此项</a>
-                                <a href="#" class="btn btn-success btn-sm">通过此项</a>
-                            </div>
-                        </div>
-                        <!-- 任务2审核 -->
-                        <div class="audit-task-block">
-                            <h4><span>任务: 标的定损</span><span>陈浩</span></h4>
-                            <div class="commission-item">
-                                <span>基础佣金</span>
-                                <div class="input-with-unit">
-                                    <input type="number" class="commission-input commission-base-input" value="50.00">
-                                    <span>元</span>
-                                </div>
-                            </div>
-                            <div class="commission-item">
-                                <span>扣罚</span>
-                                <div class="input-with-unit">
-                                    <input type="number" class="commission-input commission-deduction-input" value="0.00">
-                                    <span>元</span>
-                                </div>
-                            </div>
-                            <div class="commission-item">
-                                <span>扣罚原因</span>
-                                <input type="text" class="reason-input" placeholder="选填">
-                            </div>
-                            <div style="display: flex; gap: 10px; margin-top: 15px; border-top: 1px dashed var(--border-color-lighter); padding-top: 10px; justify-content: flex-end;">
-                                <a href="#" class="btn btn-danger btn-sm">退回此项</a>
-                                <a href="#" class="btn btn-success btn-sm">通过此项</a>
-                            </div>
-                        </div>
-                        <!-- 任务3审核 -->
-                        <div class="audit-task-block">
-                            <h4><span>任务: 三者定损</span><span>陈浩</span></h4>
-                            <div class="commission-item">
-                                <span>基础佣金</span>
-                                <div class="input-with-unit">
-                                    <input type="number" class="commission-input commission-base-input" value="50.00">
-                                    <span>元</span>
-                                </div>
-                            </div>
-                            <div class="commission-item">
-                                <span>扣罚</span>
-                                <div class="input-with-unit">
-                                    <input type="number" class="commission-input commission-deduction-input" value="0.00">
-                                    <span>元</span>
-                                </div>
-                            </div>
-                            <div class="commission-item">
-                                <span>扣罚原因</span>
-                                <input type="text" class="reason-input" placeholder="选填">
-                            </div>
-                            <div style="display: flex; gap: 10px; margin-top: 15px; border-top: 1px dashed var(--border-color-lighter); padding-top: 10px; justify-content: flex-end;">
+                            <div class="task-actions">
                                 <a href="#" class="btn btn-danger btn-sm">退回此项</a>
                                 <a href="#" class="btn btn-success btn-sm">通过此项</a>
                             </div>
@@ -444,15 +183,11 @@
                                 </div>
                             </div>
                             <div class="form-item">
-                                <label for="final-commission">最终应付佣金</label>
-                                <input type="text" id="final-commission" value="180.00" readonly>
-                            </div>
-                            <div class="form-item">
                                 <label for="audit-notes">案件总体意见</label>
-                                <textarea id="audit-notes" placeholder="若有需要，可填写对整个案件的说明..."></textarea>
+                                <textarea id="audit-notes" class="form-textarea" placeholder="若有需要，可填写对整个案件的说明..."></textarea>
                             </div>
                             <div style="margin-top: 20px;">
-                                <a href="finance_settlement.html" class="btn btn-success" style="width:100%; text-align:center;">完成案件审核</a>
+                                <a href="finance_settlement.html" class="btn btn-success" style="width:100%; text-align:center;" id="complete-audit-btn">完成案件审核</a>
                             </div>
                         </div>
                     </div>
@@ -462,49 +197,41 @@
     </div>
 </div>
 <script src="demo_helper.js"></script>
-<!-- ==================== 新增交互脚本: 自动计算佣金 ==================== -->
 <script>
     document.addEventListener('DOMContentLoaded', function() {
         const settlementCard = document.getElementById('settlement-card');
         const totalDisplay = document.getElementById('total-commission-display');
-        const finalInput = document.getElementById('final-commission');
+        const completeAuditBtn = document.getElementById('complete-audit-btn');
 
         function calculateCommission() {
-            let totalBase = 0;
-            let totalDeduction = 0;
-
-            const baseInputs = settlementCard.querySelectorAll('.commission-base-input');
-            const deductionInputs = settlementCard.querySelectorAll('.commission-deduction-input');
-
-            baseInputs.forEach(input => {
-                totalBase += parseFloat(input.value) || 0;
+            let total = 0;
+            const auditBlocks = settlementCard.querySelectorAll('.audit-task-block');
+            auditBlocks.forEach(block => {
+                const base = parseFloat(block.querySelector('.commission-base-input').value) || 0;
+                const deduction = parseFloat(block.querySelector('.commission-deduction-input').value) || 0;
+                total += (base - deduction);
             });
-
-            deductionInputs.forEach(input => {
-                totalDeduction += parseFloat(input.value) || 0;
-            });
-
-            const finalCommission = totalBase - totalDeduction;
-
-            // 更新显示
-            const formattedTotal = finalCommission.toFixed(2);
+            const formattedTotal = total.toFixed(2);
             totalDisplay.textContent = formattedTotal;
-            finalInput.value = formattedTotal;
         }
 
-        // 使用事件委托，监听整个结算卡片内的输入事件
         settlementCard.addEventListener('input', function(event) {
-            // 确保事件源是我们需要监听的输入框
-            if (event.target.classList.contains('commission-base-input') ||
-                event.target.classList.contains('commission-deduction-input')) {
+            if (event.target.classList.contains('commission-input')) {
                 calculateCommission();
             }
         });
 
-        // 页面加载时立即执行一次计算，以确保初始值正确
+        completeAuditBtn.addEventListener('click', function(e) {
+            e.preventDefault();
+            const finalCommission = totalDisplay.textContent;
+            showModal('审核完成', `案件审核已完成，最终佣金为 <strong>${finalCommission} 元</strong>。<br>案件已流转至财务中心进行结算。`, 'success');
+            setTimeout(() => {
+                window.location.href = this.href;
+            }, 2000);
+        });
+
         calculateCommission();
     });
 </script>
-<!-- ======================================================= -->
 </body>
 </html>
