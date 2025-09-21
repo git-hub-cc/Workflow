@@ -85,10 +85,11 @@ document.addEventListener('DOMContentLoaded', function() {
     // --- 角色切换器逻辑 ---
     const roles = [
         { name: '总经理 (张伟)', page: 'index.html' },
-        { name: '调度员 (王芳)', page: 'dispatcher_case_entry.html' },
+        { name: '运营专员 (李四)', page: 'ops_surveyor_approval.html' },
+        { name: '调度员 (王芳)', page: 'dispatcher_task_query.html' },
         { name: '查勘员 (陈浩)', page: 'surveyor_task_list.html' },
-        { name: '品控 (赵磊)', page: 'reviewer_case_audit.html' },
-        { name: '财务 (李娜)', page: 'finance_settlement.html' },
+        { name: '品控 (赵磊)', page: 'reviewer_business_report.html' },
+        { name: '财务 (李娜)', page: 'finance_withdrawal.html' },
     ];
 
     const currentPage = window.location.pathname.split('/').pop() || 'index.html';
@@ -112,6 +113,8 @@ document.addEventListener('DOMContentLoaded', function() {
             isActive = currentPage.startsWith('reviewer_');
         } else if (role.name.includes('财务')) {
             isActive = currentPage.startsWith('finance_');
+        } else if (role.name.includes('运营专员')) {
+            isActive = currentPage.startsWith('ops_');
         } else {
             isActive = (role.page === currentPage);
         }

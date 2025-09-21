@@ -5,6 +5,41 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>财务中心 - 穗源保险公估一体化业务管理平台</title>
     <link rel="stylesheet" href="style.css">
+    <!-- 新增页面专属样式 -->
+    <style>
+        .commission-block {
+            border: 1px solid var(--border-color-lighter);
+            border-radius: var(--border-radius-base);
+            padding: 15px;
+            margin-top: 15px;
+            position: relative;
+            background-color: #fcfcfc;
+        }
+        .commission-block-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+        .commission-block-header h5 {
+            margin: 0;
+            font-size: 14px;
+        }
+        .remove-block-btn {
+            background: none;
+            border: none;
+            color: var(--danger-color);
+            font-size: 20px;
+            line-height: 1;
+            cursor: pointer;
+            opacity: 0.7;
+        }
+        .remove-block-btn:hover { opacity: 1; }
+        .add-item-btn-container {
+            text-align: right;
+            margin-top: 10px;
+        }
+    </style>
 </head>
 <body>
 <div class="app-container">
@@ -12,9 +47,8 @@
     <aside class="sidebar">
         <div class="sidebar-header">穗源保险公估</div>
         <ul class="sidebar-nav">
-            <li class="sidebar-nav-item active"><a href="finance_settlement.html">财务中心</a></li>
-            <li class="sidebar-nav-item"><a href="finance_ledger.html">财务台账</a></li>
-            <li class="sidebar-nav-item"><a href="finance_income_expense.html">收支管理</a></li>
+            <li class="sidebar-nav-item"><a href="finance_withdrawal.html">提现审批</a></li>
+            <li class="sidebar-nav-item"><a href="finance_ledger.html">佣金管理</a></li>
         </ul>
     </aside>
     <!-- 主内容区 -->
@@ -31,149 +65,189 @@
         </header>
         <!-- 页面内容 -->
         <main class="main-content">
-            <h1 class="page-title">财务中心</h1>
-
-            <div class="tab-container">
-                <div id="tab2-btn" class="tab-link active">案件结算 (1)</div>
-                <div id="tab1-btn" class="tab-link">提现审批 (1)</div>
-            </div>
+            <h1 class="page-title">财务中心 - 案件结算</h1>
 
             <!-- 案件结算内容 -->
-            <div id="tab2-content" class="tab-content active">
-                <div class="card">
-                    <div class="card-header"><span>财务结算录入 - 案件 SY-20240520-001</span></div>
-                    <form class="finance-form">
-                        <!-- Section: Fee Info -->
-                        <div class="form-section-header">公估费信息</div>
-                        <div class="form-grid">
-                            <div class="form-item">
-                                <label>系统公估费 (元)</label>
-                                <input type="text" value="425.00" disabled>
-                            </div>
-                            <div class="form-item">
-                                <label>审核后实际公估费 (元)</label>
-                                <input type="number" value="425.00">
+            <div class="card">
+                <div class="card-header"><span>财务结算录入</span></div>
+                <form id="finance-form" class="finance-form">
+                    <!-- Section: Case Number Input -->
+                    <div class="form-grid" style="margin-bottom: 1rem;">
+                        <div class="form-item col-span-full">
+                            <label>结算案件编号</label>
+                            <div class="input-with-button">
+                                <input type="text" value="SY-20240520-001" placeholder="输入案件编号后点击加载">
+                                <button type="button" class="btn btn-primary">加载案件信息</button>
                             </div>
                         </div>
-
-                        <!-- Section: Vehicle/Property Settlement -->
-                        <div class="form-section-header">查勘员结算</div>
-                        <div class="form-grid">
-                            <div class="form-item">
-                                <label>结算提成姓名 1</label>
-                                <select><option>陈浩</option><option>刘洋</option></select>
-                            </div>
-                            <div class="form-item">
-                                <label>结算任务类型 1</label>
-                                <select><option>单查勘</option><option selected>查勘+定损</option></select>
-                            </div>
-                            <div class="form-item">
-                                <label>基础佣金 1 (元)</label>
-                                <input type="number" value="200.00">
-                            </div>
-                            <div class="form-item">
-                                <label>扣罚/奖励 1 (元)</label>
-                                <input type="number" value="-20.00" title="负数为扣罚，正数为奖励">
-                            </div>
-                        </div>
-
-                        <!-- Section: Other Commissions -->
-                        <div class="form-section-header">其他人员结算</div>
-                        <div class="form-grid">
-                            <div class="form-item">
-                                <label>审案人</label>
-                                <select><option>赵磊</option></select>
-                            </div>
-                            <div class="form-item">
-                                <label>审案提成 (元)</label>
-                                <input type="number" value="15.00">
-                            </div>
-                            <div class="form-item">
-                                <label>录案人</label>
-                                <select><option>王芳</option></select>
-                            </div>
-                            <div class="form-item">
-                                <label>录案提成 (元)</label>
-                                <input type="number" value="5.00">
-                            </div>
-                        </div>
-
-                        <!-- Section: Remarks & System Info -->
-                        <div class="form-section-header">备注与系统信息</div>
-                        <div class="form-grid">
-                            <div class="form-item col-span-full">
-                                <label>备注</label>
-                                <textarea class="form-textarea" rows="2"></textarea>
-                            </div>
-                            <div class="form-item">
-                                <label>结算操作员</label>
-                                <input type="text" value="李娜" disabled>
-                            </div>
-                            <div class="form-item">
-                                <label>结算操作时间</label>
-                                <input type="text" value="2024-05-20 12:05:10" disabled>
-                            </div>
-                        </div>
-
-                        <!-- Actions -->
-                        <div class="form-actions">
-                            <button type="button" class="btn btn-secondary">暂存</button>
-                            <button type="button" class="btn btn-success" id="complete-settlement-btn">完成结算</button>
-                        </div>
-                    </form>
-                </div>
-            </div>
-
-            <!-- 提现审批内容 -->
-            <div id="tab1-content" class="tab-content">
-                <div class="card">
-                    <div class="card-header"><span>提现审批列表</span></div>
-                    <div class="table-responsive-wrapper">
-                        <table>
-                            <thead>
-                            <tr><th>申请人</th><th>申请时间</th><th>提现金额 (元)</th><th>状态</th><th>操作</th></tr>
-                            </thead>
-                            <tbody>
-                            <tr>
-                                <td>陈浩 (广州-车险一部)</td>
-                                <td>2024-05-31 10:20:15</td>
-                                <td><strong>3,500.00</strong></td>
-                                <td><span class="status-tag status-warning">待审批</span></td>
-                                <td>
-                                    <button class="btn btn-success btn-sm">批准</button>
-                                    <button class="btn btn-danger btn-sm">驳回</button>
-                                </td>
-                            </tr>
-                            </tbody>
-                        </table>
                     </div>
-                </div>
-            </div>
 
+                    <!-- Section: Fee Info -->
+                    <div class="form-section-header">公估费信息</div>
+                    <div class="form-grid">
+                        <div class="form-item">
+                            <label>系统公估费 (元)</label>
+                            <input type="text" value="425.00" disabled>
+                        </div>
+                        <div class="form-item">
+                            <label>审核后实际公估费 (元)</label>
+                            <input type="number" value="425.00">
+                        </div>
+                    </div>
+
+                    <!-- Section: Vehicle/Property Settlement -->
+                    <div class="form-section-header">查勘员结算 (车物/财险)</div>
+                    <div id="surveyor-commission-container">
+                        <!-- 动态添加的查勘员结算块将插入此处 -->
+                        <div class="commission-block">
+                            <div class="commission-block-header">
+                                <h5>结算项 #1</h5>
+                                <button type="button" class="remove-block-btn" title="删除此结算项">&times;</button>
+                            </div>
+                            <div class="form-grid">
+                                <div class="form-item">
+                                    <label>结算提成姓名</label>
+                                    <select><option selected>陈浩</option><option>刘洋</option></select>
+                                </div>
+                                <div class="form-item">
+                                    <label>结算任务类型</label>
+                                    <select><option>单查勘</option><option selected>查勘+定损</option></select>
+                                </div>
+                                <div class="form-item">
+                                    <label>基础佣金 (元)</label>
+                                    <input type="number" value="200.00">
+                                </div>
+                                <div class="form-item">
+                                    <label>扣罚/奖励 (元)</label>
+                                    <input type="number" value="-20.00" title="负数为扣罚，正数为奖励">
+                                </div>
+                                <div class="form-item col-span-full">
+                                    <label>奖罚原因</label>
+                                    <input type="text" value="报告提交超时 (品控审核)">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="add-item-btn-container">
+                        <button type="button" id="add-surveyor-btn" class="btn btn-secondary btn-sm">[+] 添加查勘员结算</button>
+                    </div>
+
+
+                    <!-- Section: Other Commissions -->
+                    <div class="form-section-header">其他人员结算</div>
+                    <div class="form-grid">
+                        <div class="form-item">
+                            <label>审案人</label>
+                            <select><option selected>赵磊</option><option>其他品控</option></select>
+                        </div>
+                        <div class="form-item">
+                            <label>审案提成 (元)</label>
+                            <input type="number" value="15.00">
+                        </div>
+                        <div class="form-item">
+                            <label>录案人</label>
+                            <select><option selected>王芳</option><option>其他调度</option></select>
+                        </div>
+                        <div class="form-item">
+                            <label>录案提成 (元)</label>
+                            <input type="number" value="5.00">
+                        </div>
+                        <div class="form-item">
+                            <label>督导</label>
+                            <select><option>张伟</option><option selected>无</option></select>
+                        </div>
+                        <div class="form-item">
+                            <label>督导提成 (元)</label>
+                            <input type="number" value="0.00">
+                        </div>
+                    </div>
+
+                    <!-- Section: Remarks & System Info -->
+                    <div class="form-section-header">备注与系统信息</div>
+                    <div class="form-grid">
+                        <div class="form-item col-span-full">
+                            <label>备注</label>
+                            <textarea class="form-textarea" rows="2" placeholder="填写本次结算的特殊说明..."></textarea>
+                        </div>
+                        <div class="form-item">
+                            <label>结算操作员</label>
+                            <input type="text" value="李娜" disabled>
+                        </div>
+                        <div class="form-item">
+                            <label>结算操作时间</label>
+                            <input type="text" value="2024-05-28 15:00:00" disabled>
+                        </div>
+                    </div>
+
+                    <!-- Actions -->
+                    <div class="form-actions">
+                        <button type="button" class="btn btn-secondary">暂存</button>
+                        <button type="button" class="btn btn-success" id="complete-settlement-btn">完成结算</button>
+                    </div>
+                </form>
+            </div>
         </main>
     </div>
 </div>
 <script src="demo_helper.js"></script>
 <script>
     document.addEventListener('DOMContentLoaded', function() {
-        const tab1Btn = document.getElementById('tab1-btn');
-        const tab2Btn = document.getElementById('tab2-btn');
-        const tab1Content = document.getElementById('tab1-content');
-        const tab2Content = document.getElementById('tab2-content');
         const completeBtn = document.getElementById('complete-settlement-btn');
+        const financeForm = document.getElementById('finance-form');
+        let surveyorCounter = 1;
 
-        function switchTab(activeBtn, inactiveBtn, activeContent, inactiveContent) {
-            activeBtn.classList.add('active');
-            inactiveBtn.classList.remove('active');
-            activeContent.classList.add('active');
-            inactiveContent.classList.remove('active');
-        }
+        // --- 动态添加/删除结算项的逻辑 ---
 
-        tab1Btn.addEventListener('click', () => switchTab(tab1Btn, tab2Btn, tab1Content, tab2Content));
-        tab2Btn.addEventListener('click', () => switchTab(tab2Btn, tab1Btn, tab2Content, tab1Content));
+        // 查勘员结算项模板
+        const surveyorTemplate = () => {
+            surveyorCounter++;
+            return `
+            <div class="commission-block">
+                <div class="commission-block-header">
+                    <h5>结算项 #${surveyorCounter}</h5>
+                    <button type="button" class="remove-block-btn" title="删除此结算项">&times;</button>
+                </div>
+                <div class="form-grid">
+                    <div class="form-item">
+                        <label>结算提成姓名</label>
+                        <select><option>陈浩</option><option>刘洋</option><option>吴静</option></select>
+                    </div>
+                    <div class="form-item">
+                        <label>结算任务类型</label>
+                        <select><option>单查勘</option><option>查勘+定损</option></select>
+                    </div>
+                    <div class="form-item">
+                        <label>基础佣金 (元)</label>
+                        <input type="number" value="0.00">
+                    </div>
+                    <div class="form-item">
+                        <label>扣罚/奖励 (元)</label>
+                        <input type="number" value="0.00" title="负数为扣罚，正数为奖励">
+                    </div>
+                    <div class="form-item col-span-full">
+                        <label>奖罚原因</label>
+                        <input type="text" placeholder="选填">
+                    </div>
+                </div>
+            </div>`;
+        };
 
+        // "添加查勘员" 按钮事件
+        document.getElementById('add-surveyor-btn').addEventListener('click', function() {
+            const container = document.getElementById('surveyor-commission-container');
+            container.insertAdjacentHTML('beforeend', surveyorTemplate());
+        });
+
+        // 使用事件委托处理所有 "删除" 按钮的点击事件
+        financeForm.addEventListener('click', function(e) {
+            if (e.target.classList.contains('remove-block-btn')) {
+                e.target.closest('.commission-block').remove();
+            }
+        });
+
+        // "完成结算" 按钮事件
         completeBtn.addEventListener('click', function() {
-            showModal('结算成功', '案件 SY-20240520-001 已完成财务结算。<br>相关款项已记入台账，查勘员佣金已入账。', 'success');
+            showModal('结算成功', '案件 SY-20240520-001 已完成财务结算。<br>相关款项已记入台账，所有人员佣金已入账。', 'success');
         });
     });
 </script>

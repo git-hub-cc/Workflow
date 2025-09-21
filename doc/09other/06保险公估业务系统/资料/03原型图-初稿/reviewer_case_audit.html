@@ -5,6 +5,108 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>案件审核 - SY-20240520-001</title>
     <link rel="stylesheet" href="style.css">
+    <!-- START: 新增样式支持多项扣罚 -->
+    <style>
+        .audit-task-block {
+            border: 1px solid var(--border-color-lighter);
+            border-radius: 4px;
+            padding: 10px 15px;
+            margin-bottom: 15px;
+            transition: all 0.3s ease;
+        }
+        .audit-task-block h4 {
+            border-bottom: 1px dashed var(--border-color-lighter);
+            padding-bottom: 10px;
+            margin-top: 0;
+            margin-bottom: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .commission-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 5px 0;
+            margin-bottom: 10px;
+            color: var(--text-color-regular);
+        }
+        .deductions-list {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            margin: 10px 0;
+            padding-left: 10px;
+            border-left: 2px solid var(--border-color-lighter);
+        }
+        .deduction-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .deduction-item .reason-input {
+            flex-grow: 1;
+        }
+        .deduction-item .input-with-unit {
+            flex-shrink: 0;
+        }
+        .add-deduction-wrapper {
+            margin-top: 10px;
+            text-align: right;
+        }
+        .remove-deduction-btn {
+            background: none; border: none; color: var(--danger-color); font-size: 20px;
+            line-height: 1; cursor: pointer; opacity: 0.6; padding: 0 5px;
+        }
+        .remove-deduction-btn:hover {
+            opacity: 1;
+        }
+        .task-actions {
+            margin-top: 15px;
+            text-align: right;
+            display: flex;
+            justify-content: flex-end;
+            align-items: center;
+            gap: 10px;
+        }
+        /* Styles for approved state simulation */
+        .audit-task-block.approved {
+            border-color: var(--success-color, #67C23A);
+            background-color: #f0f9eb;
+        }
+        .audit-task-block.approved .add-deduction-wrapper,
+        .audit-task-block.approved .remove-deduction-btn {
+            display: none;
+        }
+        .audit-task-block.approved .reason-input,
+        .audit-task-block.approved .commission-deduction-input {
+            background-color: #f5f7fa;
+            border-color: #e4e7ed;
+            pointer-events: none;
+        }
+        .status-badge {
+            display: inline-block;
+            padding: 3px 10px;
+            border-radius: 12px;
+            font-weight: bold;
+            font-size: 13px;
+        }
+        .status-success {
+            background-color: var(--success-color, #67C23A);
+            color: #fff;
+        }
+        .btn-link {
+            color: var(--primary-color, #409EFF);
+            text-decoration: none;
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-size: 13px;
+        }
+        .btn-link:hover {
+            text-decoration: underline;
+        }
+    </style>
+    <!-- END: 新增样式支持多项扣罚 -->
 </head>
 <body>
 <div class="app-container">
@@ -12,10 +114,7 @@
     <aside class="sidebar">
         <div class="sidebar-header">穗源保险公估</div>
         <ul class="sidebar-nav">
-            <li class="sidebar-nav-item"><a href="reviewer_todo_list.html">待办列表</a></li>
-            <li class="sidebar-nav-item active"><a href="reviewer_case_audit.html">案件审核</a></li>
-            <li class="sidebar-nav-item"><a href="reviewer_case_history.html">历史案件</a></li>
-            <li class="sidebar-nav-item"><a href="reviewer_business_report.html">商务报表</a></li>
+            <li class="sidebar-nav-item active"><a href="reviewer_business_report.html">审核管理</a></li>
         </ul>
     </aside>
 
@@ -49,175 +148,226 @@
                         </div>
                     </div>
                     <div class="card">
-                        <div class="card-header"><span>委托任务 (1): 现场查勘</span></div>
+                        <div class="card-header"><span>委托任务与查勘总结</span></div>
                         <p><strong>执行查勘员:</strong> 陈浩</p>
                         <p><strong>查勘员总结:</strong> 标的车前保险杠、左前大灯、中网破损。三者车后保险杠、尾门变形。符合事故逻辑。损失已核实，建议按清单定损。现场单证已收集齐全。</p>
                     </div>
+
+                    <!-- START: Rebuilt Review Checklist based on new specification -->
                     <div class="card">
-                        <div class="card-header"><span>委托任务 (2): 标的定损</span></div>
-                        <div class="table-responsive-wrapper">
-                            <table>
-                                <thead>
-                                <tr><th>项目名称 (标的车: 奥迪A6)</th><th>数量</th></tr>
-                                </thead>
-                                <tbody>
-                                <tr><td>前保险杠更换</td><td>1 件</td></tr>
-                                <tr><td>左前大灯总成更换</td><td>1 件</td></tr>
-                                <tr><td>工时费</td><td>1 项</td></tr>
-                                </tbody>
-                            </table>
+                        <div class="card-header"><span>影像资料审核</span></div>
+                        <div id="review-checklist" class="review-checklist">
+                            <!-- 1. 大环境照 -->
+                            <div class="review-group">
+                                <div class="review-group-header">1. 大环境照</div>
+                                <div class="review-item">
+                                    <div class="review-item-header"><div class="title">事故现场整体环境<span class="required-star">*</span></div></div>
+                                    <div class="review-item-content"><div class="image-preview-grid"><div class="preview-thumbnail"><span>🖼️ 大环境-前.jpg</span></div><div class="preview-thumbnail"><span>🖼️ 大环境-后.jpg</span></div></div></div>
+                                </div>
+                            </div>
+                            <!-- 2. 事故车辆外观照 -->
+                            <div class="review-group">
+                                <div class="review-group-header">2. 事故车辆外观照</div>
+                                <div class="review-item">
+                                    <div class="review-item-header"><div class="title">标的车 & 三者车四角照<span class="required-star">*</span></div></div>
+                                    <div class="review-item-content"><div class="image-preview-grid"><div class="preview-thumbnail"><span>🖼️ 标的-左前.jpg</span></div><div class="preview-thumbnail"><span>🖼️ 标的-右前.jpg</span></div><div class="preview-thumbnail"><span>🖼️ 三者-左后.jpg</span></div><div class="preview-thumbnail"><span>🖼️ 三者-右后.jpg</span></div></div></div>
+                                </div>
+                            </div>
+                            <!-- 5. 受损部位递进照 -->
+                            <div class="review-group">
+                                <div class="review-group-header">5. 受损部位递进照</div>
+                                <div class="review-item">
+                                    <div class="review-item-header"><div class="title">每处受损部位<span class="required-star">*</span></div></div>
+                                    <div class="review-item-content"><div class="image-preview-grid"><div class="preview-thumbnail"><span>🖼️ 前杠-远.jpg</span></div><div class="preview-thumbnail"><span>🖼️ 前杠-中.jpg</span></div><div class="preview-thumbnail"><span>🖼️ 前杠-特写.jpg</span></div></div></div>
+                                </div>
+                            </div>
+                            <!-- 6. 证件资料照 -->
+                            <div class="review-group">
+                                <div class="review-group-header">6. 证件资料照</div>
+                                <div class="review-item">
+                                    <div class="review-item-header"><div class="title">行驶证 & 驾驶证<span class="required-star">*</span></div></div>
+                                    <div class="review-item-content"><div class="image-preview-grid"><div class="preview-thumbnail"><span>📄 驾驶证.pdf</span></div><div class="preview-thumbnail"><span>📄 行驶证.pdf</span></div></div></div>
+                                </div>
+                            </div>
+                            <!-- 7. 必拍项目 -->
+                            <div class="review-group">
+                                <div class="review-group-header">7. 必拍项目</div>
+                                <div class="review-item">
+                                    <div class="review-item-header"><div class="title">人车合影<span class="required-star">*</span></div></div>
+                                    <div class="review-item-content"><div class="image-preview-grid"><div class="preview-thumbnail"><span>🖼️ 人车合影.jpg</span></div></div></div>
+                                </div>
+                                <div class="review-item">
+                                    <div class="review-item-header"><div class="title">车架号 (VIN)<span class="required-star">*</span></div></div>
+                                    <div class="review-item-content"><div class="image-preview-grid"><div class="preview-thumbnail"><span>🖼️ VIN.jpg</span></div></div></div>
+                                </div>
+                            </div>
                         </div>
                     </div>
-                    <div class="card">
-                        <div class="card-header"><span>委托任务 (3): 三者定损</span></div>
-                        <div class="table-responsive-wrapper">
-                            <table>
-                                <thead>
-                                <tr><th>项目名称 (三者车: 丰田卡罗拉)</th><th>数量</th></tr>
-                                </thead>
-                                <tbody>
-                                <tr><td>后保险杠修复喷漆</td><td>1 项</td></tr>
-                                <tr><td>尾门钣金喷漆</td><td>1 项</td></tr>
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                    <div class="card">
-                        <div class="card-header"><span>现场照片与收集单证</span></div>
-                        <div class="photo-gallery">
-                            <div class="photo-item"><span>IMG_1015_碰撞部位.jpg</span></div>
-                            <div class="photo-item"><span>IMG_1016_标的车全貌.jpg</span></div>
-                            <div class="photo-item"><span>IMG_1017_三者车受损.jpg</span></div>
-                            <div class="photo-item"><span>IMG_1018_车架号.jpg</span></div>
-                            <div class="photo-item"><span>王先生驾驶证.pdf</span></div>
-                            <div class="photo-item"><span>粤A88888行驶证.pdf</span></div>
-                        </div>
-                    </div>
+                    <!-- END: Rebuilt Review Checklist -->
+
                     <!-- 品管信息录入卡片 -->
                     <div class="card">
                         <div class="card-header"><span>品管信息录入</span></div>
                         <form class="form-grid">
-                            <div class="form-item">
-                                <label>保单归属地</label>
-                                <input type="text" value="广州">
+                            <div class="form-item"><label>保单归属地</label><input type="text" value="广州"></div>
+                            <div class="form-item"><label>是否录入公估费</label><select><option>是</option><option>否</option></select></div>
+                            <div class="form-item"><label>实际操作任务类型</label><select><option selected>单查勘</option><option>单定损</option><option>查勘+定损</option><option>人伤查勘</option></select></div>
+                            <div class="form-item"><label>是否人伤</label><select><option selected>否</option><option>是</option></select></div>
+                            <div class="form-item"><label>是否万元以上案件</label><select><option selected>否</option><option>是</option></select></div>
+                            <div class="form-item"><label>标的万元以上案件核损通过时间</label><input type="datetime-local" placeholder="选择时间"></div>
+                            <div class="form-item"><label>结案时间或移出我司平台时间</label><input type="datetime-local" placeholder="选择时间"></div>
+                            <div class="form-item"><label>案件状态</label>
+                                <select>
+                                    <option selected>已结案</option>
+                                    <option>待定损</option>
+                                    <option>定损中</option>
+                                    <option>定损退回</option>
+                                    <option>待查勘</option>
+                                    <option>待复勘</option>
+                                    <option>单证收集</option>
+                                    <option>待理算</option>
+                                    <option>取消委托</option>
+                                    <option>未结案</option>
+                                    <option>未勘销案</option>
+                                </select>
                             </div>
-                            <div class="form-item">
-                                <label>是否录入公估费</label>
-                                <select><option>是</option><option>否</option></select>
-                            </div>
-                            <div class="form-item">
-                                <label>实际操作任务类型</label>
-                                <select><option selected>查勘+定损</option><option>单查勘</option></select>
-                            </div>
-                            <div class="form-item">
-                                <label>是否人伤</label>
-                                <select><option selected>否</option><option>是</option></select>
-                            </div>
-                            <div class="form-item">
-                                <label>是否万元以上案件</label>
-                                <select><option selected>否</option><option>是</option></select>
-                            </div>
-                            <div class="form-item">
-                                <label>案件状态</label>
-                                <select><option>已结案</option></select>
-                            </div>
-                            <div class="form-item col-span-full">
-                                <label>案件处理情况</label>
-                                <textarea class="form-textarea" placeholder="手录案件处理情况..."></textarea>
-                            </div>
-                            <div class="form-item">
-                                <label>审核人</label>
-                                <input type="text" value="赵磊" disabled>
-                            </div>
-                            <div class="form-item">
-                                <label>审核时间</label>
-                                <input type="text" value="2024-05-20 11:45:00" disabled>
-                            </div>
-                            <div class="form-item col-span-full">
-                                <label>备注</label>
-                                <textarea class="form-textarea" placeholder="填写备注..."></textarea>
-                            </div>
-                            <div class="form-actions col-span-full">
-                                <button type="button" class="btn btn-secondary">保存品管信息</button>
-                            </div>
+                            <div class="form-item col-span-full"><label>案件处理情况</label><textarea class="form-textarea" placeholder="手录案件处理情况..."></textarea></div>
+                            <div class="form-item"><label>审核人</label><input type="text" value="赵磊" disabled></div>
+                            <div class="form-item"><label>审核时间</label><input type="text" value="2024-05-20 11:45:00" disabled></div>
+                            <div class="form-item col-span-full"><label>备注</label><textarea class="form-textarea" placeholder="填写备注..."></textarea></div>
+                            <div class="form-actions col-span-full"><button type="button" class="btn btn-secondary">保存品管信息</button></div>
                         </form>
                     </div>
                 </div>
                 <!-- 右侧审核面板 -->
                 <aside class="side-audit-panel">
+                    <!-- START: 修改后的审核与结算面板 -->
                     <div id="settlement-card" class="card">
                         <div class="card-header"><span>审核与结算</span></div>
-                        <!-- 任务审核 -->
-                        <div class="audit-task-block">
-                            <h4><span>任务: 查勘+定损</span><span>陈浩</span></h4>
-                            <hr class="dashed-divider">
-                            <div class="commission-item">
-                                <span>基础佣金</span>
-                                <div class="input-with-unit">
-                                    <input type="number" class="commission-input commission-base-input" value="200.00">
-                                    <span>元</span>
-                                </div>
+                        <!-- 任务审核 1: 已通过, 无扣罚 -->
+                        <div class="audit-task-block approved">
+                            <h4><span>任务: 车物查勘</span><span>陈浩</span></h4>
+                            <div class="deductions-list">
+                                <!-- 无扣罚项 -->
                             </div>
-                            <div class="commission-item">
-                                <span>扣罚</span>
-                                <div class="input-with-unit">
-                                    <input type="number" class="commission-input commission-deduction-input" value="20.00">
-                                    <span>元</span>
-                                </div>
-                            </div>
-                            <div class="commission-item">
-                                <span>扣罚原因</span>
-                                <input type="text" class="reason-input" value="报告提交超时">
+                            <div class="add-deduction-wrapper">
+                                <button type="button" class="btn btn-secondary btn-sm add-deduction-btn">+ 添加扣罚项</button>
                             </div>
                             <div class="task-actions">
-                                <a href="#" class="btn btn-danger btn-sm">退回此项</a>
-                                <a href="#" class="btn btn-success btn-sm">通过此项</a>
+                                <span class="status-badge status-success">已通过</span>
                             </div>
+                        </div>
+
+                        <!-- 任务审核 2: 有扣罚, 可动态增删 -->
+                        <div class="audit-task-block">
+                            <h4><span>任务: 车物定损</span><span>陈浩</span></h4>
+                            <div class="deductions-list">
+                                <div class="deduction-item">
+                                    <input type="text" class="reason-input" placeholder="扣罚原因" value="报告提交超时">
+                                    <div class="input-with-unit">
+                                        <input type="number" class="commission-input commission-deduction-input" value="20.00">
+                                        <span>元</span>
+                                    </div>
+                                    <button type="button" class="remove-deduction-btn">&times;</button>
+                                </div>
+                            </div>
+                            <div class="add-deduction-wrapper">
+                                <button type="button" class="btn btn-secondary btn-sm add-deduction-btn">+ 添加扣罚项</button>
+                            </div>
+                            <div class="form-item col-span-full"><label>备注</label><textarea class="form-textarea" placeholder="填写备注..."></textarea></div>
+                            <div class="task-actions"><a href="#" class="btn btn-danger btn-sm">退回此项</a><a href="#" class="btn btn-success btn-sm">通过此项</a></div>
                         </div>
 
                         <!-- 最终汇总 -->
                         <div class="final-summary">
-                            <div class="form-item">
-                                <div class="commission-item">
-                                    <span><strong>佣金合计</strong></span>
-                                    <span><strong><span id="total-commission-display">180.00</span> 元</strong></span>
-                                </div>
-                            </div>
-                            <div class="form-item">
-                                <label for="audit-notes">案件总体意见</label>
-                                <textarea id="audit-notes" class="form-textarea" placeholder="若有需要，可填写对整个案件的说明..."></textarea>
-                            </div>
-                            <div style="margin-top: 20px;">
-                                <a href="finance_settlement.html" class="btn btn-success" style="width:100%; text-align:center;" id="complete-audit-btn">完成案件审核</a>
-                            </div>
+                            <div class="form-item"><div class="commission-item"><span><strong>佣金合计</strong></span><span><strong><span id="total-commission-display">230.00</span> 元</strong></span></div></div>
+                            <div class="form-item"><label for="audit-notes">案件总体意见</label><textarea id="audit-notes" class="form-textarea" placeholder="若有需要，可填写对整个案件的说明...">资料齐全，保险系统已通过。</textarea></div>
+                            <div style="margin-top: 20px;"><a href="finance_settlement.html" class="btn btn-success" style="width:100%; text-align:center;" id="complete-audit-btn">完成案件审核</a></div>
                         </div>
                     </div>
+                    <!-- END: 修改后的审核与结算面板 -->
                 </aside>
             </div>
         </main>
     </div>
 </div>
 <script src="demo_helper.js"></script>
+<!-- START: 修改后的JS逻辑 -->
 <script>
     document.addEventListener('DOMContentLoaded', function() {
         const settlementCard = document.getElementById('settlement-card');
         const totalDisplay = document.getElementById('total-commission-display');
         const completeAuditBtn = document.getElementById('complete-audit-btn');
+        const checklist = document.getElementById('review-checklist');
+
+        // Logic for approve/reject buttons in the checklist
+        checklist.addEventListener('click', function(e) {
+            const item = e.target.closest('.review-item');
+            if (!item) return;
+
+            if (e.target.classList.contains('approve-btn')) {
+                item.classList.remove('rejected');
+                item.classList.add('approved');
+            } else if (e.target.classList.contains('reject-btn')) {
+                item.classList.remove('approved');
+                item.classList.add('rejected');
+                const reasonBox = item.querySelector('.rejection-reason-box');
+                if (reasonBox) {
+                    reasonBox.querySelector('textarea').focus();
+                }
+            }
+        });
 
         function calculateCommission() {
-            let total = 0;
+            let grandTotal = 0;
             const auditBlocks = settlementCard.querySelectorAll('.audit-task-block');
+
             auditBlocks.forEach(block => {
-                const base = parseFloat(block.querySelector('.commission-base-input').value) || 0;
-                const deduction = parseFloat(block.querySelector('.commission-deduction-input').value) || 0;
-                total += (base - deduction);
+                const baseCommissionEl = block.querySelector('.commission-item strong');
+                // Extract number from text like "150.00 元"
+                const baseCommission = parseFloat(baseCommissionEl.textContent) || 0;
+
+                let totalDeductions = 0;
+                const deductionInputs = block.querySelectorAll('.commission-deduction-input');
+                deductionInputs.forEach(input => {
+                    totalDeductions += parseFloat(input.value) || 0;
+                });
+
+                grandTotal += (baseCommission - totalDeductions);
             });
-            const formattedTotal = total.toFixed(2);
+
+            const formattedTotal = grandTotal.toFixed(2);
             totalDisplay.textContent = formattedTotal;
         }
 
+        // Main event listener for the settlement card for adding/removing deductions
+        settlementCard.addEventListener('click', function(e) {
+            // Add a new deduction item
+            if (e.target.classList.contains('add-deduction-btn')) {
+                const deductionsList = e.target.closest('.audit-task-block').querySelector('.deductions-list');
+                const newDeductionItem = document.createElement('div');
+                newDeductionItem.className = 'deduction-item';
+                newDeductionItem.innerHTML = `
+                    <input type="text" class="reason-input" placeholder="扣罚原因">
+                    <div class="input-with-unit">
+                        <input type="number" class="commission-input commission-deduction-input" value="0.00">
+                        <span>元</span>
+                    </div>
+                    <button type="button" class="remove-deduction-btn">&times;</button>
+                `;
+                deductionsList.appendChild(newDeductionItem);
+            }
+
+            // Remove a deduction item
+            if (e.target.classList.contains('remove-deduction-btn')) {
+                e.target.closest('.deduction-item').remove();
+                calculateCommission(); // Recalculate after removing
+            }
+        });
+
+        // Recalculate when any commission amount is changed
         settlementCard.addEventListener('input', function(event) {
-            if (event.target.classList.contains('commission-input')) {
+            if (event.target.classList.contains('commission-input') || event.target.classList.contains('reason-input')) {
                 calculateCommission();
             }
         });
@@ -231,8 +381,10 @@
             }, 2000);
         });
 
+        // Initial calculation on page load
         calculateCommission();
     });
 </script>
+<!-- END: 修改后的JS逻辑 -->
 </body>
 </html>

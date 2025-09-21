@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>人员信息 - 穗源保险公估一体化业务管理平台</title>
+    <link rel="stylesheet" href="style.css">
+    <style>
+        .detail-section h4 { font-size: 16px; margin-bottom: 15px; border-left: 4px solid var(--primary-color); padding-left: 10px; }
+        .detail-item, .form-item { margin-bottom: 15px; }
+        .detail-item .label, .form-item label { width: 120px; color: var(--text-color-secondary); flex-shrink: 0; display: block; margin-bottom: 5px; font-weight: 500;}
+        .detail-item .value { font-weight: 500; }
+        .detail-item .value a { color: var(--primary-color); text-decoration: underline; }
+        .approval-actions { padding-top: 20px; margin-top: 20px; border-top: 1px solid var(--border-color-base); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px; }
+        .region-assignment, .action-buttons { display: flex; align-items: center; gap: 10px; }
+        .file-upload-area { border: 1px dashed var(--border-color-base); border-radius: 4px; padding: 15px; text-align: center; }
+        .file-upload-area .icon { font-size: 28px; }
+        .file-upload-area .text { font-size: 12px; }
+        .file-name-display { font-size: 12px; color: var(--success-color); margin-top: 5px; }
+    </style>
+</head>
+<body>
+<div class="app-container">
+    <aside class="sidebar">
+        <div class="sidebar-header">穗源保险公估</div>
+        <ul class="sidebar-nav">
+            <li class="sidebar-nav-item active"><a href="ops_surveyor_management.html">查勘员管理</a></li>
+        </ul>
+    </aside>
+    <div class="main-wrapper">
+        <header class="header">
+            <div class="header-left"><button id="hamburger-btn" class="hamburger-btn">☰</button></div>
+            <div class="user-profile"><div class="avatar" style="background-color: #909399;">李</div><span>李四 (运营专员)</span></div>
+        </header>
+        <main class="main-content">
+            <h1 id="page-title" class="page-title">人员信息</h1>
+            <div class="card">
+                <div class="card-header"><span id="card-title">人员详情</span></div>
+                <div id="detail-content" style="padding-top: 20px;">
+                    <!-- JS将在此处动态生成内容 -->
+                    <p>正在加载信息...</p>
+                </div>
+                <div id="action-footer" class="approval-actions">
+                    <!-- JS将在此处动态生成操作按钮 -->
+                </div>
+            </div>
+        </main>
+    </div>
+</div>
+
+<script src="demo_helper.js"></script>
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // --- 模拟数据库 ---
+        const MOCK_DATA = {
+            'svy001': { name: '陈浩', phone: '138****1234', region: '广州-天河区', status: '在职', bankCard: '6228 **** **** 1234', registered: '2023-10-15 09:00' },
+            'svy002': { name: '刘洋', phone: '139****5678', region: '广州-白云区', status: '在职', bankCard: '6222 **** **** 5678', registered: '2023-11-01 14:20' },
+            'svy003': { name: '吴静', phone: '137****8899', region: '广州-番禺区', status: '在职', bankCard: '6217 **** **** 8899', registered: '2023-11-20 11:30' },
+            'svy004': { name: '张三', phone: '135****4321', region: '深圳-福田区', status: '离职', bankCard: '6225 **** **** 4321', registered: '2024-01-05 16:00' },
+            'svy005': { name: '王五', phone: '136****1111', region: '待分配', status: '申请中', bankCard: '6212 **** **** 1111', registered: '2024-05-28 10:30' }
+        };
+        const REGION_OPTIONS = ["广州-天河区", "广州-白云区", "广州-番禺区", "深圳-福田区", "佛山-顺德区"];
+
+        // --- DOM 元素 ---
+        const pageTitle = document.getElementById('page-title');
+        const cardTitle = document.getElementById('card-title');
+        const detailContent = document.getElementById('detail-content');
+        const actionFooter = document.getElementById('action-footer');
+
+        // --- 渲染函数 ---
+        function renderContent(mode, user) {
+            const isEditable = mode === 'edit';
+            const isView = mode === 'view';
+
+            let regionSelector = `<input type="text" value="${user.region}" disabled>`;
+            if (isEditable) {
+                regionSelector = `<select id="region-select">${REGION_OPTIONS.map(r => `<option value="${r}" ${r === user.region ? 'selected' : ''}>${r}</option>`).join('')}</select>`;
+            }
+
+            // --- START: 新增状态选择器逻辑 ---
+            let statusSelector = `<input type="text" value="${user.status}" disabled>`;
+            if (isEditable) {
+                statusSelector = `
+                    <select id="status-select">
+                        <option value="在职" ${user.status === '在职' ? 'selected' : ''}>在职</option>
+                        <option value="离职" ${user.status === '离职' ? 'selected' : ''}>离职</option>
+                    </select>
+                `;
+            }
+            // --- END: 新增状态选择器逻辑 ---
+
+            detailContent.innerHTML = `
+            <div class="detail-section"><h4>基本信息</h4></div>
+            <div class="form-item"><label>姓名</label><input type="text" value="${user.name}" disabled></div>
+            <div class="form-item"><label>手机号</label><input type="text" value="${user.phone}" disabled></div>
+            <div class="form-item"><label>注册时间</label><input type="text" value="${user.registered}" disabled></div>
+            <div class="form-item"><label>所属区域</label>${regionSelector}</div>
+            <!-- START: 增加状态显示 -->
+            <div class="form-item"><label>当前状态</label>${statusSelector}</div>
+            <!-- END: 增加状态显示 -->
+
+            <div class="detail-section"><h4>资料附件</h4></div>
+            <div class="detail-item"><span class="label">身份证:</span> <span class="value"><a href="#">人像面.jpg</a> / <a href="#">国徽面.jpg</a></span></div>
+            <div class="detail-item"><span class="label">合同文件:</span> <span class="value"><a href="#">查看合同.pdf</a></span></div>
+
+            <div class="detail-section"><h4>结算信息</h4></div>
+            <div class="form-item"><label>银行卡号</label><input type="text" value="${user.bankCard}" ${isView ? 'disabled' : ''}></div>
+            <!-- START: 增加银行卡照片显示 -->
+            <div class="detail-item"><span class="label">银行卡照片:</span> <span class="value"><a href="#">查看照片.jpg</a></span></div>
+            <!-- END: 增加银行卡照片显示 -->
+        `;
+        }
+
+        function renderActions(mode, user) {
+            let footerHTML = '';
+            switch(mode) {
+                case 'audit':
+                    footerHTML = `
+                    <div class="region-assignment">
+                        <label for="region-select-audit">分配区域:</label>
+                        <select id="region-select-audit" style="min-width: 180px;">
+                            <option value="">-- 请选择 --</option>
+                            ${REGION_OPTIONS.map(r => `<option value="${r}">${r}</option>`).join('')}
+                        </select>
+                    </div>
+                    <div class="action-buttons">
+                        <button type="button" id="reject-btn" class="btn btn-danger">驳回</button>
+                        <button type="button" id="approve-btn" class="btn btn-success">批准</button>
+                    </div>`;
+                    break;
+                case 'edit':
+                    footerHTML = `<div class="action-buttons"><a href="ops_surveyor_management.html" class="btn btn-secondary">取消</a><button id="save-btn" class="btn btn-primary">保存修改</button></div>`;
+                    break;
+                case 'view':
+                default:
+                    footerHTML = `<div class="action-buttons" style="width:100%; justify-content:flex-end;"><a href="ops_surveyor_management.html" class="btn btn-secondary">返回列表</a></div>`;
+                    break;
+            }
+            actionFooter.innerHTML = footerHTML;
+        }
+
+        // --- 主逻辑 ---
+        function initializePage() {
+            const params = new URLSearchParams(window.location.search);
+            const mode = params.get('mode') || 'view'; // 默认是查看模式
+            const userId = params.get('id');
+            const user = MOCK_DATA[userId];
+
+            if (!user) {
+                detailContent.innerHTML = '<p style="color:red;">错误：未找到指定的人员信息。</p>';
+                return;
+            }
+
+            // 更新标题
+            const modeTitles = {
+                'audit': '查勘员入驻审核', 'view': '查看人员详情', 'edit': '修改人员信息'
+            };
+            pageTitle.textContent = modeTitles[mode];
+            cardTitle.textContent = `人员: ${user.name}`;
+
+            // 渲染内容和操作按钮
+            renderContent(mode, user);
+            renderActions(mode, user);
+        }
+
+        // --- 事件委托处理按钮点击 ---
+        actionFooter.addEventListener('click', function(e) {
+            const targetId = e.target.id;
+            const surveyorName = MOCK_DATA[new URLSearchParams(window.location.search).get('id')]?.name;
+
+            if (targetId === 'approve-btn') {
+                const region = document.getElementById('region-select-audit').value;
+                if (!region) {
+                    showModal('提示', '请先分配区域！', 'warning');
+                    return;
+                }
+                showModal('确认批准', `确定要批准 <strong>${surveyorName}</strong> 并分配至 <strong>${region}</strong> 吗？`, 'info');
+                // 此处省略后续模拟跳转逻辑，可按需添加
+            } else if (targetId === 'reject-btn') {
+                showModal('确认驳回', `确定要驳回 <strong>${surveyorName}</strong> 的申请吗？`, 'warning');
+            } else if (targetId === 'save-btn') {
+                showModal('保存成功', `<strong>${surveyorName}</strong> 的信息已更新。`, 'success');
+            }
+        });
+
+        initializePage();
+    });
+</script>
+</body>
+</html>

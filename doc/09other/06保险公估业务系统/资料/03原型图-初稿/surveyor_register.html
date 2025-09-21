@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>查勘员注册 - 穗源保险公估一体化业务管理平台</title>
+    <link rel="stylesheet" href="style.css">
+    <!-- 页面专属样式，用于实现居中布局 -->
+    <style>
+        body {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            background-color: var(--bg-color-base);
+            padding: 20px 0; /* 为长表单增加垂直内边距 */
+        }
+        .register-container {
+            width: 100%;
+            max-width: 420px;
+            margin: 20px;
+        }
+        .register-container .card-header {
+            justify-content: center;
+            font-size: 20px;
+            background-color: transparent; /* 移除头部背景色 */
+        }
+        .login-link {
+            text-align: center;
+            margin-top: 20px;
+            font-size: 14px;
+            color: var(--text-color-secondary);
+        }
+        /* --- 文件上传区域样式 --- */
+        .file-upload-area {
+            border: 1px dashed var(--border-color-base);
+            border-radius: var(--border-radius-base);
+            padding: 20px;
+            text-align: center;
+            cursor: pointer;
+            transition: border-color 0.2s;
+            position: relative; /* 为内部标签定位 */
+        }
+        .file-upload-area:hover {
+            border-color: var(--primary-color);
+        }
+        .upload-label .icon {
+            font-size: 36px;
+            color: var(--text-color-placeholder);
+            display: block;
+            line-height: 1;
+        }
+        .upload-label .text {
+            font-size: 13px;
+            color: var(--text-color-secondary);
+            margin-top: 8px;
+            display: block;
+        }
+        .file-name-display {
+            display: block;
+            margin-top: 10px;
+            font-size: 13px;
+            color: var(--success-color);
+            font-weight: 500;
+            /* 确保长文件名不会破坏布局 */
+            word-break: break-all;
+        }
+        /* --- 新增: 用于身份证上传的两列网格布局 --- */
+        .id-upload-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px; /* 网格间距 */
+        }
+        /* 调整网格内上传区域的样式，使其更紧凑 */
+        .id-upload-grid .file-upload-area {
+            padding: 15px;
+        }
+        .id-upload-grid .upload-label .icon {
+            font-size: 28px;
+        }
+        .id-upload-grid .upload-label .text {
+            font-size: 12px;
+        }
+        .id-upload-grid .file-name-display {
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="register-container">
+    <div class="card">
+        <div class="card-header">
+            <span>查勘员注册</span>
+        </div>
+        <form id="register-form" class="form-grid" style="grid-template-columns: 1fr; gap: 20px; padding-top: 20px;">
+            <div class="form-item">
+                <label for="phone">手机号</label>
+                <input type="tel" id="phone" name="phone" placeholder="请输入您的手机号" required autocomplete="tel">
+            </div>
+            <div class="form-item">
+                <label for="sms-code">短信验证码</label>
+                <div class="input-with-button">
+                    <input type="text" id="sms-code" name="sms-code" placeholder="请输入6位验证码" required>
+                    <button type="button" id="get-code-btn" class="btn btn-secondary">获取验证码</button>
+                </div>
+            </div>
+            <div class="form-item">
+                <label for="password">设置密码</label>
+                <input type="password" id="password" name="password" placeholder="请输入密码" required autocomplete="new-password">
+            </div>
+            <div class="form-item">
+                <label for="confirm-password">确认密码</label>
+                <input type="password" id="confirm-password" name="confirm-password" placeholder="请再次输入密码" required autocomplete="new-password">
+            </div>
+
+            <!-- 合同上传模块 -->
+            <div class="form-item">
+                <label for="contract-file">合同附件上传 (PDF/JPG)</label>
+                <div class="file-upload-area">
+                    <input type="file" id="contract-file" name="contract-file" hidden accept=".pdf,.jpg,.jpeg,.png">
+                    <label for="contract-file" class="upload-label">
+                        <span class="icon">+</span>
+                        <span class="text">点击上传合同文件</span>
+                    </label>
+                    <span class="file-name-display"></span>
+                </div>
+            </div>
+
+            <!-- 新增: 身份证上传模块 -->
+            <div class="form-item">
+                <label>身份证照片 (JPG/PNG)</label>
+                <div class="id-upload-grid">
+                    <!-- 身份证人像面 -->
+                    <div class="file-upload-area">
+                        <input type="file" id="id-card-front" name="id-card-front" hidden accept=".jpg,.jpeg,.png">
+                        <label for="id-card-front" class="upload-label">
+                            <span class="icon">+</span>
+                            <span class="text">上传人像面</span>
+                        </label>
+                        <span class="file-name-display"></span>
+                    </div>
+                    <!-- 身份证国徽面 -->
+                    <div class="file-upload-area">
+                        <input type="file" id="id-card-back" name="id-card-back" hidden accept=".jpg,.jpeg,.png">
+                        <label for="id-card-back" class="upload-label">
+                            <span class="icon">+</span>
+                            <span class="text">上传国徽面</span>
+                        </label>
+                        <span class="file-name-display"></span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 新增: 银行卡信息模块 -->
+            <div class="form-item">
+                <label for="bank-card-number">银行卡号</label>
+                <input type="text" id="bank-card-number" name="bank-card-number" placeholder="请输入用于结算的银行卡号" required>
+            </div>
+            <div class="form-item">
+                <label for="bank-card-photo">银行卡照片 (JPG/PNG)</label>
+                <div class="file-upload-area">
+                    <input type="file" id="bank-card-photo" name="bank-card-photo" hidden accept=".jpg,.jpeg,.png">
+                    <label for="bank-card-photo" class="upload-label">
+                        <span class="icon">+</span>
+                        <span class="text">点击上传银行卡照片</span>
+                    </label>
+                    <span class="file-name-display"></span>
+                </div>
+            </div>
+
+            <div class="form-actions" style="border-top: none; padding-top: 10px; margin-top: 0;">
+                <button type="submit" class="btn btn-primary" style="width: 100%;">立即注册</button>
+            </div>
+        </form>
+        <p class="login-link">已有账号？ <a href="surveyor_task_list.html">立即登录</a></p>
+    </div>
+</div>
+
+<!-- 引入演示助手的JS，用于弹窗提示 -->
+<script src="demo_helper.js"></script>
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const getCodeBtn = document.getElementById('get-code-btn');
+        const registerForm = document.getElementById('register-form');
+        const phoneInput = document.getElementById('phone');
+
+        // 获取验证码按钮逻辑
+        getCodeBtn.addEventListener('click', function() {
+            const phoneRegex = /^1[3-9]\d{9}$/;
+            if (!phoneRegex.test(phoneInput.value)) {
+                showModal('提示', '请输入有效的11位手机号码。', 'warning');
+                return;
+            }
+
+            let countdown = 60;
+            this.disabled = true;
+            this.textContent = countdown + '秒后重试';
+
+            const timer = setInterval(() => {
+                countdown--;
+                if (countdown > 0) {
+                    this.textContent = countdown + '秒后重试';
+                } else {
+                    clearInterval(timer);
+                    this.disabled = false;
+                    this.textContent = '获取验证码';
+                }
+            }, 1000);
+            showModal('发送成功', '验证码已模拟发送至 ' + phoneInput.value, 'success');
+        });
+
+        // --- 更新: 文件上传处理逻辑 ---
+        /**
+         * 为文件上传输入框设置事件监听器
+         * @param {string} inputId - file input 元素的 ID
+         * @param {string} defaultText - 默认的提示文本
+         */
+        function setupFileUpload(inputId, defaultText) {
+            const fileInput = document.getElementById(inputId);
+            if (!fileInput) return;
+
+            // 找到与 input 关联的元素
+            const uploadArea = fileInput.parentElement;
+            const fileNameDisplay = uploadArea.querySelector('.file-name-display');
+            const uploadLabelText = uploadArea.querySelector('.upload-label .text');
+
+            fileInput.addEventListener('change', function() {
+                if (this.files && this.files.length > 0) {
+                    const fileName = this.files[0].name;
+                    fileNameDisplay.textContent = '已选: ' + fileName;
+                    uploadLabelText.textContent = '点击可重新上传';
+                } else {
+                    fileNameDisplay.textContent = '';
+                    uploadLabelText.textContent = defaultText;
+                }
+            });
+        }
+
+        // 初始化所有文件上传区域
+        setupFileUpload('contract-file', '点击上传合同文件');
+        setupFileUpload('id-card-front', '上传人像面');
+        setupFileUpload('id-card-back', '上传国徽面');
+        setupFileUpload('bank-card-photo', '点击上传银行卡照片');
+
+        // 表单提交逻辑
+        registerForm.addEventListener('submit', function(e) {
+            e.preventDefault(); // 阻止表单默认提交
+
+            const password = document.getElementById('password').value;
+            const confirmPassword = document.getElementById('confirm-password').value;
+
+            if (password !== confirmPassword) {
+                showModal('注册失败', '两次输入的密码不一致，请检查。', 'danger');
+                return;
+            }
+
+            showModal('提交成功', '您的查勘员注册申请已提交！<br>请等待运营专员审核，通过后即可登录接单。', 'success');
+
+            setTimeout(() => {
+                window.location.href = 'surveyor_task_list.html';
+            }, 2500);
+        });
+    });
+</script>
+
+</body>
+</html>

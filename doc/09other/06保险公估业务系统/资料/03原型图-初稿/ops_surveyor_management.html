@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>查勘员管理 - 穗源保险公估一体化业务管理平台</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="app-container">
+    <!-- 侧边导航栏 -->
+    <aside class="sidebar">
+        <div class="sidebar-header">穗源保险公估</div>
+        <ul class="sidebar-nav">
+            <li class="sidebar-nav-item active"><a href="ops_surveyor_management.html">查勘员管理</a></li>
+        </ul>
+    </aside>
+
+    <!-- 主内容区 -->
+    <div class="main-wrapper">
+        <!-- 顶部栏 -->
+        <header class="header">
+            <div class="header-left">
+                <button id="hamburger-btn" class="hamburger-btn">☰</button>
+            </div>
+            <div class="user-profile">
+                <div class="avatar" style="background-color: #909399;">李</div>
+                <span>李四 (运营专员)</span>
+            </div>
+        </header>
+
+        <!-- 页面内容 -->
+        <main class="main-content">
+            <h1 class="page-title">查勘员管理</h1>
+            <div class="card">
+                <div class="filter-bar">
+                    <!-- 筛选器内容未改变 -->
+                    <div class="filter-item">
+                        <label>所属区域:</label>
+                        <select>
+                            <option>全部</option>
+                            <option>广州-天河区</option>
+                        </select>
+                    </div>
+                    <div class="filter-item">
+                        <label>查勘员:</label>
+                        <input type="text" placeholder="输入姓名...">
+                    </div>
+                    <div class="filter-actions">
+                        <button class="btn btn-primary">查询</button>
+                    </div>
+                </div>
+            </div>
+            <div id="management-card" class="card">
+                <div class="card-header">
+                    <span>人员信息管理</span>
+                </div>
+                <div class="table-responsive-wrapper">
+                    <table id="surveyor-table">
+                        <thead>
+                        <tr>
+                            <th>查勘员</th><th>所属区域</th><th>状态</th>
+                            <th>操作</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        <!-- START: 修改链接并添加 data-id -->
+                        <tr data-id="svy005">
+                            <td>王五</td>
+                            <td>待分配</td>
+                            <td><span class="status-tag status-warning">申请中</span></td>
+                            <td class="action-links">
+                                <a href="ops_surveyor_approval.html?mode=audit&id=svy005" class="btn btn-primary btn-sm">审核</a>
+                            </td>
+                        </tr>
+                        <tr data-id="svy001">
+                            <td>陈浩</td>
+                            <td>广州-天河区</td>
+                            <td><span class="status-dot status-enabled"></span>在职</td>
+                            <td class="action-links">
+                                <a href="ops_surveyor_approval.html?mode=view&id=svy001" class="view-btn">查看</a>
+                                <a href="ops_surveyor_approval.html?mode=edit&id=svy001" class="edit-btn">修改</a>
+                            </td>
+                        </tr>
+                        <tr data-id="svy002">
+                            <td>刘洋</td>
+                            <td>广州-白云区</td>
+                            <td><span class="status-dot status-enabled"></span>在职</td>
+                            <td class="action-links">
+                                <a href="ops_surveyor_approval.html?mode=view&id=svy002" class="view-btn">查看</a>
+                                <a href="ops_surveyor_approval.html?mode=edit&id=svy002" class="edit-btn">修改</a>
+                            </td>
+                        </tr>
+                        <tr data-id="svy003">
+                            <td>吴静</td>
+                            <td>广州-番禺区</td>
+                            <td><span class="status-dot status-enabled"></span>在职</td>
+                            <td class="action-links">
+                                <a href="ops_surveyor_approval.html?mode=view&id=svy003" class="view-btn">查看</a>
+                                <a href="ops_surveyor_approval.html?mode=edit&id=svy003" class="edit-btn">修改</a>
+                            </td>
+                        </tr>
+                        <tr data-id="svy004">
+                            <td>张三</td>
+                            <td>深圳-福田区</td>
+                            <td><span class="status-dot status-disabled"></span>离职</td>
+                            <td class="action-links">
+                                <a href="ops_surveyor_approval.html?mode=view&id=svy004" class="view-btn">查看</a>
+                                <a href="ops_surveyor_approval.html?mode=edit&id=svy004" class="edit-btn">修改</a>
+                            </td>
+                        </tr>
+                        <!-- END: 修改链接并添加 data-id -->
+                        </tbody>
+                    </table>
+                </div>
+                <div class="card-footer">
+                    <nav class="pagination">
+                        <ul>
+                            <li class="disabled"><a href="#">&laquo;</a></li>
+                            <li class="active"><a href="#">1</a></li>
+                            <li><a href="#">&raquo;</a></li>
+                        </ul>
+                    </nav>
+                </div>
+            </div>
+        </main>
+    </div>
+</div>
+<script src="demo_helper.js"></script>
+<!-- 无需额外JS -->
+</body>
+</html>

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>任务查询 - 穗源保险公估一体化业务管理平台</title>
+    <title>案件管理 - 穗源保险公估一体化业务管理平台</title>
     <link rel="stylesheet" href="style.css">
     <!-- 新增: 超时预警样式 -->
     <style>
@@ -13,6 +13,16 @@
         .task-overdue .status-tag {
             font-weight: bold;
         }
+        /* 新增: 导入/导出按钮样式 */
+        .table-actions {
+            margin-bottom: 1rem;
+            display: flex;
+            gap: 10px;
+        }
+        .checkbox-cell {
+            width: 40px;
+            text-align: center;
+        }
     </style>
 </head>
 <body>
@@ -21,9 +31,7 @@
     <aside class="sidebar">
         <div class="sidebar-header">穗源保险公估</div>
         <ul class="sidebar-nav">
-            <li class="sidebar-nav-item"><a href="dispatcher_dispatch_center.html">派单中心</a></li>
-            <li class="sidebar-nav-item"><a href="dispatcher_case_entry.html">案件录入</a></li>
-            <li class="sidebar-nav-item active"><a href="dispatcher_task_query.html">任务查询</a></li>
+            <li class="sidebar-nav-item active"><a href="dispatcher_task_query.html">案件管理</a></li>
             <li class="sidebar-nav-item"><a href="dispatcher_schedule_management.html">排班管理</a></li>
         </ul>
     </aside>
@@ -43,17 +51,18 @@
 
         <!-- 页面内容 -->
         <main class="main-content">
-            <h1 class="page-title">任务查询</h1>
+            <h1 class="page-title">案件管理</h1>
             <div class="card">
                 <div class="filter-bar">
                     <div class="filter-item">
                         <label>案件状态:</label>
                         <select>
                             <option>全部</option>
-                            <option selected>进行中</option>
-                            <option>待派单</option>
+                            <option selected>待派单</option>
                             <option>待接受</option>
+                            <option>进行中</option>
                             <option>待审核</option>
+                            <option>审核通过</option>
                         </select>
                     </div>
                     <div class="filter-item">
@@ -78,44 +87,71 @@
             </div>
 
             <div class="card">
+                <!-- START: 修改后的操作按钮区域 -->
+                <div class="table-actions">
+                    <a href="dispatcher_case_entry.html" class="btn btn-primary">新增案件</a>
+                    <button class="btn btn-secondary" id="import-btn">导入案件</button>
+                    <input type="file" id="import-file-input" hidden accept=".xlsx">
+                    <a href="01调度录入模板.xlsx" download class="btn btn-secondary">下载模板</a>
+                    <button class="btn btn-success" id="export-btn" disabled>导出案件</button>
+                </div>
+                <!-- END: 修改后的操作按钮区域 -->
+
                 <div class="card-header"><span>案件实时状态</span></div>
                 <div class="table-responsive-wrapper">
                     <table>
                         <thead>
                         <tr>
+                            <!-- 新增: 复选框列 -->
+                            <th class="checkbox-cell"><input type="checkbox" id="select-all-checkbox"></th>
                             <th>案件编号</th><th>报案号</th><th>车牌号</th>
                             <th>当前处理人</th><th>当前状态</th><th>更新时间</th><th>操作</th>
                         </tr>
                         </thead>
                         <tbody>
                         <tr>
+                            <!-- 新增: 复选框 -->
+                            <td class="checkbox-cell"><input type="checkbox" class="row-checkbox"></td>
                             <td>SY-20240520-001</td><td>PABX...GZ00123</td><td>粤A·88888</td>
                             <td>赵磊 (品控)</td>
                             <td><span class="status-tag status-warning">待审核</span></td>
                             <td>2024-05-20 11:30:45</td>
-                            <td class="action-links"><a href="reviewer_case_audit.html">查看</a></td>
+                            <td class="action-links"><a href="dispatcher_case_entry.html">查看/修改</a></td>
                         </tr>
                         <!-- 修改: 增加 task-overdue 类并修改状态文本 -->
                         <tr class="task-overdue">
+                            <!-- 新增: 复选框 -->
+                            <td class="checkbox-cell"><input type="checkbox" class="row-checkbox"></td>
                             <td>SY-20240521-003</td><td>PICC...GZ00458</td><td>粤B·54321</td>
                             <td>陈浩 (查勘员)</td>
                             <td><span class="status-tag status-danger">待接受 (超时)</span></td>
                             <td>2024-05-21 09:35:12</td>
-                            <td class="action-links"><a href="#">改派</a></td>
+                            <!-- START: 修改后的操作链接 -->
+                            <td class="action-links">
+                                <a href="dispatcher_case_entry.html">查看/修改</a>
+                                <button id="reassign-alert-btn" class="btn btn-warning" style="padding: 2px 8px; font-size: 12px; margin-left: 4px; vertical-align: middle;">声音提醒</button>
+                            </td>
+                            <!-- END: 修改后的操作链接 -->
                         </tr>
                         <tr>
+                            <!-- 新增: 复选框 -->
+                            <td class="checkbox-cell"><input type="checkbox" class="row-checkbox"></td>
                             <td>SY-20240522-008</td><td>TPY...SH00111</td><td>沪A·C5E67</td>
                             <td>刘洋 (查勘员)</td>
                             <td><span class="status-tag status-primary">进行中 (已到场)</span></td>
                             <td>2024-05-22 10:15:30</td>
-                            <td class="action-links"><a href="#">查看</a></td>
+                            <td class="action-links"><a href="dispatcher_case_entry.html">查看/修改</a></td>
                         </tr>
                         <tr>
+                            <!-- 新增: 复选框 -->
+                            <td class="checkbox-cell"><input type="checkbox" class="row-checkbox"></td>
                             <td>SY-20240522-009</td><td>PABX...BJ00999</td><td>京A·88B88</td>
                             <td>-</td>
                             <td><span class="status-tag status-info">待派单</span></td>
                             <td>2024-05-22 11:05:00</td>
-                            <td class="action-links"><a href="dispatcher_dispatch_center.html">去派单</a></td>
+                            <!-- START: 修改后的操作链接 -->
+                            <td class="action-links"><a href="dispatcher_case_entry.html">查看/修改</a></td>
+                            <!-- END: 修改后的操作链接 -->
                         </tr>
                         </tbody>
                     </table>
@@ -135,5 +171,113 @@
     </div>
 </div>
 <script src="demo_helper.js"></script>
+<!-- 新增: 导入/导出交互脚本 -->
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const importBtn = document.getElementById('import-btn');
+        const importFileInput = document.getElementById('import-file-input');
+        const exportBtn = document.getElementById('export-btn');
+        const selectAllCheckbox = document.getElementById('select-all-checkbox');
+        const rowCheckboxes = document.querySelectorAll('.row-checkbox');
+
+        // 导入按钮点击事件
+        importBtn.addEventListener('click', () => {
+            importFileInput.click();
+        });
+
+        // 文件选择后的事件
+        importFileInput.addEventListener('change', () => {
+            if (importFileInput.files.length > 0) {
+                const fileName = importFileInput.files[0].name;
+                // --- MODIFICATION START ---
+                // 原来: alert(`已选择文件: ${fileName}\n即将开始模拟导入...`);
+                // 修改后:
+                showModal('导入提示', `已选择文件: <strong>${fileName}</strong><br>即将开始模拟导入...`, 'info');
+                // --- MODIFICATION END ---
+
+                // 在实际应用中，这里会是上传文件的逻辑
+                // 清空文件输入，以便下次可以选择相同的文件
+                importFileInput.value = '';
+            }
+        });
+
+        // 导出按钮点击事件
+        exportBtn.addEventListener('click', () => {
+            // 检查是否有选中的行
+            const isAnyRowSelected = Array.from(rowCheckboxes).some(cb => cb.checked);
+            if (!isAnyRowSelected) {
+                // --- MODIFICATION START ---
+                // 原来: alert('请至少选择一个案件进行导出。');
+                // 修改后:
+                showModal('操作提示', '请至少选择一个案件进行导出。', 'warning');
+                // --- MODIFICATION END ---
+                return;
+            }
+
+            // 创建一个临时的 a 标签来触发下载
+            const link = document.createElement('a');
+            link.href = '02模拟调度录出.xlsx';
+            link.download = '02模拟调度录出.xlsx';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+
+            // --- MODIFICATION START ---
+            // 新增: 导出成功提示
+            showModal('导出成功', '选中的案件已成功导出。', 'success');
+            // --- MODIFICATION END ---
+        });
+
+        // 更新导出按钮状态
+        function updateExportButtonState() {
+            const isAnyRowSelected = Array.from(rowCheckboxes).some(cb => cb.checked);
+            exportBtn.disabled = !isAnyRowSelected;
+        }
+
+        // 全选/取消全选
+        selectAllCheckbox.addEventListener('change', () => {
+            rowCheckboxes.forEach(checkbox => {
+                checkbox.checked = selectAllCheckbox.checked;
+            });
+            updateExportButtonState();
+        });
+
+        // 单行复选框点击事件
+        rowCheckboxes.forEach(checkbox => {
+            checkbox.addEventListener('change', () => {
+                const allChecked = Array.from(rowCheckboxes).every(cb => cb.checked);
+                const someChecked = Array.from(rowCheckboxes).some(cb => cb.checked);
+
+                if (allChecked) {
+                    selectAllCheckbox.checked = true;
+                    selectAllCheckbox.indeterminate = false;
+                } else if (someChecked) {
+                    selectAllCheckbox.checked = false;
+                    selectAllCheckbox.indeterminate = true;
+                } else {
+                    selectAllCheckbox.checked = false;
+                    selectAllCheckbox.indeterminate = false;
+                }
+                updateExportButtonState();
+            });
+        });
+
+        // 新增: 声音提醒功能
+        const reassignAlertBtn = document.getElementById('reassign-alert-btn');
+        const alertSound = document.getElementById('alert-sound');
+
+        if (reassignAlertBtn && alertSound) {
+            reassignAlertBtn.addEventListener('click', () => {
+                // Play the sound. Modern browsers require user interaction for this, which the click provides.
+                alertSound.play().catch(error => {
+                    console.error("Audio play failed:", error);
+                    alert("无法播放声音，浏览器可能阻止了自动播放。");
+                });
+            });
+        }
+    });
+</script>
+<!-- 新增: 用于声音提醒的音频元素 -->
+<audio id="alert-sound" src="y2080.wav" preload="auto"></audio>
 </body>
 </html>

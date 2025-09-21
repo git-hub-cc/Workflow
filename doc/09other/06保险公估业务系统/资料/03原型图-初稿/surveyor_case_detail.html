@@ -26,9 +26,6 @@
         <div class="sidebar-header">穗源保险公估</div>
         <ul class="sidebar-nav">
             <li class="sidebar-nav-item active"><a href="surveyor_task_list.html">我的任务</a></li>
-            <li class="sidebar-nav-item"><a href="surveyor_case_history.html">历史案件</a></li>
-            <li class="sidebar-nav-item"><a href="surveyor_commission.html">我的佣金</a></li>
-            <li class="sidebar-nav-item"><a href="surveyor_withdrawal_history.html">提现记录</a></li>
         </ul>
     </aside>
 
@@ -57,27 +54,102 @@
                     <p><strong>出险时间:</strong> 2024-05-20 09:15</p>
                     <p class="col-span-full"><strong>出险地点:</strong> 广州市天河区黄埔大道西668号 赛马场内</p>
                 </div>
-                <div class="status-updater">
-                    <button class="btn-status">接受任务</button>
-                    <button class="btn-status">出发</button>
-                    <button class="btn-status active">已到场</button>
-                    <button class="btn-status">查勘中</button>
-                    <button class="btn-status">定损中</button>
-                    <button class="btn-status">完成</button>
-                </div>
             </div>
 
+            <!-- START: 结构化的资料上传清单 (修改后) -->
             <div class="card">
-                <div class="card-header"><span>资料上传</span></div>
-                <div class="upload-grid">
-                    <div class="upload-item"><div class="icon">+</div><div class="text">现场照片</div></div>
-                    <div class="upload-item"><div class="icon">+</div><div class="text">损毁细节</div></div>
-                    <div class="upload-item"><div class="icon">+</div><div class="text">驾驶证/行驶证</div></div>
-                    <div class="upload-item"><div class="icon">+</div><div class="text">身份证/银行卡</div></div>
-                    <div class="upload-item"><div class="icon">+</div><div class="text">事故认定书</div></div>
-                    <div class="upload-item"><div class="icon">+</div><div class="text">其他资料</div></div>
+                <div class="card-header">
+                    <span>资料上传清单 (已完成 <span id="upload-progress">2/6</span>)</span>
+                </div>
+                <div id="upload-checklist" class="upload-checklist">
+                    <!-- 1. 大环境照 -->
+                    <div class="upload-group">
+                        <div class="upload-group-header">1. 大环境照</div>
+                        <div class="upload-item" data-group-id="env-photos">
+                            <div class="upload-item-info">
+                                <div class="title">事故现场整体环境<span class="required-star">*</span></div>
+                                <div class="desc">至少2张，包含道路标志、事故车辆相对位置。</div>
+                            </div>
+                            <div class="upload-item-action">
+                                <label class="btn btn-primary btn-sm upload-btn"><span>上传照片</span><input type="file" multiple accept="image/*"></label>
+                            </div>
+                            <div class="upload-item-preview">
+                                <div class="preview-thumbnail"><span>🖼️ 大环境-前.jpg</span><button class="remove-preview-btn">&times;</button></div>
+                                <div class="preview-thumbnail"><span>🖼️ 大环境-后.jpg</span><button class="remove-preview-btn">&times;</button></div>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- 2. 事故车辆外观照 -->
+                    <div class="upload-group">
+                        <div class="upload-group-header">2. 事故车辆外观照</div>
+                        <div class="upload-item" data-group-id="car-photos">
+                            <div class="upload-item-info">
+                                <div class="title">标的车 & 三者车四角照<span class="required-star">*</span></div>
+                                <div class="desc">每辆车至少4张，清晰展示车牌。</div>
+                            </div>
+                            <div class="upload-item-action">
+                                <label class="btn btn-primary btn-sm upload-btn"><span>上传照片</span><input type="file" multiple accept="image/*"></label>
+                            </div>
+                            <div class="upload-item-preview"></div>
+                        </div>
+                    </div>
+                    <!-- 5. 受损部位递进照 -->
+                    <div class="upload-group">
+                        <div class="upload-group-header">5. 受损部位递进照</div>
+                        <div class="upload-item" data-group-id="damage-photos">
+                            <div class="upload-item-info">
+                                <div class="title">每处受损部位<span class="required-star">*</span></div>
+                                <div class="desc">远景、近景、特写各一张，清晰反映受损程度。</div>
+                            </div>
+                            <div class="upload-item-action">
+                                <label class="btn btn-primary btn-sm upload-btn"><span>上传照片</span><input type="file" multiple accept="image/*"></label>
+                            </div>
+                            <div class="upload-item-preview"></div>
+                        </div>
+                    </div>
+                    <!-- 6. 证件资料照 -->
+                    <div class="upload-group">
+                        <div class="upload-group-header">6. 证件资料照</div>
+                        <div class="upload-item" data-group-id="docs-photos">
+                            <div class="upload-item-info">
+                                <div class="title">行驶证 & 驾驶证<span class="required-star">*</span></div>
+                                <div class="desc">确保证件信息清晰可见。</div>
+                            </div>
+                            <div class="upload-item-action">
+                                <label class="btn btn-primary btn-sm upload-btn"><span>上传资料</span><input type="file" multiple accept="image/*,.pdf"></label>
+                            </div>
+                            <div class="upload-item-preview">
+                                <div class="preview-thumbnail"><span>📄 驾驶证.pdf</span><button class="remove-preview-btn">&times;</button></div>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- 7. 必拍项目 -->
+                    <div class="upload-group">
+                        <div class="upload-group-header">7. 必拍项目</div>
+                        <div class="upload-item" data-group-id="person-car-photo">
+                            <div class="upload-item-info">
+                                <div class="title">人车合影<span class="required-star">*</span></div>
+                                <div class="desc">驾驶员与车辆受损部位的合影。</div>
+                            </div>
+                            <div class="upload-item-action">
+                                <label class="btn btn-primary btn-sm upload-btn"><span>上传照片</span><input type="file" accept="image/*"></label>
+                            </div>
+                            <div class="upload-item-preview"></div>
+                        </div>
+                        <div class="upload-item" data-group-id="vin-photo">
+                            <div class="upload-item-info">
+                                <div class="title">车架号 (VIN)<span class="required-star">*</span></div>
+                                <div class="desc">拍摄车辆铭牌或挡风玻璃下的VIN码。</div>
+                            </div>
+                            <div class="upload-item-action">
+                                <label class="btn btn-primary btn-sm upload-btn"><span>上传照片</span><input type="file" accept="image/*"></label>
+                            </div>
+                            <div class="upload-item-preview"></div>
+                        </div>
+                    </div>
                 </div>
             </div>
+            <!-- END: 结构化的资料上传清单 -->
 
             <div class="card">
                 <div class="card-header"><span>定损清单</span></div>
@@ -138,6 +210,7 @@
 <script src="demo_helper.js"></script>
 <script>
     document.addEventListener('DOMContentLoaded', function() {
+        // --- START: 零件选择器逻辑 (无变化) ---
         const partsData = [
             "前保险杠总成", "后保险杠总成", "左前大灯总成", "右前大灯总成",
             "左前翼子板", "右前翼子板", "引擎盖", "前挡风玻璃", "后挡风玻璃",
@@ -145,7 +218,6 @@
             "水箱框架", "水箱", "冷凝器", "电子扇", "左前轮毂", "右前轮胎",
             "工时-喷漆(金属漆)", "工时-喷漆(珍珠漆)", "工时-钣金"
         ];
-
         const lossTableBody = document.querySelector('#loss-table tbody');
         const addRowBtn = document.getElementById('add-row-btn');
         const modal = document.getElementById('parts-modal');
@@ -154,7 +226,6 @@
         const partsList = document.getElementById('parts-list');
         const confirmBtn = document.getElementById('confirm-part-btn');
         const submitBtn = document.getElementById('submit-audit-btn');
-
         let activeCell = null;
 
         function populatePartsList(filter = '') {
@@ -167,20 +238,17 @@
                 partsList.appendChild(li);
             });
         }
-
         function openModal(cell) {
             activeCell = cell;
             populatePartsList();
             modal.style.display = 'block';
             searchInput.focus();
         }
-
         function closeModal() {
             modal.style.display = 'none';
             searchInput.value = '';
             activeCell = null;
         }
-
         function addRow() {
             const newRow = document.createElement('tr');
             newRow.innerHTML = `
@@ -192,52 +260,66 @@
             lossTableBody.appendChild(newRow);
         }
 
-        lossTableBody.addEventListener('dblclick', function(e) {
-            const cell = e.target.closest('td.part-selector');
-            if (cell) openModal(cell);
-        });
-
-        lossTableBody.addEventListener('click', function(e) {
-            if (e.target && e.target.matches('a.delete-row')) {
-                e.preventDefault();
-                e.target.closest('tr').remove();
-            }
-        });
-
+        lossTableBody.addEventListener('dblclick', e => (e.target.closest('td.part-selector')) && openModal(e.target.closest('td.part-selector')));
+        lossTableBody.addEventListener('click', e => { if (e.target.matches('a.delete-row')) { e.preventDefault(); e.target.closest('tr').remove(); } });
         addRowBtn.addEventListener('click', addRow);
         closeBtn.addEventListener('click', closeModal);
         window.addEventListener('click', e => (e.target == modal) && closeModal());
-
         searchInput.addEventListener('input', () => populatePartsList(searchInput.value));
-
-        partsList.addEventListener('click', function(e) {
-            if (e.target && e.target.matches('li')) {
-                const currentSelected = partsList.querySelector('.selected');
-                if (currentSelected) currentSelected.classList.remove('selected');
-                e.target.classList.add('selected');
-            }
-        });
-
-        confirmBtn.addEventListener('click', function() {
-            const selectedPart = partsList.querySelector('li.selected');
-            if (selectedPart && activeCell) {
-                activeCell.textContent = selectedPart.dataset.partName;
-                activeCell.classList.add('filled');
-                closeModal();
-            } else {
-                showModal('提示', '请先从列表中选择一个零件。', 'warning');
-            }
-        });
-
-        submitBtn.addEventListener('click', function(e) {
-            e.preventDefault();
-            showModal('提交成功', '案件 SY-20240520-001 已成功提交至审核部门。', 'success');
-            setTimeout(() => {
-                window.location.href = this.href;
-            }, 1500);
-        });
-
+        partsList.addEventListener('click', e => { if (e.target.matches('li')) { const c = partsList.querySelector('.selected'); if (c) c.classList.remove('selected'); e.target.classList.add('selected'); } });
+        confirmBtn.addEventListener('click', () => { const p = partsList.querySelector('li.selected'); if (p && activeCell) { activeCell.textContent = p.dataset.partName; activeCell.classList.add('filled'); closeModal(); } else { showModal('提示', '请先从列表中选择一个零件。', 'warning'); } });
+        submitBtn.addEventListener('click', e => { e.preventDefault(); showModal('提交成功', '案件 SY-20240520-001 已成功提交至审核部门。', 'success'); setTimeout(() => { window.location.href = e.target.href; }, 1500); });
         populatePartsList();
+        // --- END: 零件选择器逻辑 ---
+
+        // --- START: 文件上传清单逻辑 (新增) ---
+        const uploadChecklist = document.getElementById('upload-checklist');
+        const progressIndicator = document.getElementById('upload-progress');
+        const totalItems = uploadChecklist.querySelectorAll('.upload-item').length;
+
+        function updateProgress() {
+            const completedItems = uploadChecklist.querySelectorAll('.upload-item.completed').length;
+            progressIndicator.textContent = `${completedItems}/${totalItems}`;
+        }
+
+        uploadChecklist.addEventListener('change', function(e) {
+            if (e.target.tagName === 'INPUT' && e.target.type === 'file') {
+                const item = e.target.closest('.upload-item');
+                const previewContainer = item.querySelector('.upload-item-preview');
+                if (!e.target.multiple) previewContainer.innerHTML = '';
+
+                if (e.target.files.length > 0) {
+                    Array.from(e.target.files).forEach(file => {
+                        const previewEl = document.createElement('div');
+                        previewEl.className = 'preview-thumbnail';
+                        const icon = file.type.startsWith('image/') ? '🖼️' : '📄';
+                        previewEl.innerHTML = `<span>${icon} ${file.name}</span><button class="remove-preview-btn">&times;</button>`;
+                        previewContainer.appendChild(previewEl);
+                    });
+                    item.classList.add('completed');
+                }
+
+                if (previewContainer.children.length === 0) item.classList.remove('completed');
+                updateProgress();
+            }
+        });
+
+        uploadChecklist.addEventListener('click', function(e) {
+            if (e.target.classList.contains('remove-preview-btn')) {
+                const item = e.target.closest('.upload-item');
+                const previewContainer = item.querySelector('.upload-item-preview');
+                e.target.closest('.preview-thumbnail').remove();
+                if (previewContainer.children.length === 0) item.classList.remove('completed');
+                updateProgress();
+            }
+        });
+
+        // 初始化页面时，根据预设内容更新状态
+        document.querySelectorAll('.upload-item-preview').forEach(container => {
+            if (container.children.length > 0) container.closest('.upload-item').classList.add('completed');
+        });
+        updateProgress();
+        // --- END: 文件上传清单逻辑 ---
     });
 </script>
 </body>

@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>提现审批 - 穗源保险公估一体化业务管理平台</title>
+    <link rel="stylesheet" href="style.css">
+    <style>
+        /* 为行内展开添加的样式 */
+        .details-row td {
+            padding: 0;
+            border: none;
+            background-color: #fcfcfc;
+        }
+        .details-content {
+            padding: 20px;
+            border-top: 2px solid #e4e7ed;
+        }
+        .master-row.row-expanded {
+            background-color: #ecf5ff; /* 展开时高亮主行 */
+        }
+        .details-content p {
+            margin-top: 0;
+            margin-bottom: 1rem;
+            color: #606266;
+        }
+        /* START: 移除了与旧版 filter-form 相关的不统一的样式 */
+        .table-actions {
+            margin-bottom: 1rem;
+        }
+        /* END: 移除了与旧版 filter-form 相关的不统一的样式 */
+    </style>
+</head>
+<body>
+<div class="app-container">
+    <!-- 侧边导航栏 -->
+    <aside class="sidebar">
+        <div class="sidebar-header">穗源保险公估</div>
+        <ul class="sidebar-nav">
+            <li class="sidebar-nav-item active"><a href="finance_withdrawal.html">提现审批</a></li>
+            <li class="sidebar-nav-item"><a href="finance_ledger.html">佣金管理</a></li>
+        </ul>
+    </aside>
+    <!-- 主内容区 -->
+    <div class="main-wrapper">
+        <!-- 顶部栏 -->
+        <header class="header">
+            <div class="header-left">
+                <button id="hamburger-btn" class="hamburger-btn">☰</button>
+            </div>
+            <div class="user-profile">
+                <div class="avatar" style="background-color: #F56C6C;">李</div>
+                <span>李娜 (财务)</span>
+            </div>
+        </header>
+        <!-- 页面内容 -->
+        <main class="main-content">
+            <h1 class="page-title">提现审批</h1>
+
+            <!-- START: 重构后的搜索筛选区域，与全局样式保持一致 -->
+            <div class="card">
+                <div class="filter-bar">
+                    <div class="filter-item">
+                        <label>申请人姓名:</label>
+                        <input type="text" placeholder="输入姓名搜索">
+                    </div>
+                    <div class="filter-item">
+                        <label>审批状态:</label>
+                        <select>
+                            <option>全部状态</option>
+                            <option>待审批</option>
+                            <option>已批准</option>
+                            <option>已驳回</option>
+                        </select>
+                    </div>
+                    <div class="filter-item">
+                        <label>申请日期:</label>
+                        <input type="date">
+                        <span>-</span>
+                        <input type="date">
+                    </div>
+                    <div class="filter-actions">
+                        <button class="btn btn-primary">查询</button>
+                        <button class="btn btn-secondary">重置</button>
+                    </div>
+                </div>
+            </div>
+            <!-- END: 重构后的搜索筛选区域 -->
+
+            <!-- 表格与操作区域 -->
+            <div class="card">
+                <div class="card-header"><span>提现审批列表 (3)</span></div>
+
+                <div class="table-actions" style="padding: 1rem 1rem 0 1rem;">
+                    <button id="export-btn" class="btn btn-success" disabled>批量导出</button>
+                </div>
+
+                <div class="table-responsive-wrapper">
+                    <table>
+                        <thead>
+                        <tr>
+                            <th style="width: 40px;"><input type="checkbox" id="select-all-checkbox"></th>
+                            <th>申请人</th>
+                            <th>申请时间</th>
+                            <th>提现金额 (元)</th>
+                            <th>状态</th>
+                            <th>操作</th>
+                        </tr>
+                        </thead>
+                        <tbody id="approval-table-body">
+                        <!-- 记录 1: 待审批 -->
+                        <tr class="master-row">
+                            <td><input type="checkbox" class="row-checkbox"></td>
+                            <td>陈浩 (广州-车险一部)</td>
+                            <td>2024-05-31 10:20:15</td>
+                            <td><strong>700.00</strong></td>
+                            <td><span class="status-tag status-warning">待审批</span></td>
+                            <td class="action-links">
+                                <button class="btn btn-success btn-sm">批准</button>
+                                <button class="btn btn-danger btn-sm">驳回</button>
+                                <button class="btn btn-secondary btn-sm view-details-btn">查看清单</button>
+                            </td>
+                        </tr>
+                        <tr class="details-row" style="display: none;">
+                            <td colspan="6">
+                                <!-- START: 重构后的佣金清单表格 -->
+                                <div class="details-content">
+                                    <p>申请人 <strong>陈浩</strong> 于 <strong>2024-05-31 10:20:15</strong> 申请提现，总额为 <strong>700.00 元</strong>，包含以下佣金明细：</p>
+                                    <table style="width:100%; font-size: 13px; text-align: left; border-collapse: collapse;">
+                                        <thead style="background-color: #f5f7fa;">
+                                        <tr>
+                                            <th style="padding: 8px; border: 1px solid #EBEEF5;">案件编号</th>
+                                            <th style="padding: 8px; border: 1px solid #EBEEF5;">任务内容</th>
+                                            <th style="padding: 8px; border: 1px solid #EBEEF5;">结算完成时间</th>
+                                            <th style="padding: 8px; border: 1px solid #EBEEF5; text-align: right;">基础佣金</th>
+                                            <th style="padding: 8px; border: 1px solid #EBEEF5; text-align: right;">奖罚金额</th>
+                                            <th style="padding: 8px; border: 1px solid #EBEEF5; text-align: right;">最终佣金</th>
+                                        </tr>
+                                        </thead>
+                                        <tbody>
+                                        <tr>
+                                            <td style="padding: 8px; border: 1px solid #EBEEF5;">SY-20240520-001</td>
+                                            <td style="padding: 8px; border: 1px solid #EBEEF5;">查勘+定损</td>
+                                            <td style="padding: 8px; border: 1px solid #EBEEF5;">2024-05-28 15:00</td>
+                                            <td style="padding: 8px; border: 1px solid #EBEEF5; text-align: right;">200.00</td>
+                                            <td style="padding: 8px; border: 1px solid #EBEEF5; text-align: right; color: #F56C6C;">-20.00</td>
+                                            <td style="padding: 8px; border: 1px solid #EBEEF5; text-align: right; font-weight: bold;">180.00</td>
+                                        </tr>
+                                        <tr>
+                                            <td style="padding: 8px; border: 1px solid #EBEEF5;">SY-20240515-011</td>
+                                            <td style="padding: 8px; border: 1px solid #EBEEF5;">查勘+定损</td>
+                                            <td style="padding: 8px; border: 1px solid #EBEEF5;">2024-05-22 11:35</td>
+                                            <td style="padding: 8px; border: 1px solid #EBEEF5; text-align: right;">500.00</td>
+                                            <td style="padding: 8px; border: 1px solid #EBEEF5; text-align: right; color: #F56C6C;">-50.00</td>
+                                            <td style="padding: 8px; border: 1px solid #EBEEF5; text-align: right; font-weight: bold;">450.00</td>
+                                        </tr>
+                                        <tr>
+                                            <td style="padding: 8px; border: 1px solid #EBEEF5;">SY-20240512-007</td>
+                                            <td style="padding: 8px; border: 1px solid #EBEEF5;">单查勘</td>
+                                            <td style="padding: 8px; border: 1px solid #EBEEF5;">2024-05-18 09:12</td>
+                                            <td style="padding: 8px; border: 1px solid #EBEEF5; text-align: right;">70.00</td>
+                                            <td style="padding: 8px; border: 1px solid #EBEEF5; text-align: right;">0.00</td>
+                                            <td style="padding: 8px; border: 1px solid #EBEEF5; text-align: right; font-weight: bold;">70.00</td>
+                                        </tr>
+                                        </tbody>
+                                        <tfoot style="font-weight: bold; background-color: #f5f7fa;">
+                                        <tr>
+                                            <td colspan="5" style="padding: 8px; border: 1px solid #EBEEF5; text-align: right;">合计:</td>
+                                            <td style="padding: 8px; border: 1px solid #EBEEF5; text-align: right;">700.00</td>
+                                        </tr>
+                                        </tfoot>
+                                    </table>
+                                </div>
+                                <!-- END: 重构后的佣金清单表格 -->
+                            </td>
+                        </tr>
+                        <!-- 记录 2: 已批准 (其他人员) -->
+                        <tr class="master-row">
+                            <td><input type="checkbox" class="row-checkbox"></td>
+                            <td>赵磊 (品控)</td>
+                            <td>2024-05-30 14:55:01</td>
+                            <td><strong>155.00</strong></td>
+                            <td><span class="status-tag status-success">已批准</span></td>
+                            <td class="action-links">
+                                <button class="btn btn-secondary btn-sm view-details-btn">查看清单</button>
+                            </td>
+                        </tr>
+                        <tr class="details-row" style="display: none;">
+                            <td colspan="6">
+                                <div class="details-content">
+                                    <p>申请人 <strong>赵磊</strong> 提现 <strong>155.00 元</strong> 包含以下审案佣金：</p>
+                                    <table style="width:100%; font-size: 13px; text-align: left; border-collapse: collapse;">
+                                        <thead style="background-color: #f5f7fa;">
+                                        <tr>
+                                            <th style="padding: 8px; border: 1px solid #EBEEF5;">案件编号</th>
+                                            <th style="padding: 8px; border: 1px solid #EBEEF5;">任务内容</th>
+                                            <th style="padding: 8px; border: 1px solid #EBEEF5;">结算完成时间</th>
+                                            <th style="padding: 8px; border: 1px solid #EBEEF5; text-align: right;">审案佣金</th>
+                                        </tr>
+                                        </thead>
+                                        <tbody>
+                                        <tr><td style="padding: 8px; border: 1px solid #EBEEF5;">SY-20240520-001</td><td style="padding: 8px; border: 1px solid #EBEEF5;">审案</td><td style="padding: 8px; border: 1px solid #EBEEF5;">2024-05-28 15:00</td><td style="padding: 8px; border: 1px solid #EBEEF5; text-align: right;">15.00</td></tr>
+                                        <tr><td style="padding: 8px; border: 1px solid #EBEEF5;">SY-20240521-005</td><td style="padding: 8px; border: 1px solid #EBEEF5;">审案</td><td style="padding: 8px; border: 1px solid #EBEEF5;">2024-05-22 11:35</td><td style="padding: 8px; border: 1px solid #EBEEF5; text-align: right;">25.00</td></tr>
+                                        <!-- ... more rows ... -->
+                                        </tbody>
+                                        <tfoot style="font-weight: bold; background-color: #f5f7fa;">
+                                        <tr><td colspan="3" style="padding: 8px; border: 1px solid #EBEEF5; text-align: right;">合计:</td><td style="padding: 8px; border: 1px solid #EBEEF5; text-align: right;">155.00</td></tr>
+                                        </tfoot>
+                                    </table>
+                                </div>
+                            </td>
+                        </tr>
+                        <!-- 记录 3: 已驳回 -->
+                        <tr class="master-row">
+                            <td><input type="checkbox" class="row-checkbox"></td>
+                            <td>王芳 (调度员)</td>
+                            <td>2024-05-29 09:10:33</td>
+                            <td><strong>32.00</strong></td>
+                            <td><span class="status-tag status-danger">已驳回</span></td>
+                            <td class="action-links">
+                                <button class="btn btn-secondary btn-sm view-details-btn">查看清单</button>
+                            </td>
+                        </tr>
+                        <tr class="details-row" style="display: none;">
+                            <td colspan="6">
+                                <div class="details-content">
+                                    <p style="text-align: center; color: #909399;">此提现申请无关联的佣金明细记录。</p>
+                                </div>
+                            </td>
+                        </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+        </main>
+    </div>
+</div>
+<script src="demo_helper.js"></script>
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const approvalTableBody = document.getElementById('approval-table-body');
+        const selectAllCheckbox = document.getElementById('select-all-checkbox');
+        const rowCheckboxes = document.querySelectorAll('.row-checkbox');
+        const exportBtn = document.getElementById('export-btn');
+
+        // --- 批量选择与导出逻辑 (无变化) ---
+        function updateExportButtonState() {
+            const checkedCount = document.querySelectorAll('.row-checkbox:checked').length;
+            exportBtn.disabled = checkedCount === 0;
+        }
+
+        selectAllCheckbox.addEventListener('change', function() {
+            rowCheckboxes.forEach(checkbox => {
+                checkbox.checked = this.checked;
+            });
+            updateExportButtonState();
+        });
+
+        approvalTableBody.addEventListener('change', function(e) {
+            if (e.target.classList.contains('row-checkbox')) {
+                const total = rowCheckboxes.length;
+                const checked = document.querySelectorAll('.row-checkbox:checked').length;
+                selectAllCheckbox.checked = total === checked;
+                updateExportButtonState();
+            }
+        });
+
+        exportBtn.addEventListener('click', function() {
+            const checkedCount = document.querySelectorAll('.row-checkbox:checked').length;
+            if (checkedCount > 0) {
+                showModal('导出确认', `您已选择 ${checkedCount} 条记录，确认要导出吗？`, 'info');
+            }
+        });
+
+        // --- 行内展开逻辑 (无变化) ---
+        approvalTableBody.addEventListener('click', function(e) {
+            if (e.target.classList.contains('view-details-btn')) {
+                const button = e.target;
+                const masterRow = button.closest('.master-row');
+                const detailsRow = masterRow.nextElementSibling;
+                const isVisible = detailsRow.style.display !== 'none';
+
+                // 关闭所有其他已打开的详情行
+                document.querySelectorAll('.details-row').forEach(row => {
+                    if (row !== detailsRow) {
+                        row.style.display = 'none';
+                        const otherMasterRow = row.previousElementSibling;
+                        otherMasterRow.classList.remove('row-expanded');
+                        const otherBtn = otherMasterRow.querySelector('.view-details-btn');
+                        if(otherBtn) otherBtn.textContent = '查看清单';
+                    }
+                });
+
+                // 切换当前点击行的状态
+                if (isVisible) {
+                    detailsRow.style.display = 'none';
+                    button.textContent = '查看清单';
+                    masterRow.classList.remove('row-expanded');
+                } else {
+                    detailsRow.style.display = 'table-row';
+                    button.textContent = '收起清单';
+                    masterRow.classList.add('row-expanded');
+                }
+            }
+        });
+    });
+</script>
+</body>
+</html>

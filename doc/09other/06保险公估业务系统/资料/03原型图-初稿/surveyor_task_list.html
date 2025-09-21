@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>我的任务 - 穗源保险公估一体化业务管理平台</title>
     <link rel="stylesheet" href="style.css">
-    <!-- 新增: 超时预警样式 -->
+    <!-- START: 修改后的样式 -->
     <style>
         .task-overdue td {
             background-color: #fef0f0 !important;
@@ -13,7 +13,18 @@
         .task-overdue .status-tag {
             font-weight: bold;
         }
+        /* 新增: 操作栏和复选框样式 */
+        .table-actions {
+            margin-bottom: 1rem;
+            display: flex;
+            gap: 10px;
+        }
+        .checkbox-cell {
+            width: 40px;
+            text-align: center;
+        }
     </style>
+    <!-- END: 修改后的样式 -->
 </head>
 <body>
 <div class="app-container">
@@ -21,10 +32,8 @@
     <aside class="sidebar">
         <div class="sidebar-header">穗源保险公估</div>
         <ul class="sidebar-nav">
+            <li class="sidebar-nav-item"><a href="surveyor_register.html">注册页面</a></li>
             <li class="sidebar-nav-item active"><a href="surveyor_task_list.html">我的任务</a></li>
-            <li class="sidebar-nav-item"><a href="surveyor_case_history.html">历史案件</a></li>
-            <li class="sidebar-nav-item"><a href="surveyor_commission.html">我的佣金</a></li>
-            <li class="sidebar-nav-item"><a href="surveyor_withdrawal_history.html">提现记录</a></li>
         </ul>
     </aside>
 
@@ -52,6 +61,7 @@
                             <option>全部</option>
                             <option>待接受</option>
                             <option>进行中</option>
+                            <option>已提交</option>
                             <option>已完成</option>
                         </select>
                     </div>
@@ -67,14 +77,22 @@
             </div>
 
             <div class="card">
+                <!-- START: 新增操作按钮区域 -->
+                <div class="table-actions">
+                    <button id="withdraw-btn" class="btn btn-success" disabled>批量提现</button>
+                </div>
+                <!-- END: 新增操作按钮区域 -->
                 <div class="card-header"><span>任务列表</span></div>
                 <div class="table-responsive-wrapper">
                     <table>
                         <thead>
                         <tr>
+                            <!-- 新增: 复选框列 -->
+                            <th class="checkbox-cell"><input type="checkbox" id="select-all-checkbox"></th>
                             <th>案件编号</th>
                             <th>车牌号</th>
                             <th>案件类型</th>
+                            <th>委托内容</th>
                             <th>委托方</th>
                             <th>派单时间</th>
                             <th>状态</th>
@@ -82,11 +100,13 @@
                         </tr>
                         </thead>
                         <tbody>
-                        <!-- 修改: 增加 task-overdue 类并修改状态文本 -->
                         <tr class="task-overdue">
+                            <!-- 新增: 禁用的复选框 -->
+                            <td class="checkbox-cell"><input type="checkbox" class="row-checkbox" disabled></td>
                             <td>SY-20240520-001</td>
                             <td>粤A·88888</td>
                             <td><strong>查勘+定损</strong></td>
+                            <td>车物查勘, 车物定损</td>
                             <td>平安保险</td>
                             <td>2024-05-20 09:45:00</td>
                             <td><span class="status-tag status-danger">待接受 (超时)</span></td>
@@ -96,9 +116,12 @@
                             </td>
                         </tr>
                         <tr>
+                            <!-- 新增: 禁用的复选框 -->
+                            <td class="checkbox-cell"><input type="checkbox" class="row-checkbox" disabled></td>
                             <td>SY-20240521-005</td>
                             <td>粤A·GHJ789</td>
                             <td><strong>人伤查勘</strong></td>
+                            <td>人伤查勘</td>
                             <td>平安保险</td>
                             <td>2024-05-21 10:15:00</td>
                             <td><span class="status-tag status-danger">待接受</span></td>
@@ -108,9 +131,12 @@
                             </td>
                         </tr>
                         <tr>
+                            <!-- 新增: 禁用的复选框 -->
+                            <td class="checkbox-cell"><input type="checkbox" class="row-checkbox" disabled></td>
                             <td>SY-20240521-003</td>
                             <td>粤B·54321</td>
                             <td><strong>车物查勘</strong></td>
+                            <td>车物查勘</td>
                             <td>人保财险</td>
                             <td>2024-05-21 09:35:12</td>
                             <td><span class="status-tag status-primary">进行中 (已出发)</span></td>
@@ -118,10 +144,13 @@
                                 <a href="#">处理任务</a>
                             </td>
                         </tr>
-                        <tr>
+                        <!-- START: 修改和新增的数据行 -->
+                        <tr data-commission="180.00">
+                            <td class="checkbox-cell"><input type="checkbox" class="row-checkbox"></td>
                             <td>SY-20240518-002</td>
                             <td>粤A·66778</td>
                             <td><strong>车物定损</strong></td>
+                            <td>车物定损</td>
                             <td>太平洋保险</td>
                             <td>2024-05-18 10:10:00</td>
                             <td><span class="status-tag status-success">已完成</span></td>
@@ -129,6 +158,59 @@
                                 <a href="#">查看详情</a>
                             </td>
                         </tr>
+                        <tr data-commission="450.00">
+                            <td class="checkbox-cell"><input type="checkbox" class="row-checkbox"></td>
+                            <td>SY-20240515-011</td>
+                            <td>粤A·ABCD1</td>
+                            <td><strong>查勘+定损</strong></td>
+                            <td>车物查勘, 车物定损</td>
+                            <td>平安保险</td>
+                            <td>2024-05-15 09:10:00</td>
+                            <td><span class="status-tag status-success">已完成</span></td>
+                            <td class="action-links">
+                                <a href="#">查看详情</a>
+                            </td>
+                        </tr>
+                        <tr data-commission="70.00">
+                            <td class="checkbox-cell"><input type="checkbox" class="row-checkbox"></td>
+                            <td>SY-20240512-007</td>
+                            <td>粤B·XYZ89</td>
+                            <td><strong>单查勘</strong></td>
+                            <td>车物查勘</td>
+                            <td>太平洋保险</td>
+                            <td>2024-05-12 11:00:00</td>
+                            <td><span class="status-tag status-success">已完成</span></td>
+                            <td class="action-links">
+                                <a href="#">查看详情</a>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td class="checkbox-cell"><input type="checkbox" class="row-checkbox" disabled></td>
+                            <td>SY-20240510-020</td>
+                            <td>粤A·KLM45</td>
+                            <td><strong>车物查勘</strong></td>
+                            <td>车物查勘</td>
+                            <td>人保财险</td>
+                            <td>2024-05-10 14:00:00</td>
+                            <td><span class="status-tag status-warning">提现申请中</span></td>
+                            <td class="action-links">
+                                <a href="#">查看详情</a>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td class="checkbox-cell"><input type="checkbox" class="row-checkbox" disabled></td>
+                            <td>SY-20240508-015</td>
+                            <td>粤C·PQR12</td>
+                            <td><strong>车物定损</strong></td>
+                            <td>车物定损</td>
+                            <td>平安保险</td>
+                            <td>2024-05-08 16:30:00</td>
+                            <td><span class="status-tag status-info">已提现</span></td>
+                            <td class="action-links">
+                                <a href="#">查看详情</a>
+                            </td>
+                        </tr>
+                        <!-- END: 修改和新增的数据行 -->
                         </tbody>
                     </table>
                 </div>
@@ -148,5 +230,84 @@
     </div>
 </div>
 <script src="demo_helper.js"></script>
+<!-- START: 新增的提现交互脚本 -->
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const withdrawBtn = document.getElementById('withdraw-btn');
+        const selectAllCheckbox = document.getElementById('select-all-checkbox');
+        // 只选择那些没有被禁用的复选框
+        const rowCheckboxes = document.querySelectorAll('.row-checkbox:not([disabled])');
+
+        // 更新提现按钮的状态
+        function updateWithdrawButtonState() {
+            const isAnyRowSelected = Array.from(rowCheckboxes).some(cb => cb.checked);
+            withdrawBtn.disabled = !isAnyRowSelected;
+        }
+
+        // 全选/取消全选
+        selectAllCheckbox.addEventListener('change', () => {
+            rowCheckboxes.forEach(checkbox => {
+                checkbox.checked = selectAllCheckbox.checked;
+            });
+            updateWithdrawButtonState();
+        });
+
+        // 单行复选框点击事件
+        rowCheckboxes.forEach(checkbox => {
+            checkbox.addEventListener('change', () => {
+                // 检查所有可选的复选框是否都已选中
+                const allChecked = Array.from(rowCheckboxes).every(cb => cb.checked);
+                selectAllCheckbox.checked = allChecked;
+                updateWithdrawButtonState();
+            });
+        });
+
+        // 提现按钮点击事件
+        withdrawBtn.addEventListener('click', () => {
+            let selectedCount = 0;
+            let totalCommission = 0;
+
+            rowCheckboxes.forEach(checkbox => {
+                if (checkbox.checked) {
+                    selectedCount++;
+                    const row = checkbox.closest('tr');
+                    const commission = parseFloat(row.dataset.commission || '0');
+                    totalCommission += commission;
+                }
+            });
+
+            if (selectedCount > 0) {
+                const message = `您已选择 <strong>${selectedCount}</strong> 个已完成的案件申请提现，佣金总计 <strong>${totalCommission.toFixed(2)} 元</strong>。<br>确认提交申请吗？`;
+                showModal('提现申请确认', message, 'info');
+
+                // 模拟确认后的操作
+                const okBtn = document.getElementById('global-modal-ok');
+                const onOkClick = () => {
+                    // 移除原来的监听器，避免重复触发
+                    okBtn.removeEventListener('click', onOkClick);
+                    // 找到所有选中的行并模拟处理
+                    const checkedBoxes = document.querySelectorAll('.row-checkbox:checked:not([disabled])');
+                    checkedBoxes.forEach(box => {
+                        const row = box.closest('tr');
+                        row.querySelector('td:last-child').innerHTML = '<span>提现申请中</span>';
+                        row.style.opacity = '0.6';
+                        box.checked = false;
+                        box.disabled = true;
+                    });
+                    selectAllCheckbox.checked = false;
+                    updateWithdrawButtonState();
+                    // 显示成功提示
+                    showModal('提交成功', '您的提现申请已成功提交，请等待财务审批。', 'success');
+                };
+                okBtn.addEventListener('click', onOkClick);
+
+            } else {
+                showModal('操作提示', '请至少选择一个“已完成”的案件进行提现。', 'warning');
+            }
+        });
+
+    });
+</script>
+<!-- END: 新增的提现交互脚本 -->
 </body>
 </html>

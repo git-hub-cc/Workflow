@@ -5,6 +5,19 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>审核质量分析 - 穗源保险公估一体化业务管理平台</title>
     <link rel="stylesheet" href="style.css">
+    <!-- START: 新增样式 -->
+    <style>
+        .table-actions {
+            margin-bottom: 1rem;
+            display: flex;
+            gap: 10px;
+        }
+        .checkbox-cell {
+            width: 40px;
+            text-align: center;
+        }
+    </style>
+    <!-- END: 新增样式 -->
 </head>
 <body>
 <div class="app-container">
@@ -12,10 +25,7 @@
     <aside class="sidebar">
         <div class="sidebar-header">穗源保险公估</div>
         <ul class="sidebar-nav">
-            <li class="sidebar-nav-item"><a href="reviewer_todo_list.html">待办列表</a></li>
-            <li class="sidebar-nav-item"><a href="reviewer_case_audit.html">案件审核</a></li>
-            <li class="sidebar-nav-item"><a href="reviewer_case_history.html">历史案件</a></li>
-            <li class="sidebar-nav-item active"><a href="reviewer_business_report.html">商务报表</a></li>
+            <li class="sidebar-nav-item active"><a href="reviewer_business_report.html">审核管理</a></li>
         </ul>
     </aside>
 
@@ -34,28 +44,6 @@
 
         <!-- 页面内容 (已重构为审核质量分析) -->
         <main class="main-content">
-            <h1 class="page-title">审核质量分析报表</h1>
-
-            <!-- 新增: 品控核心指标 -->
-            <div class="kpi-card-container">
-                <div class="card kpi-card blue">
-                    <div class="value">128</div>
-                    <div class="label">本月审核总数</div>
-                </div>
-                <div class="card kpi-card orange">
-                    <div class="value">35<span class="unit">分钟</span></div>
-                    <div class="label">平均审核耗时</div>
-                </div>
-                <div class="card kpi-card green">
-                    <div class="value">93.8%</div>
-                    <div class="label">一次性通过率</div>
-                </div>
-                <div class="card kpi-card red">
-                    <div class="value">6.2%</div>
-                    <div class="label">退回修改率</div>
-                </div>
-            </div>
-
             <!-- 筛选区域 (已修改) -->
             <div class="card" style="margin-top:20px;">
                 <div class="filter-bar">
@@ -109,38 +97,55 @@
 
             <!-- 数据列表 (已修改) -->
             <div class="card">
+                <!-- START: 修改后的操作按钮区域 -->
+                <div class="table-actions">
+                    <button class="btn btn-secondary" id="import-btn">导入报表</button>
+                    <input type="file" id="import-file-input" hidden accept=".xlsx">
+                    <button class="btn btn-success" id="export-btn" disabled>导出报表</button>
+                </div>
+                <!-- END: 修改后的操作按钮区域 -->
                 <div class="card-header">
                     <span>审核明细</span>
-                    <button class="btn btn-primary">导出报表</button>
+                    <!-- 原导出按钮已移到上方 -->
                 </div>
                 <div class="table-responsive-wrapper">
                     <table>
                         <thead>
                         <tr>
+                            <!-- 新增: 复选框列 -->
+                            <th class="checkbox-cell"><input type="checkbox" id="select-all-checkbox"></th>
                             <th>案件编号</th><th>车牌号</th><th>查勘员</th>
                             <th>审核完成时间</th><th>审核耗时</th><th>审核结果</th><th>操作</th>
                         </tr>
                         </thead>
                         <tbody>
                         <tr>
+                            <!-- 新增: 复选框 -->
+                            <td class="checkbox-cell"><input type="checkbox" class="row-checkbox"></td>
                             <td>SY-20240520-001</td><td>粤A·88888</td><td>陈浩</td>
                             <td>2024-05-20 12:05:10</td><td>35分钟</td>
                             <td><span class="status-tag status-success">审核通过</span></td>
                             <td class="action-links"><a href="reviewer_case_audit.html">查看</a></td>
                         </tr>
                         <tr>
+                            <!-- 新增: 复选框 -->
+                            <td class="checkbox-cell"><input type="checkbox" class="row-checkbox"></td>
                             <td>SY-20240518-002</td><td>粤A·66778</td><td>刘洋</td>
                             <td>2024-05-18 16:30:15</td><td>28分钟</td>
                             <td><span class="status-tag status-success">审核通过</span></td>
                             <td class="action-links"><a href="#">查看</a></td>
                         </tr>
                         <tr>
+                            <!-- 新增: 复选框 -->
+                            <td class="checkbox-cell"><input type="checkbox" class="row-checkbox"></td>
                             <td>SY-20240515-011</td><td>粤A·ABCD1</td><td>陈浩</td>
                             <td>2024-05-15 10:05:20</td><td>48分钟</td>
                             <td><span class="status-tag status-danger">退回修改</span></td>
                             <td class="action-links"><a href="#">查看</a></td>
                         </tr>
                         <tr>
+                            <!-- 新增: 复选框 -->
+                            <td class="checkbox-cell"><input type="checkbox" class="row-checkbox"></td>
                             <td>SY-20240512-007</td><td>粤B·XYZ89</td><td>陈浩</td>
                             <td>2024-05-12 11:45:55</td><td>25分钟</td>
                             <td><span class="status-tag status-success">审核通过</span></td>
@@ -163,5 +168,83 @@
     </div>
 </div>
 <script src="demo_helper.js"></script>
+<!-- START: 新增导入/导出交互脚本 -->
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const importBtn = document.getElementById('import-btn');
+        const importFileInput = document.getElementById('import-file-input');
+        const exportBtn = document.getElementById('export-btn');
+        const selectAllCheckbox = document.getElementById('select-all-checkbox');
+        const rowCheckboxes = document.querySelectorAll('.row-checkbox');
+
+        // 导入按钮点击事件
+        importBtn.addEventListener('click', () => {
+            importFileInput.click();
+        });
+
+        // 文件选择后的事件
+        importFileInput.addEventListener('change', () => {
+            if (importFileInput.files.length > 0) {
+                const fileName = importFileInput.files[0].name;
+                // 使用全局模态框提示
+                showModal('导入提示', `已选择文件: <strong>${fileName}</strong><br>即将开始模拟导入...`, 'info');
+                // 清空文件输入，以便下次可以选择相同的文件
+                importFileInput.value = '';
+            }
+        });
+
+        // 导出按钮点击事件
+        exportBtn.addEventListener('click', () => {
+            const isAnyRowSelected = Array.from(rowCheckboxes).some(cb => cb.checked);
+            if (!isAnyRowSelected) {
+                showModal('操作提示', '请至少选择一个案件进行导出。', 'warning');
+                return;
+            }
+
+            // 创建一个临时的 a 标签来触发下载
+            const link = document.createElement('a');
+            link.href = '03模拟审核导出.xlsx';
+            link.download = '03模拟审核导出.xlsx';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        });
+
+        // 更新导出按钮状态
+        function updateExportButtonState() {
+            const isAnyRowSelected = Array.from(rowCheckboxes).some(cb => cb.checked);
+            exportBtn.disabled = !isAnyRowSelected;
+        }
+
+        // 全选/取消全选
+        selectAllCheckbox.addEventListener('change', () => {
+            rowCheckboxes.forEach(checkbox => {
+                checkbox.checked = selectAllCheckbox.checked;
+            });
+            updateExportButtonState();
+        });
+
+        // 单行复选框点击事件
+        rowCheckboxes.forEach(checkbox => {
+            checkbox.addEventListener('change', () => {
+                const allChecked = Array.from(rowCheckboxes).every(cb => cb.checked);
+                const someChecked = Array.from(rowCheckboxes).some(cb => cb.checked);
+
+                if (allChecked) {
+                    selectAllCheckbox.checked = true;
+                    selectAllCheckbox.indeterminate = false;
+                } else if (someChecked) {
+                    selectAllCheckbox.checked = false;
+                    selectAllCheckbox.indeterminate = true;
+                } else {
+                    selectAllCheckbox.checked = false;
+                    selectAllCheckbox.indeterminate = false;
+                }
+                updateExportButtonState();
+            });
+        });
+    });
+</script>
+<!-- END: 新增导入/导出交互脚本 -->
 </body>
 </html>

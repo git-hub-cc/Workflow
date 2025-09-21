@@ -3,8 +3,22 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>财务台账 - 穗源保险公估一体化业务管理平台</title>
+    <title>佣金管理 - 穗源保险公估一体化业务管理平台</title>
     <link rel="stylesheet" href="style.css">
+    <!-- 新增页面专属样式 -->
+    <style>
+        .profit-negative { color: var(--danger-color); font-weight: bold; }
+        .text-left { text-align: left !important; padding-left: 15px !important; }
+        .text-right { text-align: right !important; padding-right: 15px !important; }
+        .th-right, .td-right { text-align: right !important; padding-right: 15px !important;}
+        .th-left, .td-left { text-align: left !important; padding-left: 15px !important;}
+        /* 新增: 操作栏样式 */
+        .table-actions {
+            margin-bottom: 1rem;
+            display: flex;
+            gap: 10px;
+        }
+    </style>
 </head>
 <body>
 <div class="app-container">
@@ -12,9 +26,8 @@
     <aside class="sidebar">
         <div class="sidebar-header">穗源保险公估</div>
         <ul class="sidebar-nav">
-            <li class="sidebar-nav-item"><a href="finance_settlement.html">财务中心</a></li>
-            <li class="sidebar-nav-item active"><a href="finance_ledger.html">财务台账</a></li>
-            <li class="sidebar-nav-item"><a href="finance_income_expense.html">收支管理</a></li>
+            <li class="sidebar-nav-item"><a href="finance_withdrawal.html">提现审批</a></li>
+            <li class="sidebar-nav-item active"><a href="finance_ledger.html">佣金管理</a></li>
         </ul>
     </aside>
 
@@ -33,12 +46,24 @@
 
         <!-- 页面内容 -->
         <main class="main-content">
-            <h1 class="page-title">财务台账</h1>
+            <h1 class="page-title">佣金管理</h1>
             <div class="card">
                 <div class="filter-bar">
                     <div class="filter-item">
                         <label>结案日期:</label>
                         <input type="date" value="2024-05-01"> - <input type="date" value="2024-05-31">
+                    </div>
+                    <div class="filter-item">
+                        <label>案件编号:</label>
+                        <input type="text" placeholder="请输入案件编号">
+                    </div>
+                    <div class="filter-item">
+                        <label>承保方:</label>
+                        <input type="text" placeholder="请输入承保方">
+                    </div>
+                    <div class="filter-item">
+                        <label>查勘员:</label>
+                        <input type="text" placeholder="请输入查勘员姓名">
                     </div>
                     <div class="filter-actions">
                         <button class="btn btn-primary">查询</button>
@@ -47,65 +72,105 @@
                 </div>
             </div>
             <div class="card">
+                <!-- START: 新增的操作按钮区域 -->
+                <div class="table-actions">
+                    <button class="btn btn-secondary" id="import-btn">导入Excel</button>
+                    <input type="file" id="import-file-input" hidden accept=".xlsx">
+                    <button class="btn btn-primary" id="export-btn" disabled>导出已选</button>
+                </div>
+                <!-- END: 新增的操作按钮区域 -->
                 <div class="card-header">
                     <span>财务明细列表</span>
-                    <a href="#" class="btn btn-primary">导出Excel</a>
                 </div>
                 <div class="table-responsive-wrapper">
                     <table>
                         <thead>
+                        <!-- START: 重构后的表头 -->
                         <tr>
-                            <th class="text-left">案件编号</th>
-                            <th class="text-left">承保方</th>
-                            <th class="text-left">查勘员</th>
+                            <th><input type="checkbox" id="selectAllCheckbox"></th>
+                            <th class="th-left">案件编号</th>
+                            <th class="th-left">承保方</th>
+                            <th class="th-left">查勘员</th>
                             <th>结案日期</th>
-                            <th>公估费收入(元)</th>
-                            <th>查勘员佣金(元)</th>
-                            <th>其他成本(元)</th>
-                            <th>利润(元)</th>
+                            <th class="th-right">公估费收入(元)</th>
+                            <th class="th-right">查勘员佣金(元)</th>
+                            <th class="th-right">奖罚金额(元)</th>
+                            <th class="th-right">审案佣金(元)</th>
+                            <th class="th-right">录案佣金(元)</th>
+                            <th class="th-right">督导佣金(元)</th>
+                            <th class="th-right">总成本(元)</th>
+                            <th class="th-right">利润(元)</th>
+                            <th>操作</th>
                         </tr>
+                        <!-- END: 重构后的表头 -->
                         </thead>
                         <tbody>
+                        <!-- START: 重构后的数据行 -->
                         <tr>
-                            <td class="text-left">SY-20240520-001</td>
-                            <td class="text-left">平安保险</td>
-                            <td class="text-left">陈浩</td>
-                            <td>2024-05-20</td>
-                            <td class="text-right">425.00</td>
-                            <td class="text-right">180.00</td>
-                            <td class="text-right">20.00</td>
-                            <td class="text-right profit-positive">225.00</td>
+                            <td><input type="checkbox" class="row-checkbox"></td>
+                            <td class="td-left">SY-20240520-001</td>
+                            <td class="td-left">平安保险</td>
+                            <td class="td-left">陈浩</td>
+                            <td>2024-05-28</td>
+                            <td class="td-right">425.00</td>
+                            <td class="td-right">200.00</td>
+                            <td class="td-right" style="color: var(--danger-color);">-20.00</td>
+                            <td class="td-right">15.00</td>
+                            <td class="td-right">5.00</td>
+                            <td class="td-right">0.00</td>
+                            <td class="td-right text-bold">200.00</td>
+                            <td class="td-right profit-positive">225.00</td>
+                            <td class="action-links"><a href="finance_settlement.html">查看</a></td>
                         </tr>
                         <tr>
-                            <td class="text-left">SY-20240521-005</td>
-                            <td class="text-left">人保财险</td>
-                            <td class="text-left">刘洋</td>
+                            <td><input type="checkbox" class="row-checkbox"></td>
+                            <td class="td-left">SY-20240521-005</td>
+                            <td class="td-left">人保财险</td>
+                            <td class="td-left">刘洋, 吴静</td>
                             <td>2024-05-22</td>
-                            <td class="text-right">765.00</td>
-                            <td class="text-right">350.00</td>
-                            <td class="text-right">25.00</td>
-                            <td class="text-right profit-positive">390.00</td>
+                            <td class="td-right">765.00</td>
+                            <td class="td-right">350.00</td>
+                            <td class="td-right" style="color: var(--success-color);">50.00</td>
+                            <td class="td-right">25.00</td>
+                            <td class="td-right">5.00</td>
+                            <td class="td-right">0.00</td>
+                            <td class="td-right text-bold">430.00</td>
+                            <td class="td-right profit-positive">335.00</td>
+                            <td class="action-links"><a href="finance_settlement.html">查看</a></td>
                         </tr>
                         <tr>
-                            <td class="text-left">SY-20240518-002</td>
-                            <td class="text-left">太平洋保险</td>
-                            <td class="text-left">刘洋</td>
+                            <td><input type="checkbox" class="row-checkbox"></td>
+                            <td class="td-left">SY-20240518-002</td>
+                            <td class="td-left">太平洋保险</td>
+                            <td class="td-left">刘洋</td>
                             <td>2024-05-19</td>
-                            <td class="text-right">350.00</td>
-                            <td class="text-right">130.00</td>
-                            <td class="text-right">15.00</td>
-                            <td class="text-right profit-positive">205.00</td>
+                            <td class="td-right">350.00</td>
+                            <td class="td-right">130.00</td>
+                            <td class="td-right">0.00</td>
+                            <td class="td-right">15.00</td>
+                            <td class="td-right">5.00</td>
+                            <td class="td-right">20.00</td>
+                            <td class="td-right text-bold">170.00</td>
+                            <td class="td-right profit-positive">180.00</td>
+                            <td class="action-links"><a href="finance_settlement.html">查看</a></td>
                         </tr>
                         <tr>
-                            <td class="text-left">SY-20240515-011</td>
-                            <td class="text-left">平安保险</td>
-                            <td class="text-left">陈浩</td>
+                            <td><input type="checkbox" class="row-checkbox"></td>
+                            <td class="td-left">SY-20240515-011</td>
+                            <td class="td-left">平安保险</td>
+                            <td class="td-left">陈浩</td>
                             <td>2024-05-16</td>
-                            <td class="text-right">1250.00</td>
-                            <td class="text-right">450.00</td>
-                            <td class="text-right">30.00</td>
-                            <td class="text-right profit-positive">770.00</td>
+                            <td class="td-right">1250.00</td>
+                            <td class="td-right">500.00</td>
+                            <td class="td-right" style="color: var(--danger-color);">-50.00</td>
+                            <td class="td-right">30.00</td>
+                            <td class="td-right">10.00</td>
+                            <td class="td-right">0.00</td>
+                            <td class="td-right text-bold">490.00</td>
+                            <td class="td-right profit-positive">760.00</td>
+                            <td class="action-links"><a href="finance_settlement.html">查看</a></td>
                         </tr>
+                        <!-- END: 重构后的数据行 -->
                         </tbody>
                     </table>
                 </div>
@@ -123,5 +188,81 @@
     </div>
 </div>
 <script src="demo_helper.js"></script>
+<!-- START: 新增的导入/导出交互脚本 -->
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const importBtn = document.getElementById('import-btn');
+        const importFileInput = document.getElementById('import-file-input');
+        const exportBtn = document.getElementById('export-btn');
+        const selectAllCheckbox = document.getElementById('selectAllCheckbox');
+        const rowCheckboxes = document.querySelectorAll('.row-checkbox');
+
+        // 导入按钮点击事件
+        importBtn.addEventListener('click', () => {
+            importFileInput.click();
+        });
+
+        // 文件选择后的事件
+        importFileInput.addEventListener('change', () => {
+            if (importFileInput.files.length > 0) {
+                const fileName = importFileInput.files[0].name;
+                showModal('导入提示', `已选择文件: <strong>${fileName}</strong><br>即将开始模拟导入...`, 'info');
+                importFileInput.value = ''; // 清空以便下次选择
+            }
+        });
+
+        // 导出按钮点击事件
+        exportBtn.addEventListener('click', () => {
+            if (!Array.from(rowCheckboxes).some(cb => cb.checked)) {
+                showModal('操作提示', '请至少选择一条记录进行导出。', 'warning');
+                return;
+            }
+            const link = document.createElement('a');
+            link.href = '04模拟佣金导出.xlsx';
+            link.download = '04模拟佣金导出.xlsx';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        });
+
+        // 更新导出按钮状态
+        function updateExportButtonState() {
+            const isAnyRowSelected = Array.from(rowCheckboxes).some(cb => cb.checked);
+            exportBtn.disabled = !isAnyRowSelected;
+        }
+
+        // 全选/取消全选
+        selectAllCheckbox.addEventListener('change', () => {
+            rowCheckboxes.forEach(checkbox => {
+                checkbox.checked = selectAllCheckbox.checked;
+            });
+            updateExportButtonState();
+        });
+
+        // 单行复选框点击事件
+        rowCheckboxes.forEach(checkbox => {
+            checkbox.addEventListener('change', () => {
+                const allChecked = Array.from(rowCheckboxes).every(cb => cb.checked);
+                const someChecked = Array.from(rowCheckboxes).some(cb => cb.checked);
+
+                if (allChecked) {
+                    selectAllCheckbox.checked = true;
+                    selectAllCheckbox.indeterminate = false;
+                } else if (someChecked) {
+                    selectAllCheckbox.checked = false;
+                    selectAllCheckbox.indeterminate = true;
+                } else {
+                    selectAllCheckbox.checked = false;
+                    selectAllCheckbox.indeterminate = false;
+                }
+                updateExportButtonState();
+            });
+        });
+
+        // 初始化按钮状态
+        updateExportButtonState();
+    });
+</script>
+<!-- END: 新增的导入/导出交互脚本 -->
 </body>
 </html>
