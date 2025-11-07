@@ -10,6 +10,9 @@ export const adminMenus = [
         children: [
             { id: 'admin-dashboard', name: '仪表盘', path: '/admin/dashboard', icon: 'DashboardOutlined', type: 'DATA_LIST' },
             { id: 'admin-forms', name: '表单管理', path: '/admin/forms', icon: 'FormOutlined', type: 'DATA_LIST' },
+            // --- 【核心新增】页面管理菜单 ---
+            // 注意: `DesktopOutlined` 需要在你的 `iconLibrary.js` 中引入和导出
+            { id: 'admin-pages', name: '页面管理', path: '/admin/pages', icon: 'DesktopOutlined', type: 'DATA_LIST' },
             { id: 'admin-instances', name: '实例管理', path: '/admin/instances', icon: 'NodeIndexOutlined', type: 'DATA_LIST' },
             { id: 'admin-menus', name: '菜单管理', path: '/admin/menus', icon: 'AppstoreOutlined', type: 'DATA_LIST' },
             {
@@ -67,6 +70,12 @@ const staticRoutes = [
             { path: 'profile', name: 'profile', component: () => import('../views/Profile.vue'), meta: { title: '个人设置' } },
             // 【新增】通知中心路由
             { path: 'notifications', name: 'notification-center', component: () => import('../views/NotificationCenter.vue'), meta: { title: '通知中心' } },
+
+            // --- 【核心新增】页面设计器相关路由 ---
+            { path: 'admin/pages', name: 'admin-pages', component: () => import('../views/admin/PageManagement.vue'), meta: { title: '页面管理', requiresAdmin: true } },
+            { path: 'page-designer/create', name: 'page-designer-create', component: () => import('../views/PageDesigner.vue'), meta: { title: '新建页面', requiresAdmin: true } },
+            { path: 'page-designer/edit/:schemaId', name: 'page-designer-edit', component: () => import('../views/PageDesigner.vue'), props: true, meta: { title: '编辑页面', requiresAdmin: true } },
+
             // 管理员专属的静态页面
             { path: 'admin/dashboard', name: 'admin-dashboard', component: () => import('../views/admin/Dashboard.vue'), meta: { title: '仪表盘', requiresAdmin: true } },
             { path: 'admin/forms', name: 'admin-forms', component: () => import('../views/admin/FormManagement.vue'), meta: { title: '表单管理', requiresAdmin: true } },

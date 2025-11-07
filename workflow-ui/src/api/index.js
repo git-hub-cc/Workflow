@@ -86,6 +86,20 @@ service.interceptors.response.use(
     }
 );
 
+// --- 页面管理 (Page Schema) API ---
+// 【权限修复】新增页面管理相关API
+export const getPageSchemas = (params) => service.get('/admin/schemas', { params });
+export const getPageSchemaById = (id) => service.get(`/admin/schemas/${id}`);
+export const createPageSchema = (data) => service.post('/admin/schemas', data);
+export const updatePageSchema = (id, data) => service.put(`/admin/schemas/${id}`, data);
+export const deletePageSchema = (id) => service.delete(`/admin/schemas/${id}`);
+// 【权限修复】新增公共获取页面结构的API
+export const getPublicPageSchema = (pageKey) => service.get(`/public/pages/${pageKey}`);
+
+// --- 组件元数据 API ---
+export const getComponentMetas = () => service.get('/components');
+
+
 // --- 表单 API ---
 // 【阶段二修改】getForms 函数现在接受参数
 export const getForms = (params) => service.get('/forms', { params });

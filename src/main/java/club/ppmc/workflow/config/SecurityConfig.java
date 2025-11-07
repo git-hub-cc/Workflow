@@ -32,6 +32,17 @@ public class SecurityConfig {
         http
                 .csrf(csrf -> csrf.disable())
                 .authorizeHttpRequests(auth -> auth
+                        // ===================================================================
+                        // 【权限修复】移除过于宽泛的 /api/schemas/** 规则
+                        // ===================================================================
+                        // .requestMatchers(HttpMethod.GET, "/api/schemas/**").permitAll() // <- 已移除
+
+                        // 【核心修改】公开C端渲染端所需的API
+                        // 注意: 获取页面结构的API已移至 PublicController, 由 /api/public/** 规则覆盖
+                        .requestMatchers(HttpMethod.GET, "/api/products/**").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/articles/**").permitAll()
+                        // ===================================================================
+
                         // 公开访问的端点
                         .requestMatchers("/api/auth/**", "/h2-console/**",  "/camunda/**", "/api/public/**").permitAll()
                         // 允许对文件进行公开的GET请求（如图标、背景图），而其他操作（如POST上传）仍需认证
